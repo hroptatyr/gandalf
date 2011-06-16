@@ -52,13 +52,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include "gandalf.h"
+#include "nifty.h"
 #include "gand_msg-parser.h"
 
 #define GCSZ_DEBUG(args...)
 
 #define RETURN_TOKEN(_x)			\
 	do {					\
-		GCSZ_DEBUG(#_x "\n");		\
+		GAND_DEBUG(#_x "\n");		\
 		return _x;			\
 	} while (0)
 
@@ -82,6 +83,9 @@ ws		[ \t\f\n\r]+
 date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-2]{2,2}
 range		-
 
+get_ser		get_ser(ies)?
+get_dat		get_date?
+
 %%
 
 {range} {
@@ -96,11 +100,11 @@ range		-
 	RETURN_TOKEN(TOK_INUM);
 }
 
-"get_ser(ies)?" {
+{get_ser} {
 	RETURN_TOKEN(TOK_GET_SER);
 }
 
-"get_date?" {
+{get_dat} {
 	RETURN_TOKEN(TOK_GET_DAT);
 }
 
@@ -111,6 +115,7 @@ range		-
 
 <*>. {
 	/* ignore? */
+	fprintf(stderr, "%02x ", *yytext);
 	RETURN_TOKEN(TOK_BOLLOCKS);
 }
 
@@ -127,6 +132,7 @@ __parse(gand_msg_t msg, const char *s, size_t l)
 	buf = yy_scan_string(s, scanner);
 	/* parse him */
 	res = yyparse(scanner, msg);
+	yy_delete_buffer(buf, scanner);
         yylex_destroy(scanner);
 	return (res == 0) - 1;
 }

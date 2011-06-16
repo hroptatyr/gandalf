@@ -43,9 +43,11 @@ TOK_GET_DAT
 cmd:
 cmd_get_ser {
 	gand_set_msg_type(msg, GAND_MSG_GET_SERIES);
+	YYACCEPT;
 } |
 cmd_get_dat {
 	gand_set_msg_type(msg, GAND_MSG_GET_DATE);
+	YYACCEPT;
 };
 
 cmd_get_ser:
