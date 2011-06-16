@@ -19,6 +19,7 @@ aouhdr_HEADERS += gandalf.h
 noinst_HEADERS += gandalf-private.h
 noinst_HEADERS += epoll-helpers.h
 noinst_HEADERS += ud-sock.h
+noinst_HEADERS += nifty.h
 libgandalf_la_SOURCES =
 EXTRA_libgandalf_la_SOURCES =
 EXTRA_libgandalf_la_SOURCES += $(BUILT_SOURCES)

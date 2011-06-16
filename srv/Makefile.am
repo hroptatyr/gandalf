@@ -26,7 +26,6 @@ dso_gandalf_la_SOURCES += dso-gandalf.c
 EXTRA_dso_gandalf_la_SOURCES += con6ity.c con6ity.h
 EXTRA_dso_gandalf_la_SOURCES += be-sql.c be-sql.h
 dso_gandalf_la_CPPFLAGS += -DHARD_INCLUDE_con6ity
-noinst_HEADERS += nifty.h
 ## database goodness
 if USE_MYSQL
 dso_gandalf_la_LDFLAGS += $(MYSQL_LDFLAGS)
