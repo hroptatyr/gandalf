@@ -16,6 +16,8 @@ if BUILD_SERVER
 mod_LTLIBRARIES += dso-gandalf.la
 dso_gandalf_la_SOURCES = dso-gandalf.c
 dso_gandalf_la_SOURCES += gand_msg.c
+dso_gandalf_la_SOURCES += gand_msg-scanner.l
+dso_gandalf_la_SOURCES += gand_msg-parser.y
 EXTRA_dso_gandalf_la_SOURCES =
 dso_gandalf_la_LDFLAGS = -module
 dso_gandalf_la_LDFLAGS += $(unserding_LDFLAGS) $(LIBXML2_LIBS)
@@ -24,6 +26,8 @@ dso_gandalf_la_CPPFLAGS += -I$(top_srcdir)/lib
 dso_gandalf_la_CPPFLAGS += $(LIBXML2_CFLAGS)
 dso_gandalf_la_SOURCES += dso-gandalf.c
 EXTRA_dso_gandalf_la_SOURCES += con6ity.c con6ity.h
+BUILT_SOURCES += gand_msg-parser.c gand_msg-parser.h
+BUILT_SOURCES += gand_msg-scanner.c
 dso_gandalf_la_CPPFLAGS += -DHARD_INCLUDE_con6ity
 endif ## BUILD_SERVER
 

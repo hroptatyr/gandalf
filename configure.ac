@@ -32,6 +32,8 @@ SXE_INIT_MSG_LEVEL
 ## the build chain
 AC_PROG_CC(["icc -static-intel" icc gcc cc])
 AC_PROG_CC_C99
+AC_PROG_YACC
+AM_PROG_LEX
 LT_INIT
 
 AC_CHECK_HEADERS([stdbool.h])
