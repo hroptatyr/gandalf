@@ -38,8 +38,12 @@ yyerror(void *sca, gand_msg_t msg, char *s)
 %token
 TOK_BOLLOCKS
 TOK_DATE
-TOK_RANGE
 TOK_INUM
+TOK_RANGE
+TOK_AND
+TOK_ALT
+TOK_SYM
+TOK_KEY
 
 TOK_GET_SER
 TOK_GET_DAT
@@ -57,10 +61,18 @@ cmd_get_dat {
 };
 
 cmd_get_ser:
+cmd_get_ser_mand |
+cmd_get_ser_mand valflav_list;
+
+cmd_get_dat:
+cmd_get_dat_mand |
+cmd_get_dat_mand valflav_list;
+
+cmd_get_ser_mand:
 TOK_GET_SER rolf_obj |
 TOK_GET_SER rolf_obj date_range_list;
 
-cmd_get_dat:
+cmd_get_dat_mand:
 TOK_GET_DAT date |
 TOK_GET_DAT date rolf_obj_list;
 
@@ -72,6 +84,10 @@ rolf_obj:
 TOK_INUM {
 	resize_rolf_objs(msg);
 	msg->rolf_objs[msg->nrolf_objs++].rolf_id = $<ival>1;
+} |
+TOK_SYM {
+	resize_rolf_objs(msg);
+	msg->rolf_objs[msg->nrolf_objs++].rolf_sym = strdup($<sval>1);
 };
 
 date_range_list:
@@ -94,6 +110,21 @@ date TOK_RANGE date {
 
 date:
 TOK_DATE;
+
+valflav_list:
+valflav |
+valflav_list TOK_AND valflav;
+
+valflav:
+TOK_KEY {
+	resize_valflavs(msg);
+	msg->valflavs[msg->nvalflavs++].this = strdup($<sval>1);
+} |
+valflav TOK_ALT TOK_KEY {
+	struct valflav_s *vf = msg->valflavs + msg->nvalflavs - 1;
+	resize_alts(vf);
+	vf->alts[vf->nalts++] = strdup($<sval>3);
+};
 
 %%
 

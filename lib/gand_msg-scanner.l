@@ -82,6 +82,10 @@ extern int yyparse(void *scanner, gand_msg_t msg);
 ws		[ \t\f\n\r]+
 date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-2]{2,2}
 range		-
+and		\+
+alt		"|"|"/"
+sym		[^ \t\f\n\r]+@[[:alnum:]]*
+key		[a-z_]+
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
@@ -110,6 +114,24 @@ get_dat		get_date?
 	RETURN_TOKEN(TOK_GET_DAT);
 }
 
+{and} {
+	RETURN_TOKEN(TOK_AND);
+}
+
+{alt} {
+	RETURN_TOKEN(TOK_ALT);
+}
+
+{sym} {
+	yylval->sval = yytext;
+	RETURN_TOKEN(TOK_SYM);
+}
+
+{key} {
+	yylval->sval = yytext;
+	RETURN_TOKEN(TOK_KEY);
+}
+
  /* more ignored shit, whitespace et al */
 <*>{ws} {
 	/* ignore */
@@ -118,7 +140,6 @@ get_dat		get_date?
 <*>. {
 	/* ignore? */
 	fprintf(stderr, "%02x ", *yytext);
-	RETURN_TOKEN(TOK_BOLLOCKS);
 }
 
 %%

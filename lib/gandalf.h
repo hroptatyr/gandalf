@@ -75,6 +75,12 @@ struct date_rng_s {
 	idate_t end;
 };
 
+struct valflav_s {
+	char *this;
+	size_t nalts;
+	char **alts;
+};
+
 struct gand_msg_s {
 	struct gand_msg_hdr_s hdr;
 
@@ -83,10 +89,14 @@ struct gand_msg_s {
 
 	size_t ndate_rngs;
 	struct date_rng_s *date_rngs;
+
+	size_t nvalflavs;
+	struct valflav_s *valflavs;
 };
 
 #define GAND_MSG_ROLF_OBJS_INC	(16)
 #define GAND_MSG_DATE_RNGS_INC	(16)
+#define GAND_MSG_VALFLAVS_INC	(16)
 
 
 /* some useful functions */

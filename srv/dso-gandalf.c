@@ -83,8 +83,8 @@ interpret_msg(char **buf, gand_msg_t msg)
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SERIES:
-		GAND_DEBUG(MOD_PRE ": get_series msg %zu dates\n",
-			   msg->ndate_rngs);
+		GAND_DEBUG(MOD_PRE ": get_series msg %zu dates  %zu vfs\n",
+			   msg->ndate_rngs, msg->nvalflavs);
 		break;
 
 	case GAND_MSG_GET_DATE:

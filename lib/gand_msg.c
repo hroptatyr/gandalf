@@ -12,6 +12,7 @@ gand_free_msg(gand_msg_t msg)
 {
 	unsize_rolf_objs(msg);
 	unsize_date_rngs(msg);
+	unsize_valflavs(msg);
 	free(msg);
 	return;
 }

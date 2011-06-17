@@ -9,7 +9,7 @@ resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {
 	if (cnt == 0) {
 		size_t new = inc * blksz;
-		*ptr = malloc(new);
+		*ptr = calloc(inc, blksz);
 
 	} else if (cnt % inc == 0) {
 		/* resize */
@@ -123,6 +123,46 @@ unsize_date_rngs(gand_msg_t msg)
 		msg->ndate_rngs,
 		sizeof(*msg->date_rngs),
 		GAND_MSG_DATE_RNGS_INC);
+	return;
+}
+
+static inline void
+resize_valflavs(gand_msg_t msg)
+{
+	resize_mall(
+		(void**)&msg->valflavs,
+		msg->nvalflavs,
+		sizeof(*msg->valflavs),
+		GAND_MSG_VALFLAVS_INC);
+	return;
+}
+
+static inline void
+unsize_valflavs(gand_msg_t msg)
+{
+	for (size_t i = 0; i < msg->nvalflavs; i++) {
+		unsize_mall(
+			(void**)&msg->valflavs[i].alts,
+			msg->valflavs[i].nalts,
+			sizeof(*msg->valflavs[i].alts),
+			GAND_MSG_VALFLAVS_INC);
+	}
+	unsize_mall(
+		(void**)&msg->valflavs,
+		msg->nvalflavs,
+		sizeof(*msg->valflavs),
+		GAND_MSG_VALFLAVS_INC);
+	return;
+}
+
+static inline void
+resize_alts(struct valflav_s *vf)
+{
+	resize_mall(
+		(void**)&vf->alts,
+		vf->nalts,
+		sizeof(*vf->alts),
+		GAND_MSG_VALFLAVS_INC);
 	return;
 }
 
