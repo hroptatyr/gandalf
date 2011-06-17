@@ -39,6 +39,7 @@
 #define INCLUDED_gandalf_h_
 
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 #if defined __cplusplus
@@ -47,7 +48,9 @@ extern "C" {
 
 typedef void *gand_ctx_t;
 typedef struct __gand_s *gand_doc_t;
-typedef union gand_msg_u *gand_msg_t;
+typedef struct gand_msg_s *gand_msg_t;
+
+typedef uint32_t idate_t;
 
 /* message types */
 typedef enum {
@@ -60,12 +63,30 @@ typedef enum {
 struct gand_msg_hdr_s {
 	/* this is generally msg_type * 2 */
 	unsigned int mt;
-	void *p;
 };
 
-union gand_msg_u {
-	struct gand_msg_hdr_s hdr;
+struct rolf_obj_s {
+	uint32_t rolf_id;
+	char *rolf_sym;
 };
+
+struct date_rng_s {
+	idate_t beg;
+	idate_t end;
+};
+
+struct gand_msg_s {
+	struct gand_msg_hdr_s hdr;
+
+	size_t nrolf_objs;
+	struct rolf_obj_s *rolf_objs;
+
+	size_t ndate_rngs;
+	struct date_rng_s *date_rngs;
+};
+
+#define GAND_MSG_ROLF_OBJS_INC	(16)
+#define GAND_MSG_DATE_RNGS_INC	(16)
 
 
 /* some useful functions */

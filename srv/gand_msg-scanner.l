@@ -93,10 +93,12 @@ get_dat		get_date?
 }
 
 {date} {
+	yylval->sval = yytext;
 	RETURN_TOKEN(TOK_DATE);
 }
 
 [1-9][0-9]* {
+	yylval->ival = strtol(yytext, NULL, 10);
 	RETURN_TOKEN(TOK_INUM);
 }
 

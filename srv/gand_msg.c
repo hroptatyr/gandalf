@@ -1,35 +1,17 @@
 #include <string.h>
 #include "gandalf.h"
 #include "nifty.h"
+#include "gand_msg-parser.h"
+#include "gand_msg-private.h"
 
 #define MSG_PRE		"gandmsg"
-
-extern int __parse(gand_msg_t msg, const char *s, size_t l);
-
-
-void
-gand_handle_msg(gand_msg_t msg)
-{
-	switch (gand_get_msg_type(msg)) {
-	case GAND_MSG_GET_SERIES:
-		GAND_DEBUG(MSG_PRE ": get_series msg\n");
-		break;
-
-	case GAND_MSG_GET_DATE:
-		GAND_DEBUG(MSG_PRE ": get_date msg\n");
-		break;
-
-	default:
-		GAND_DEBUG(MSG_PRE ": unknown message %u\n", msg->hdr.mt);
-		break;
-	}
-	return;
-}
 
 
 void
 gand_free_msg(gand_msg_t msg)
 {
+	unsize_rolf_objs(msg);
+	unsize_date_rngs(msg);
 	free(msg);
 	return;
 }
