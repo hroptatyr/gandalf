@@ -80,7 +80,7 @@ extern int yyparse(void *scanner, gand_msg_t msg);
 %}
 
 ws		[ \t\f\n\r]+
-date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-2]{2,2}
+date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-9]{2,2}
 range		-
 and		\+
 alt		"|"|"/"
