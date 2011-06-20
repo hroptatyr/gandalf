@@ -109,7 +109,7 @@ extern void gand_free_msg(gand_msg_t);
 /**
  * Parse BSZ bytes in BUF and, by side effect, obtain a context.
  * That context can be reused in subsequent calls to
- * `umpf_parse_blob()' to parse fragments of XML documents in
+ * `gand_parse_blob()' to parse fragments of XML documents in
  * several goes, use a NULL pointer upon the first go.
  * If CTX becomes NULL the document is either finished or
  * errors have occurred, the return value will be the document
@@ -118,7 +118,7 @@ extern gand_msg_t
 gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz);
 
 /**
- * Like `umpf_parse_blob()' but re-entrant (and thus slower). */
+ * Like `gand_parse_blob()' but re-entrant (and thus slower). */
 extern gand_msg_t
 gand_parse_blob_r(gand_ctx_t *ctx, const char *buf, size_t bsz);
 

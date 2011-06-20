@@ -329,9 +329,12 @@ handle_data(gand_conn_t ctx, char *msg, size_t msglen)
 			GAND_DEBUG(
 				MOD_PRE ": installing buf wr'er %p %zu\n",
 				buf, len);
+			/* use the write-soon service */
 			wr = write_soon(ctx, buf, len, wr_fin_cb);
 			put_fd_data(wr, buf);
 			set_conn_flag_munmap(wr);
+			put_fd_data(ctx, wr);
+			return 0;
 		}
 		/* kick original context's data */
 		put_fd_data(ctx, NULL);

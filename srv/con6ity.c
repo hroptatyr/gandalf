@@ -23,6 +23,8 @@
 
 typedef	enum {
 	WBUF_FL_NIL = 0,
+	/* autoset when free()'d or munmap()ped */
+	WBUF_FL_FINISHED = 1,
 	/* set when buffer should be freed after sending */
 	WBUF_FL_FREE = 2,
 	/* set when buffer should be munmapped after sending */
@@ -41,6 +43,7 @@ struct __wbuf_s {
 	size_t nwr;
 	unsigned int flags;
 	int(*notify_cb)(gand_conn_t);
+	void *neigh;
 };
 
 
@@ -272,13 +275,19 @@ clo:
 	if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
 	    WBUF_FL_MUNMAP) {
 		munmap(wb->buf, wb->len);
+		wb->flags &= ~(WBUF_FL_FREE | WBUF_FL_MUNMAP);
+		wb->flags |= (WBUF_FL_FINISHED);
 	} else if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
 		   WBUF_FL_FREE) {
 		free(wb->buf);
+		wb->flags &= ~(WBUF_FL_FREE | WBUF_FL_MUNMAP);
+		wb->flags |= (WBUF_FL_FINISHED);
 	}
 	if (wb->flags & WBUF_FL_KEEP) {
 		free(wb);
 	}
+	/* remove ourselves from our neighbour's slot */
+	put_fd_data(wb->neigh, NULL);
 	return;
 }
 
@@ -287,16 +296,27 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 	char buf[4096];
 	ssize_t nrd;
+	void *ctx;
 
 	if ((nrd = read(w->fd, buf, sizeof(buf))) <= 0) {
 		goto clo;
 	}
 	GAND_DEBUG(C10Y_PRE ": new data in sock %d\n", w->fd);
+	if (LIKELY(nrd < sizeof(buf))) {
+		/* seeing as we get around to it */
+		buf[nrd] = '\0';
+	}
 	if (handle_data(w, buf, nrd) < 0) {
 		goto clo;
 	}
 	return;
 clo:
+	if ((ctx = get_fd_data(w)) != NULL) {
+		struct __wbuf_s *wb = ctx;
+		GAND_DEBUG(C10Y_PRE ": unfinished business on %p\n", ctx);
+		;
+		return;
+	}
 	GAND_DEBUG(C10Y_PRE ": %zd data, closing socket %d\n", nrd, w->fd);
 	handle_close(w);
 	clo_wio(EV_A_ w);
@@ -389,7 +409,8 @@ write_soon(gand_conn_t conn, const char *buf, size_t len, int(*cb)(gand_conn_t))
 	wb->nwr = 0UL;
 	wb->flags = WBUF_FL_NIL;
 	wb->notify_cb = cb;
-	
+	wb->neigh = conn;
+
 	/* finally we pretend interest in this socket */
         ev_io_init(wb->io, writ_cb, ((FD_MAP_TYPE)conn)->fd, EV_WRITE);
         ev_io_start(gloop, wb->io);
