@@ -42,6 +42,10 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <unserding/unserding-ctx.h>
 #include <unserding/unserding-cfg.h>
@@ -66,6 +70,7 @@
 #define MOD_PRE		"mod/gandalf"
 
 static char *trolfdir;
+static size_t ntrolfdir;
 
 
 /* connexion<->proto glue */
@@ -77,15 +82,210 @@ wr_fin_cb(gand_conn_t ctx)
 	return 0;
 }
 
+static const char*
+make_lateglu_name(uint32_t rolf_id)
+{
+	static const char glud[] = "show_lateglu/";
+	static char f[PATH_MAX];
+	size_t idx;
+
+	if (UNLIKELY(trolfdir == NULL)) {
+		return NULL;
+	}
+
+	/* construct the path */
+	memcpy(f, trolfdir, (idx = ntrolfdir));
+	if (f[idx - 1] != '/') {
+		f[idx++] = '/';
+	}
+	memcpy(f + idx, glud, sizeof(glud) - 1);
+	idx += sizeof(glud) - 1;
+	snprintf(f + idx, PATH_MAX - idx, "%08u", rolf_id);
+	return f;
+}
+
+static void
+free_lateglu_name(const char *name)
+{
+	/* just for later when we're reentrant */
+	return;
+}
+
+static size_t
+mmap_whole_file(char **tgt, int *fd, const char *f)
+{
+	struct stat st[1];
+
+	/* init */
+	*fd = -1;
+	*tgt = NULL;
+
+	if (UNLIKELY(stat(f, st) < 0)) {
+		return 0UL;
+	} else if (UNLIKELY((*fd = open(f, O_RDONLY)) < 0)) {
+		return 0UL;
+	}
+
+	/* mmap the file */
+	*tgt = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, *fd, 0);
+	return st->st_size;
+}
+
+static void
+munmap_all(char *buf, size_t bsz, int fd)
+{
+	if (buf != NULL && bsz > 0UL) {
+		munmap(buf, bsz);
+	}
+	close(fd);
+	return;
+}
+
+static bool
+match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
+{
+	const char *dt;
+	idate_t idt;
+
+	dt = rawmemchr(ln, '\t');
+	dt = rawmemchr(dt + 1, '\t');
+	dt = rawmemchr(dt + 1, '\t');
+
+	idt = __to_idate(dt + 1);
+	if (idt >= dr->beg && idt <= dr->end) {
+		return true;
+	}
+	return false;
+}
+
+static bool
+match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
+{
+	const char *a;
+	const char *eoa;
+
+	a = rawmemchr(ln, '\t');
+	a = rawmemchr(a + 1, '\t');
+	a = rawmemchr(a + 1, '\t');
+	a = rawmemchr(a + 1, '\t');
+	a = rawmemchr(a + 1, '\t');
+	eoa = rawmemchr(++a, '\t');
+
+	if (strncmp(vf->this, a, eoa - a) == 0) {
+		return true;
+	}
+	for (size_t i = 0; i < vf->nalts; i++) {
+		if (strncmp(vf->alts[i], a, eoa - a) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
+{
+	bool res;
+
+	res = msg->ndate_rngs == 0;
+	for (size_t i = 0; i < msg->ndate_rngs; i++) {
+		if (match_date1_p(ln, lsz, msg->date_rngs + i)) {
+			res = true;
+			break;
+		}
+	}
+	/* check */
+	if (!res) {
+		return false;
+	}
+
+	res = msg->nvalflavs == 0;
+	for (size_t i = 0; i < msg->nvalflavs; i++) {
+		if (match_valflav1_p(ln, lsz, msg->valflavs + i)) {
+			res = true;
+			break;
+		}
+	}
+	if (!res) {
+		return false;
+	}
+	return true;
+}
+
+#define PROT_MEM		(PROT_READ | PROT_WRITE)
+#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
+#define BUF_INC			(4096)
+
+static void __attribute__((noinline))
+bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
+{
+	size_t mmbsz = (*bsz & ~(BUF_INC - 1)) + BUF_INC;
+
+	/* check if we need to resize */
+	if (*bsz == 0) {
+		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
+		*buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
+	} else if (*bsz + lsz > mmbsz) {
+		size_t new = ((*bsz + lsz + 1) & ~(BUF_INC - 1)) + BUF_INC;
+		*buf = mremap(*buf, mmbsz, new, MREMAP_MAYMOVE);
+	}
+
+	memcpy(*buf + *bsz, lin, lsz);
+	(*buf)[*bsz += lsz] = '\n';
+	(*bsz)++;
+	return;
+}
+
+static size_t
+get_ser(char **buf, gand_msg_t msg)
+{
+	const char *f;
+	char *fb;
+	size_t fsz;
+	int fd;
+	size_t bsz = 0;
+
+	/* init the bollocks */
+	*buf = NULL;
+	bsz = 0;
+
+	/* general checks and get us the lateglu name */
+	if (UNLIKELY(msg->nrolf_objs == 0)) {
+		return 0UL;
+	} else if ((f = make_lateglu_name(msg->rolf_objs[0].rolf_id)) == NULL) {
+		return 0UL;
+	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
+		goto out;
+	}
+
+	for (size_t idx = 0; idx < fsz; ) {
+		const char *lin = fb + idx;
+		char *eol = rawmemchr(lin, '\n');
+		size_t lsz = eol - lin;
+
+		if (match_msg_p(lin, lsz, msg)) {
+			bang_line(buf, &bsz, lin, lsz);
+		}
+		idx += lsz + 1;
+	}
+
+	/* free the resources */
+	munmap_all(fb, fsz, fd);
+out:
+	free_lateglu_name(f);
+	return bsz;
+}
+
 static size_t
 interpret_msg(char **buf, gand_msg_t msg)
 {
-	size_t len;
+	size_t len = 0;
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SERIES:
 		GAND_DEBUG(MOD_PRE ": get_series msg %zu dates  %zu vfs\n",
 			   msg->ndate_rngs, msg->nvalflavs);
+		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_DATE:
@@ -95,7 +295,6 @@ interpret_msg(char **buf, gand_msg_t msg)
 
 	default:
 		GAND_DEBUG(MOD_PRE ": unknown message %u\n", msg->hdr.mt);
-		len = 0;
 		break;
 	}
 	/* free 'im 'ere */
@@ -127,7 +326,9 @@ handle_data(gand_conn_t ctx, char *msg, size_t msglen)
 		if ((len = interpret_msg(&buf, umsg))) {
 			gand_conn_t wr;
 
-			GAND_DEBUG(MOD_PRE ": installing buf wr'er %p\n", buf);
+			GAND_DEBUG(
+				MOD_PRE ": installing buf wr'er %p %zu\n",
+				buf, len);
 			wr = write_soon(ctx, buf, len, wr_fin_cb);
 			put_fd_data(wr, buf);
 			set_conn_flag_munmap(wr);
@@ -206,18 +407,22 @@ gand_init_net_sock(ud_ctx_t ctx, void *settings)
 	return res;
 }
 
-static char*
-gand_get_trolfdir(ud_ctx_t ctx, void *settings)
+static size_t
+gand_get_trolfdir(char **tgt, ud_ctx_t ctx, void *settings)
 {
-	volatile int res = -1;
-	size_t tsz;
-	const char *tgt;
+	size_t rsz;
+	const char *res;
 
-	if ((tsz = udcfg_tbl_lookup_s(&tgt, ctx, settings, "trolfdir"))) {
-		/* set up the IO watcher and timer */
-		return strndup(tgt, tsz);
+	*tgt = NULL;
+	if ((rsz = udcfg_tbl_lookup_s(&res, ctx, settings, "trolfdir"))) {
+		struct stat st[1];
+
+		if (stat(res, st) == 0) {
+			/* set up the IO watcher and timer */
+			*tgt = strndup(res, rsz);
+		}
 	}
-	return NULL;
+	return rsz;
 }
 
 
@@ -245,7 +450,7 @@ init(void *clo)
 	gand_sock_uds = gand_init_uds_sock(&gand_sock_path, ctx, settings);
 	/* obtain port number for our network socket */
 	gand_sock_net = gand_init_net_sock(ctx, settings);
-	trolfdir = gand_get_trolfdir(ctx, settings);
+	ntrolfdir = gand_get_trolfdir(&trolfdir, ctx, settings);
 
 	GAND_DEBUG(MOD_PRE ": ... loaded (%s)\n", trolfdir);
 
