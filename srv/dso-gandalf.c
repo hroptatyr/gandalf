@@ -105,10 +105,40 @@ make_lateglu_name(uint32_t rolf_id)
 }
 
 static void
-free_lateglu_name(const char *name)
+free_lateglu_name(const char *UNUSED(name))
 {
 	/* just for later when we're reentrant */
 	return;
+}
+
+static const char*
+make_symbol_name(void)
+{
+	static const char rsym[] = "rolft_symbol";
+	static char f[PATH_MAX];
+	static bool inip = false;
+	size_t idx;
+
+	if (LIKELY(inip)) {
+	singleton:
+		return f;
+	} else if (UNLIKELY(trolfdir == NULL)) {
+		return NULL;
+	}
+
+	/* construct the path */
+	memcpy(f, trolfdir, (idx = ntrolfdir));
+	if (f[idx - 1] != '/') {
+		f[idx++] = '/';
+	}
+	memcpy(f + idx, rsym, sizeof(rsym) - 1);
+	inip = true;
+	goto singleton;
+}
+
+static void
+free_symbol_name(const char *UNUSED(sym))
+{
 }
 
 static size_t
@@ -236,6 +266,47 @@ bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 	return;
 }
 
+static uint32_t
+get_rolf_id(struct rolf_obj_s *robj)
+{
+	const char *f;
+	int fd;
+	char *fb;
+	size_t fsz;
+	uint32_t rid = 0U;
+	const char *rsym;
+	size_t rssz;
+
+	if (LIKELY(robj->rolf_id > 0)) {
+		return robj->rolf_id;
+	}
+
+	/* REPLACE THE REST OF ME WITH A PREFIX TREE */
+	/* construct the rolft_symbol file name */
+	if ((f = make_symbol_name()) == NULL) {
+		return 0U;
+	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
+		goto out;
+	}
+	/* set up */
+	rsym = robj->rolf_sym;
+	rssz = strlen(rsym);
+	for (const char *cand = fb;
+	     (cand = memmem(cand, fsz - (cand - fb), rsym, rssz)) != NULL;) {
+		if (cand == fb || cand[-1] == '\n') {
+			/* we've got a prefix match */
+			cand = rawmemchr(cand, '\t');
+			rid = strtoul(cand + 1, NULL, 10);
+			break;
+		}
+	}
+	/* free the resources */
+	munmap_all(fb, fsz, fd);
+out:
+	free_symbol_name(f);
+	return rid;
+}
+
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
@@ -244,6 +315,7 @@ get_ser(char **buf, gand_msg_t msg)
 	size_t fsz;
 	int fd;
 	size_t bsz = 0;
+	uint32_t rid;
 
 	/* init the bollocks */
 	*buf = NULL;
@@ -252,7 +324,9 @@ get_ser(char **buf, gand_msg_t msg)
 	/* general checks and get us the lateglu name */
 	if (UNLIKELY(msg->nrolf_objs == 0)) {
 		return 0UL;
-	} else if ((f = make_lateglu_name(msg->rolf_objs[0].rolf_id)) == NULL) {
+	} else if ((rid = get_rolf_id(msg->rolf_objs)) == 0) {
+		return 0UL;
+	} else if ((f = make_lateglu_name(rid)) == NULL) {
 		return 0UL;
 	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
 		goto out;
