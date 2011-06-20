@@ -88,6 +88,7 @@ alt		"|"|"/"
 sym		[^ \t\f\n\r]+@[[:alnum:]]*
 key		[a-z_]+
 now		now
+then		then
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
@@ -99,7 +100,7 @@ get_dat		get_date?
 }
 
 {date} {
-	yylval->sval = yytext;
+	yylval->ival = __to_idate(yytext);
 	RETURN_TOKEN(TOK_DATE);
 }
 
@@ -117,7 +118,13 @@ get_dat		get_date?
 }
 
 {now} {
+	yylval->ival = 99991232;
 	RETURN_TOKEN(TOK_NOW);
+}
+
+{then} {
+	yylval->ival = 0;
+	RETURN_TOKEN(TOK_THEN);
 }
 
 {and} {

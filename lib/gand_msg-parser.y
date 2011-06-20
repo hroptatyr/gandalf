@@ -45,6 +45,7 @@ TOK_ALT
 TOK_SYM
 TOK_KEY
 TOK_NOW
+TOK_THEN
 
 TOK_GET_SER
 TOK_GET_DAT
@@ -98,26 +99,17 @@ date_range_list date_range;
 date_range:
 date {
 	size_t idx = msg->ndate_rngs;
-	idate_t idt = __to_idate($<sval>1);
+	idate_t idt = $<ival>1;
 
 	resize_date_rngs(msg);
 	msg->date_rngs[idx].beg = idt;
 	msg->date_rngs[idx].end = idt;
 	msg->ndate_rngs++;
 } |
-date TOK_RANGE TOK_NOW {
-	size_t idx = msg->ndate_rngs;
-	idate_t idt = __to_idate($<sval>1);
-
-	resize_date_rngs(msg);
-	msg->date_rngs[idx].beg = idt;
-	msg->date_rngs[idx].end = 99999999;
-	msg->ndate_rngs++;
-} |
 date TOK_RANGE date {
 	size_t idx = msg->ndate_rngs;
-	idate_t idt1 = __to_idate($<sval>1);
-	idate_t idt2 = __to_idate($<sval>3);
+	idate_t idt1 = $<ival>1;
+	idate_t idt2 = $<ival>3;
 
 	resize_date_rngs(msg);
 	if (idt1 <= idt2) {
@@ -131,7 +123,9 @@ date TOK_RANGE date {
 };
 
 date:
-TOK_DATE;
+TOK_DATE |
+TOK_NOW |
+TOK_THEN;
 
 valflav_list:
 valflav |
