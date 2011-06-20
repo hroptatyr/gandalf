@@ -8,7 +8,6 @@ static inline void
 resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {
 	if (cnt == 0) {
-		size_t new = inc * blksz;
 		*ptr = calloc(inc, blksz);
 
 	} else if (cnt % inc == 0) {
@@ -22,8 +21,6 @@ resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 static inline void
 unsize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {
-	size_t sz;
-
 	if (*ptr == NULL || cnt == 0) {
 		return;
 	}
@@ -68,7 +65,7 @@ unsize_mmap(void **ptr, size_t cnt, size_t blksz, size_t inc)
 	return;
 }
 
-static idate_t
+static inline idate_t
 __to_idate(const char *dstr)
 {
 	char *p;

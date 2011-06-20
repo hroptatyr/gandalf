@@ -65,6 +65,7 @@
 
 /* turn off tedious warnings */
 #if defined __INTEL_COMPILER
+# pragma warning (disable:177)
 # pragma warning (disable:593)
 # pragma warning (disable:869)
 # pragma warning (disable:1419)
