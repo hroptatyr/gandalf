@@ -216,7 +216,7 @@ match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
 #define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
 #define BUF_INC			(4096)
 
-static void __attribute__((noinline))
+static void
 bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 {
 	size_t mmbsz = (*bsz & ~(BUF_INC - 1)) + BUF_INC;
