@@ -9,6 +9,7 @@ config.guess
 config.sub
 install-sh
 missing
+ylwrap
 lib/config.h.in
 *~
 =build*

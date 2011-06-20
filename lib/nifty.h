@@ -80,7 +80,7 @@
 #if defined DEBUG_FLAG
 # include <stdio.h>
 # define GAND_DEBUG(args...)			\
-	fprintf(logout, "[umpf] " args)
+	fprintf(logout, "[gand] " args)
 # define GAND_DBGCONT(args...)			\
 	fprintf(logout, args)
 #else  /* !DEBUG_FLAG */

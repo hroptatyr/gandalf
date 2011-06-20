@@ -39,6 +39,7 @@
 #define INCLUDED_con6ity_h_
 
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #if !defined DECLF
 # define DECLF		extern
@@ -63,16 +64,23 @@ DECLF int conn_listener_net(uint16_t port);
 DECLF int conn_listener_uds(const char *sock_path);
 DECLF void init_conn_watchers(void *loop, int s);
 DECLF void deinit_conn_watchers(void *loop);
+DECLF void init_stat_watchers(void *loop, const char *file);
+DECLF void deinit_stat_watchers(void *loop);
 
 
 /* stuff the user should/must overwrite, to be replaced with callbacks */
 DECLF_W int handle_data(gand_conn_t, char *msg, size_t msglen);
 DECLF_W void handle_close(gand_conn_t);
+DECLF_W int handle_inot(gand_conn_t, const char *file, const struct stat *st);
 
 /* helper functions for as long as there is no edge-triggered writer
  * CB is called when the buffer has been written completely or there
  * was an error. */
 DECLF_W gand_conn_t
 write_soon(gand_conn_t, const char *buf, size_t len, int(*cb)(gand_conn_t));
+
+DECLF_W void set_conn_flag_free(gand_conn_t conn);
+DECLF_W void set_conn_flag_keep(gand_conn_t conn);
+DECLF_W void set_conn_flag_munmap(gand_conn_t conn);
 
 #endif	/* INCLUDED_con6ity_h_ */

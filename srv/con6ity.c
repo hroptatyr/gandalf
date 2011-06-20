@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <sys/mman.h>
 #include <errno.h>
 /* we just need the headers hereof and hope that unserding used the same ones */
 #include <ev.h>
@@ -20,6 +21,18 @@
 
 #define C10Y_PRE	"mod/gand/con6ity"
 
+typedef	enum {
+	WBUF_FL_NIL = 0,
+	/* autoset when free()'d or munmap()ped */
+	WBUF_FL_FINISHED = 1,
+	/* set when buffer should be freed after sending */
+	WBUF_FL_FREE = 2,
+	/* set when buffer should be munmapped after sending */
+	WBUF_FL_MUNMAP = 3,
+	/* keep the struct alive, but prescind from further notifs */
+	WBUF_FL_KEEP = 4,
+} conn_flag_t;
+
 struct __wbuf_s {
 	ev_io io[1];
 	union {
@@ -28,14 +41,9 @@ struct __wbuf_s {
 	};
 	size_t len;
 	size_t nwr;
-	enum {
-		WBUF_FL_NIL = 0,
-		/* set when buffer should be freed after sending */
-		WBUF_FL_FREE = 1,
-		/* keep the struct alive, but prescind from further notifs */
-		WBUF_FL_KEEP = 2,
-	} flags;
+	unsigned int flags;
 	int(*notify_cb)(gand_conn_t);
+	void *neigh;
 };
 
 
@@ -69,6 +77,8 @@ put_fd_data(gand_conn_t ctx, void *data)
 size_t nwio = 0;
 static ev_io __wio[2];
 static void *gloop = NULL;
+size_t nwst = 0;
+static ev_stat __wst[2];
 
 static void
 __shut_sock(int s)
@@ -240,6 +250,16 @@ handle_close(gand_conn_t UNUSED(c))
 }
 #endif	/* !HAVE_handle_close */
 
+#if !defined HAVE_handle_inot
+DEFUN_W int
+handle_inot(
+	gand_conn_t UNUSED(c), const char *UNUSED(file),
+	const struct stat *UNUSED(st))
+{
+	return 0;
+}
+#endif	/* !HAVE_handle_inot */
+
 static void
 writ_cb(EV_P_ ev_io *e, int UNUSED(re))
 {
@@ -264,12 +284,22 @@ clo:
 		/* call the user's idea of what has to be done now */
 		wb->notify_cb(wb);
 	}
-	if (wb->flags & WBUF_FL_FREE) {
+	if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
+	    WBUF_FL_MUNMAP) {
+		munmap(wb->buf, wb->len);
+		wb->flags &= ~(WBUF_FL_FREE | WBUF_FL_MUNMAP);
+		wb->flags |= (WBUF_FL_FINISHED);
+	} else if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
+		   WBUF_FL_FREE) {
 		free(wb->buf);
+		wb->flags &= ~(WBUF_FL_FREE | WBUF_FL_MUNMAP);
+		wb->flags |= (WBUF_FL_FINISHED);
 	}
 	if (wb->flags & WBUF_FL_KEEP) {
 		free(wb);
 	}
+	/* remove ourselves from our neighbour's slot */
+	put_fd_data(wb->neigh, NULL);
 	return;
 }
 
@@ -278,16 +308,27 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 	char buf[4096];
 	ssize_t nrd;
+	void *ctx;
 
 	if ((nrd = read(w->fd, buf, sizeof(buf))) <= 0) {
 		goto clo;
 	}
 	GAND_DEBUG(C10Y_PRE ": new data in sock %d\n", w->fd);
+	if (LIKELY(nrd < sizeof(buf))) {
+		/* seeing as we get around to it */
+		buf[nrd] = '\0';
+	}
 	if (handle_data(w, buf, nrd) < 0) {
 		goto clo;
 	}
 	return;
 clo:
+	if ((ctx = get_fd_data(w)) != NULL) {
+		struct __wbuf_s *wb = ctx;
+		GAND_DEBUG(C10Y_PRE ": unfinished business on %p\n", ctx);
+		;
+		return;
+	}
 	GAND_DEBUG(C10Y_PRE ": %zd data, closing socket %d\n", nrd, w->fd);
 	handle_close(w);
 	clo_wio(EV_A_ w);
@@ -319,6 +360,19 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 }
 
 static void
+inot_cb(EV_P_ ev_stat *w, int UNUSED(re))
+{
+	GAND_DEBUG(C10Y_PRE ": INOT something changed in %s...\n", w->path);
+	if (handle_inot(w, w->path, &w->attr) < 0) {
+		goto clo;
+	}
+	return;
+clo:
+	ev_stat_stop(EV_A_ w);
+	return;
+}
+
+static void
 clo_evsock(EV_P_ int UNUSED(type), void *w)
 {
 	ev_io *wp = w;
@@ -327,6 +381,16 @@ clo_evsock(EV_P_ int UNUSED(type), void *w)
         ev_io_stop(EV_A_ wp);
 	/* properly shut the socket */
 	__shut_sock(wp->fd);
+	return;
+}
+
+static void
+clo_evstat(EV_P_ int UNUSED(type), void *w)
+{
+	ev_stat *wp = w;
+
+        /* deinitialise the io watcher */
+        ev_stat_stop(EV_A_ wp);
 	return;
 }
 
@@ -362,9 +426,36 @@ deinit_conn_watchers(void *UNUSED(loop))
 	return;
 }
 
+DEFUN void
+init_stat_watchers(void *loop, const char *file)
+{
+	struct ev_stat *wst = __wst + nwst++;
+
+        /* initialise an io watcher, then start it */
+        ev_stat_init(wst, inot_cb, file, 0.);
+        ev_stat_start(EV_A_ wst);
+	/* last loop wins */
+	gloop = loop;
+	return;
+}
+
+DEFUN void
+deinit_stat_watchers(void *UNUSED(loop))
+{
+#if defined EV_WALK_ENABLE && EV_WALK_ENABLE
+	/* properly close all sockets */
+	ev_walk(EV_A_ EV_STAT, clo_evstat);
+#else  /* !EV_WALK_ENABLE */
+	for (size_t i = 0; i < nwst; i++) {
+		clo_evstat(EV_A_ EV_STAT, __wst + i);
+	}
+#endif	/* EV_WALK_ENABLE */
+	return;
+}
+
 
 /* helpers for careless writing */
-DECLF_W gand_conn_t
+DEFUN_W gand_conn_t
 write_soon(gand_conn_t conn, const char *buf, size_t len, int(*cb)(gand_conn_t))
 {
 	struct __wbuf_s *wb;
@@ -380,11 +471,36 @@ write_soon(gand_conn_t conn, const char *buf, size_t len, int(*cb)(gand_conn_t))
 	wb->nwr = 0UL;
 	wb->flags = WBUF_FL_NIL;
 	wb->notify_cb = cb;
-	
+	wb->neigh = conn;
+
 	/* finally we pretend interest in this socket */
         ev_io_init(wb->io, writ_cb, ((FD_MAP_TYPE)conn)->fd, EV_WRITE);
         ev_io_start(gloop, wb->io);
 	return wb;
+}
+
+DEFUN_W void
+set_conn_flag_free(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_FREE;
+	return;
+}
+
+DEFUN_W void
+set_conn_flag_keep(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_KEEP;
+	return;
+}
+
+DEFUN_W void
+set_conn_flag_munmap(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_MUNMAP;
+	return;
 }
 
 /* con6ity.c ends here */
