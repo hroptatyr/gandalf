@@ -65,16 +65,6 @@ unsize_mmap(void **ptr, size_t cnt, size_t blksz, size_t inc)
 	return;
 }
 
-static inline idate_t
-__to_idate(const char *dstr)
-{
-	char *p;
-	uint32_t y = strtoul(dstr, &p, 10);
-	uint32_t m = strtoul(p + 1, &p, 10);
-	uint32_t d = strtoul(p + 1, &p, 10);
-	return y * 10000 + m * 100 + d;
-}
-
 
 /* parser functions */
 extern int __parse(gand_msg_t msg, const char *s, size_t l);

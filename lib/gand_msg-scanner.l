@@ -80,13 +80,14 @@
 extern int yyparse(void *scanner, gand_msg_t msg);
 %}
 
-ws		[ \t\f\n\r]+
+ws		[ \t\f\n\r\x7f]+
 date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-9]{2,2}
 range		-
 and		\+
 alt		"|"|"/"
 sym		[^ \t\f\n\r]+@[[:alnum:]]*
 key		[a-z_]+
+now		now
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
@@ -113,6 +114,10 @@ get_dat		get_date?
 
 {get_dat} {
 	RETURN_TOKEN(TOK_GET_DAT);
+}
+
+{now} {
+	RETURN_TOKEN(TOK_NOW);
 }
 
 {and} {

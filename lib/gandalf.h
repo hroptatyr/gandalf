@@ -40,6 +40,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <time.h>
 
 #if defined __cplusplus
@@ -136,6 +137,17 @@ static inline gand_msg_type_t
 gand_get_msg_type(gand_msg_t msg)
 {
 	return (gand_msg_type_t)(msg->hdr.mt / 2);
+}
+
+/* convert an iso date string to an idate */
+static inline idate_t
+__to_idate(const char *dstr)
+{
+	char *p;
+	uint32_t y = strtoul(dstr, &p, 10);
+	uint32_t m = strtoul(p + 1, &p, 10);
+	uint32_t d = strtoul(p + 1, &p, 10);
+	return y * 10000 + m * 100 + d;
 }
 
 #if defined __cplusplus
