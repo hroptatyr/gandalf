@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <sys/mman.h>
 #include <errno.h>
 /* we just need the headers hereof and hope that unserding used the same ones */
 #include <ev.h>
@@ -20,6 +21,16 @@
 
 #define C10Y_PRE	"mod/gand/con6ity"
 
+typedef	enum {
+	WBUF_FL_NIL = 0,
+	/* set when buffer should be freed after sending */
+	WBUF_FL_FREE = 2,
+	/* set when buffer should be munmapped after sending */
+	WBUF_FL_MUNMAP = 3,
+	/* keep the struct alive, but prescind from further notifs */
+	WBUF_FL_KEEP = 4,
+} conn_flag_t;
+
 struct __wbuf_s {
 	ev_io io[1];
 	union {
@@ -28,13 +39,7 @@ struct __wbuf_s {
 	};
 	size_t len;
 	size_t nwr;
-	enum {
-		WBUF_FL_NIL = 0,
-		/* set when buffer should be freed after sending */
-		WBUF_FL_FREE = 1,
-		/* keep the struct alive, but prescind from further notifs */
-		WBUF_FL_KEEP = 2,
-	} flags;
+	unsigned int flags;
 	int(*notify_cb)(gand_conn_t);
 };
 
@@ -264,7 +269,11 @@ clo:
 		/* call the user's idea of what has to be done now */
 		wb->notify_cb(wb);
 	}
-	if (wb->flags & WBUF_FL_FREE) {
+	if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
+	    WBUF_FL_MUNMAP) {
+		munmap(wb->buf, wb->len);
+	} else if ((wb->flags & (WBUF_FL_FREE | WBUF_FL_MUNMAP)) ==
+		   WBUF_FL_FREE) {
 		free(wb->buf);
 	}
 	if (wb->flags & WBUF_FL_KEEP) {
@@ -364,7 +373,7 @@ deinit_conn_watchers(void *UNUSED(loop))
 
 
 /* helpers for careless writing */
-DECLF_W gand_conn_t
+DEFUN_W gand_conn_t
 write_soon(gand_conn_t conn, const char *buf, size_t len, int(*cb)(gand_conn_t))
 {
 	struct __wbuf_s *wb;
@@ -385,6 +394,30 @@ write_soon(gand_conn_t conn, const char *buf, size_t len, int(*cb)(gand_conn_t))
         ev_io_init(wb->io, writ_cb, ((FD_MAP_TYPE)conn)->fd, EV_WRITE);
         ev_io_start(gloop, wb->io);
 	return wb;
+}
+
+DEFUN_W void
+set_conn_flag_free(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_FREE;
+	return;
+}
+
+DEFUN_W void
+set_conn_flag_keep(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_KEEP;
+	return;
+}
+
+DEFUN_W void
+set_conn_flag_munmap(gand_conn_t conn)
+{
+	struct __wbuf_s *wb = conn;
+	wb->flags |= WBUF_FL_MUNMAP;
+	return;
 }
 
 /* con6ity.c ends here */

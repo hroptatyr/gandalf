@@ -75,4 +75,8 @@ DECLF_W void handle_close(gand_conn_t);
 DECLF_W gand_conn_t
 write_soon(gand_conn_t, const char *buf, size_t len, int(*cb)(gand_conn_t));
 
+DECLF_W void set_conn_flag_free(gand_conn_t conn);
+DECLF_W void set_conn_flag_keep(gand_conn_t conn);
+DECLF_W void set_conn_flag_munmap(gand_conn_t conn);
+
 #endif	/* INCLUDED_con6ity_h_ */

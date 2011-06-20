@@ -74,7 +74,6 @@ wr_fin_cb(gand_conn_t ctx)
 {
 	char *buf = get_fd_data(ctx);
 	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
-	free(buf);
 	return 0;
 }
 
@@ -131,6 +130,7 @@ handle_data(gand_conn_t ctx, char *msg, size_t msglen)
 			GAND_DEBUG(MOD_PRE ": installing buf wr'er %p\n", buf);
 			wr = write_soon(ctx, buf, len, wr_fin_cb);
 			put_fd_data(wr, buf);
+			set_conn_flag_munmap(wr);
 		}
 		/* kick original context's data */
 		put_fd_data(ctx, NULL);
