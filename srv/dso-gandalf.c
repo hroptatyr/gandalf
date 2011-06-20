@@ -65,6 +65,8 @@
 
 #define MOD_PRE		"mod/gandalf"
 
+static char *trolfdir;
+
 
 /* connexion<->proto glue */
 static int
@@ -204,12 +206,26 @@ gand_init_net_sock(ud_ctx_t ctx, void *settings)
 	return res;
 }
 
+static char*
+gand_get_trolfdir(ud_ctx_t ctx, void *settings)
+{
+	volatile int res = -1;
+	size_t tsz;
+	const char *tgt;
+
+	if ((tsz = udcfg_tbl_lookup_s(&tgt, ctx, settings, "trolfdir"))) {
+		/* set up the IO watcher and timer */
+		return strndup(tgt, tsz);
+	}
+	return NULL;
+}
+
 
 /* unserding bindings */
 static volatile int gand_sock_net = -1;
 static volatile int gand_sock_uds = -1;
 /* path to unix domain socket */
-const char *gand_sock_path;
+static const char *gand_sock_path;
 
 void
 init(void *clo)
@@ -229,8 +245,9 @@ init(void *clo)
 	gand_sock_uds = gand_init_uds_sock(&gand_sock_path, ctx, settings);
 	/* obtain port number for our network socket */
 	gand_sock_net = gand_init_net_sock(ctx, settings);
+	trolfdir = gand_get_trolfdir(ctx, settings);
 
-	GAND_DEBUG(MOD_PRE ": ... loaded\n");
+	GAND_DEBUG(MOD_PRE ": ... loaded (%s)\n", trolfdir);
 
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
@@ -253,6 +270,9 @@ deinit(void *clo)
 	deinit_conn_watchers(ctx->mainloop);
 	gand_sock_net = -1;
 	gand_sock_uds = -1;
+	if (trolfdir) {
+		free(trolfdir);
+	}
 	/* unlink the unix domain socket */
 	if (gand_sock_path != NULL) {
 		unlink(gand_sock_path);
