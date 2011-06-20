@@ -69,8 +69,26 @@
 
 #define MOD_PRE		"mod/gandalf"
 
+/* mmap buffers */
+struct mmb_s {
+	char *buf;
+	/* real size */
+	size_t bsz;
+	/* alloc size */
+	size_t all;
+	/* file desc */
+	int fd;
+};
+
 static char *trolfdir;
 static size_t ntrolfdir;
+/* rolf symbol file */
+static struct mmb_s grsym = {
+	.buf = NULL,
+	.bsz = 0UL,
+	.all = 0UL,
+	.fd = -1,
+};
 
 
 /* connexion<->proto glue */
@@ -269,41 +287,31 @@ bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 static uint32_t
 get_rolf_id(struct rolf_obj_s *robj)
 {
-	const char *f;
-	int fd;
-	char *fb;
-	size_t fsz;
 	uint32_t rid = 0U;
 	const char *rsym;
 	size_t rssz;
+	size_t rest;
 
+	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
 	if (LIKELY(robj->rolf_id > 0)) {
 		return robj->rolf_id;
+	} else if (grsym.buf == NULL) {
+		return 0U;
 	}
 
-	/* REPLACE THE REST OF ME WITH A PREFIX TREE */
-	/* construct the rolft_symbol file name */
-	if ((f = make_symbol_name()) == NULL) {
-		return 0U;
-	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
-		goto out;
-	}
 	/* set up */
 	rsym = robj->rolf_sym;
 	rssz = strlen(rsym);
-	for (const char *cand = fb;
-	     (cand = memmem(cand, fsz - (cand - fb), rsym, rssz)) != NULL;) {
-		if (cand == fb || cand[-1] == '\n') {
+	for (const char *cand = (rest = grsym.bsz, grsym.buf);
+	     (cand = memmem(cand, rest, rsym, rssz)) != NULL;
+	     rest = grsym.bsz - (cand - grsym.buf)) {
+		if (cand == grsym.buf || cand[-1] == '\n') {
 			/* we've got a prefix match */
 			cand = rawmemchr(cand, '\t');
 			rid = strtoul(cand + 1, NULL, 10);
 			break;
 		}
 	}
-	/* free the resources */
-	munmap_all(fb, fsz, fd);
-out:
-	free_symbol_name(f);
 	return rid;
 }
 
@@ -445,6 +453,22 @@ handle_close(gand_conn_t ctx)
 }
 #define HAVE_handle_close
 
+DEFUN int
+handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
+{
+	/* off with the old guy */
+	munmap_all(grsym.buf, grsym.all, grsym.fd);
+	/* reinit */
+	GAND_DEBUG(MOD_PRE ": building sym table ...");
+	if ((grsym.bsz = mmap_whole_file(&grsym.buf, &grsym.fd, f)) == 0) {
+		GAND_DBGCONT("failed\n");
+		return -1;
+	}
+	GAND_DBGCONT("done\n");
+	return 0;
+}
+#define HAVE_handle_inot
+
 
 /* our connectivity cruft */
 #if defined HARD_INCLUDE_con6ity
@@ -452,6 +476,15 @@ handle_close(gand_conn_t ctx)
 #endif	/* HARD_INCLUDE_con6ity */
 
 
+static void
+gand_init_inot(ud_ctx_t ctx, const char *file)
+{
+	init_stat_watchers(ctx->mainloop, file);
+	/* god i'm a hacker */
+	handle_inot(NULL, file, NULL);
+	return;
+}
+
 static int
 gand_init_uds_sock(const char **sock_path, ud_ctx_t ctx, void *settings)
 {
@@ -528,6 +561,8 @@ init(void *clo)
 	/* obtain port number for our network socket */
 	gand_sock_net = gand_init_net_sock(ctx, settings);
 	ntrolfdir = gand_get_trolfdir(&trolfdir, ctx, settings);
+	/* inotify the symbol file */
+	gand_init_inot(ctx, make_symbol_name());
 
 	GAND_DEBUG(MOD_PRE ": ... loaded (%s)\n", trolfdir);
 
@@ -550,6 +585,7 @@ deinit(void *clo)
 
 	GAND_DEBUG(MOD_PRE ": unloading ...");
 	deinit_conn_watchers(ctx->mainloop);
+	deinit_stat_watchers(ctx->mainloop);
 	gand_sock_net = -1;
 	gand_sock_uds = -1;
 	if (trolfdir) {

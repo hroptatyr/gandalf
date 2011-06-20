@@ -77,6 +77,8 @@ put_fd_data(gand_conn_t ctx, void *data)
 size_t nwio = 0;
 static ev_io __wio[2];
 static void *gloop = NULL;
+size_t nwst = 0;
+static ev_stat __wst[2];
 
 static void
 __shut_sock(int s)
@@ -248,6 +250,16 @@ handle_close(gand_conn_t UNUSED(c))
 }
 #endif	/* !HAVE_handle_close */
 
+#if !defined HAVE_handle_inot
+DEFUN_W int
+handle_inot(
+	gand_conn_t UNUSED(c), const char *UNUSED(file),
+	const struct stat *UNUSED(st))
+{
+	return 0;
+}
+#endif	/* !HAVE_handle_inot */
+
 static void
 writ_cb(EV_P_ ev_io *e, int UNUSED(re))
 {
@@ -348,6 +360,19 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 }
 
 static void
+inot_cb(EV_P_ ev_stat *w, int UNUSED(re))
+{
+	GAND_DEBUG(C10Y_PRE ": INOT something changed in %s...\n", w->path);
+	if (handle_inot(w, w->path, &w->attr) < 0) {
+		goto clo;
+	}
+	return;
+clo:
+	ev_stat_stop(EV_A_ w);
+	return;
+}
+
+static void
 clo_evsock(EV_P_ int UNUSED(type), void *w)
 {
 	ev_io *wp = w;
@@ -356,6 +381,16 @@ clo_evsock(EV_P_ int UNUSED(type), void *w)
         ev_io_stop(EV_A_ wp);
 	/* properly shut the socket */
 	__shut_sock(wp->fd);
+	return;
+}
+
+static void
+clo_evstat(EV_P_ int UNUSED(type), void *w)
+{
+	ev_stat *wp = w;
+
+        /* deinitialise the io watcher */
+        ev_stat_stop(EV_A_ wp);
 	return;
 }
 
@@ -386,6 +421,33 @@ deinit_conn_watchers(void *UNUSED(loop))
 #else  /* !EV_WALK_ENABLE */
 	for (size_t i = 0; i < nwio; i++) {
 		clo_evsock(EV_A_ EV_IO, __wio + i);
+	}
+#endif	/* EV_WALK_ENABLE */
+	return;
+}
+
+DEFUN void
+init_stat_watchers(void *loop, const char *file)
+{
+	struct ev_stat *wst = __wst + nwst++;
+
+        /* initialise an io watcher, then start it */
+        ev_stat_init(wst, inot_cb, file, 0.);
+        ev_stat_start(EV_A_ wst);
+	/* last loop wins */
+	gloop = loop;
+	return;
+}
+
+DEFUN void
+deinit_stat_watchers(void *UNUSED(loop))
+{
+#if defined EV_WALK_ENABLE && EV_WALK_ENABLE
+	/* properly close all sockets */
+	ev_walk(EV_A_ EV_STAT, clo_evstat);
+#else  /* !EV_WALK_ENABLE */
+	for (size_t i = 0; i < nwst; i++) {
+		clo_evstat(EV_A_ EV_STAT, __wst + i);
 	}
 #endif	/* EV_WALK_ENABLE */
 	return;
