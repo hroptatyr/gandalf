@@ -133,6 +133,11 @@ static inline void
 unsize_valflavs(gand_msg_t msg)
 {
 	for (size_t i = 0; i < msg->nvalflavs; i++) {
+		for (size_t j = 0; j < msg->valflavs[i].nalts; j++) {
+			if (msg->valflavs[i].alts[j]) {
+				free(msg->valflavs[i].alts[j]);
+			}
+		}
 		unsize_mall(
 			(void**)&msg->valflavs[i].alts,
 			msg->valflavs[i].nalts,
