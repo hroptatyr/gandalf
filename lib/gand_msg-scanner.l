@@ -96,7 +96,13 @@ get_ser		get_ser(ies)?
 get_dat		get_date?
 get_nfo		get_i?nfo
 
+%x QUO
+
 %%
+
+\" {
+	BEGIN(QUO);
+}
 
 {range} {
 	RETURN_TOKEN(TOK_RANGE);
@@ -144,6 +150,13 @@ get_nfo		get_i?nfo
 
 {sym}|{key} {
 	yylval->sval = yytext;
+	RETURN_TOKEN(TOK_SYM);
+}
+
+<QUO>[^\"]*\" {
+	yylval->sval = yytext;
+	yylval->sval[yyleng] = '\0';
+	BEGIN(INITIAL);
 	RETURN_TOKEN(TOK_SYM);
 }
 
