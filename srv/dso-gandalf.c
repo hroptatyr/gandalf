@@ -284,6 +284,8 @@ static void
 bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 {
 	size_t mmbsz = ((*bsz - 1) & ~(BUF_INC - 1)) + BUF_INC;
+	char *s;
+	char *tmp;
 
 	/* check if we need to resize */
 	if (*bsz == 0) {
@@ -294,9 +296,23 @@ bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 		*buf = mremap(*buf, mmbsz, new, MREMAP_MAYMOVE);
 	}
 
-	memcpy(*buf + *bsz, lin, lsz);
-	(*buf)[*bsz += lsz] = '\n';
-	(*bsz)++;
+	/* copy only interesting lines */
+	s = rawmemchr(lin, '\t');
+	tmp = rawmemchr(s + 1, '\t');
+	memcpy(*buf + *bsz, s + 1, tmp - (s + 1));
+	*bsz += tmp - (s + 1);
+
+	s = rawmemchr(tmp + 1, '\t');
+	tmp = rawmemchr(s + 1, '\t');
+	memcpy(*buf + *bsz, s, tmp - s);
+	*bsz += tmp - (s + 1);
+
+	s = rawmemchr(tmp + 1, '\t');
+	memcpy(*buf + *bsz, s, lsz - (s - lin));
+	*bsz += lsz - (s - lin);
+
+	/* finalise the line */
+	(*buf)[(*bsz)++] = '\n';
 	return;
 }
 
