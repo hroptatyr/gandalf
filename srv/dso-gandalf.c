@@ -172,33 +172,35 @@ free_symbol_name(const char *UNUSED(sym))
 {
 }
 
-static size_t
-mmap_whole_file(char **tgt, int *fd, const char *f)
+static int
+mmap_whole_file(struct mmfb_s *mf, const char *f)
 {
 	struct stat st[1];
 
-	/* init */
-	*fd = -1;
-	*tgt = NULL;
-
 	if (UNLIKELY(stat(f, st) < 0)) {
-		return 0UL;
-	} else if (UNLIKELY((*fd = open(f, O_RDONLY)) < 0)) {
-		return 0UL;
+		return -1;
+	} else if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
+		return -1;
 	}
 
 	/* mmap the file */
-	*tgt = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, *fd, 0);
-	return st->st_size;
+	mf->m.buf = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, mf->fd, 0);
+	return mf->m.all = mf->m.bsz = st->st_size;
 }
 
 static void
-munmap_all(char *buf, size_t bsz, int fd)
+munmap_all(struct mmfb_s *mf)
 {
-	if (buf != NULL && bsz > 0UL) {
-		munmap(buf, bsz);
+	if (mf->m.buf != NULL && mf->m.all > 0UL) {
+		munmap(mf->m.buf, mf->m.all);
 	}
-	close(fd);
+	if (mf->fd >= 0) {
+		close(mf->fd);
+	}
+	/* reset values */
+	mf->m.buf = NULL;
+	mf->m.bsz = mf->m.all = 0UL;
+	mf->fd = -1;
 	return;
 }
 
@@ -364,12 +366,10 @@ get_rolf_id(struct rolf_obj_s *robj)
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
-	const char *f;
-	char *fb;
-	size_t fsz;
-	int fd;
-	uint32_t rid;
 	struct mmmb_s mb = {0};
+	struct mmfb_s mf = {.m = {0}, .fd = -1};
+	const char *f;
+	uint32_t rid;
 
 	/* general checks and get us the lateglu name */
 	if (UNLIKELY(msg->nrolf_objs == 0)) {
@@ -378,12 +378,12 @@ get_ser(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_lateglu_name(rid)) == NULL) {
 		return 0UL;
-	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
-	for (size_t idx = 0; idx < fsz; ) {
-		const char *lin = fb + idx;
+	for (size_t idx = 0; idx < mf.m.bsz; ) {
+		const char *lin = mf.m.buf + idx;
 		char *eol = rawmemchr(lin, '\n');
 		size_t lsz = eol - lin;
 
@@ -397,7 +397,7 @@ get_ser(char **buf, gand_msg_t msg)
 	mmmb_freeze(&mb);
 	*buf = mb.buf;
 	/* free the resources */
-	munmap_all(fb, fsz, fd);
+	munmap_all(&mf);
 out:
 	free_lateglu_name(f);
 	return mb.bsz;
@@ -502,10 +502,10 @@ DEFUN int
 handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
 {
 	/* off with the old guy */
-	munmap_all(grsym.m.buf, grsym.m.all, grsym.fd);
+	munmap_all(&grsym);
 	/* reinit */
 	GAND_DEBUG(MOD_PRE ": building sym table ...");
-	if ((grsym.m.bsz = mmap_whole_file(&grsym.m.buf, &grsym.fd, f)) == 0) {
+	if (mmap_whole_file(&grsym, f) < 0) {
 		GAND_DBGCONT("failed\n");
 		return -1;
 	}
