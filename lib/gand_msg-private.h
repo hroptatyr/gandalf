@@ -72,11 +72,6 @@ extern int __parse(gand_msg_t msg, const char *s, size_t l);
 static inline void
 resize_rolf_objs(gand_msg_t msg)
 {
-	for (size_t i = 0; i < msg->nrolf_objs; i++) {
-		if (msg->rolf_objs[i].rolf_sym) {
-			free(msg->rolf_objs[i].rolf_sym);
-		}
-	}
 	resize_mall(
 		(void**)&msg->rolf_objs,
 		msg->nrolf_objs,
@@ -88,6 +83,11 @@ resize_rolf_objs(gand_msg_t msg)
 static inline void
 unsize_rolf_objs(gand_msg_t msg)
 {
+	for (size_t i = 0; i < msg->nrolf_objs; i++) {
+		if (msg->rolf_objs[i].rolf_sym) {
+			free(msg->rolf_objs[i].rolf_sym);
+		}
+	}
 	unsize_mall(
 		(void**)&msg->rolf_objs,
 		msg->nrolf_objs,
