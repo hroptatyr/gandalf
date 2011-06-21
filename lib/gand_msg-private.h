@@ -133,9 +133,14 @@ static inline void
 unsize_valflavs(gand_msg_t msg)
 {
 	for (size_t i = 0; i < msg->nvalflavs; i++) {
+		for (size_t j = 0; j < msg->valflavs[i].nall_alts; j++) {
+			if (msg->valflavs[i].alts[j]) {
+				free(msg->valflavs[i].alts[j]);
+			}
+		}
 		unsize_mall(
 			(void**)&msg->valflavs[i].alts,
-			msg->valflavs[i].nalts,
+			msg->valflavs[i].nall_alts,
 			sizeof(*msg->valflavs[i].alts),
 			GAND_MSG_VALFLAVS_INC);
 	}
@@ -152,7 +157,7 @@ resize_alts(struct valflav_s *vf)
 {
 	resize_mall(
 		(void**)&vf->alts,
-		vf->nalts,
+		vf->nall_alts = vf->nalts,
 		sizeof(*vf->alts),
 		GAND_MSG_VALFLAVS_INC);
 	return;

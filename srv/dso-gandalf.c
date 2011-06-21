@@ -69,13 +69,17 @@
 
 #define MOD_PRE		"mod/gandalf"
 
-/* mmap buffers */
-struct mmb_s {
+/* mmap buffers, memory and file based */
+struct mmmb_s {
 	char *buf;
 	/* real size */
 	size_t bsz;
 	/* alloc size */
 	size_t all;
+};
+
+struct mmfb_s {
+	struct mmmb_s m;
 	/* file desc */
 	int fd;
 };
@@ -83,10 +87,12 @@ struct mmb_s {
 static char *trolfdir;
 static size_t ntrolfdir;
 /* rolf symbol file */
-static struct mmb_s grsym = {
-	.buf = NULL,
-	.bsz = 0UL,
-	.all = 0UL,
+static struct mmfb_s grsym = {
+	.m = {
+		.buf = NULL,
+		.bsz = 0UL,
+		.all = 0UL,
+	},
 	.fd = -1,
 };
 
@@ -98,6 +104,13 @@ wr_fin_cb(gand_conn_t ctx)
 	char *buf = get_fd_data(ctx);
 	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
 	return 0;
+}
+
+static size_t
+mmmb_freeze(struct mmmb_s *mb)
+{
+	mb->buf = mremap(mb->buf, mb->all, mb->bsz, MREMAP_MAYMOVE);
+	return mb->all = mb->bsz;
 }
 
 static const char*
@@ -159,33 +172,35 @@ free_symbol_name(const char *UNUSED(sym))
 {
 }
 
-static size_t
-mmap_whole_file(char **tgt, int *fd, const char *f)
+static int
+mmap_whole_file(struct mmfb_s *mf, const char *f)
 {
 	struct stat st[1];
 
-	/* init */
-	*fd = -1;
-	*tgt = NULL;
-
 	if (UNLIKELY(stat(f, st) < 0)) {
-		return 0UL;
-	} else if (UNLIKELY((*fd = open(f, O_RDONLY)) < 0)) {
-		return 0UL;
+		return -1;
+	} else if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
+		return -1;
 	}
 
 	/* mmap the file */
-	*tgt = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, *fd, 0);
-	return st->st_size;
+	mf->m.buf = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, mf->fd, 0);
+	return mf->m.all = mf->m.bsz = st->st_size;
 }
 
 static void
-munmap_all(char *buf, size_t bsz, int fd)
+munmap_all(struct mmfb_s *mf)
 {
-	if (buf != NULL && bsz > 0UL) {
-		munmap(buf, bsz);
+	if (mf->m.buf != NULL && mf->m.all > 0UL) {
+		munmap(mf->m.buf, mf->m.all);
 	}
-	close(fd);
+	if (mf->fd >= 0) {
+		close(mf->fd);
+	}
+	/* reset values */
+	mf->m.buf = NULL;
+	mf->m.bsz = mf->m.all = 0UL;
+	mf->fd = -1;
 	return;
 }
 
@@ -206,6 +221,18 @@ match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
 	return false;
 }
 
+static void
+cancel_alts(struct valflav_s *vf, size_t idx)
+{
+	char *tmp = vf->this;
+
+	/* swap this slot and the idx-th alternative */
+	vf->this = vf->alts[idx];
+	vf->alts[idx] = tmp;
+	vf->nalts = 0;
+	return;
+}
+
 static bool
 match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 {
@@ -220,10 +247,14 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	eoa = rawmemchr(++a, '\t');
 
 	if (strncmp(vf->this, a, eoa - a) == 0) {
+		/* never try any alternatives */
+		vf->nalts = 0;
 		return true;
 	}
 	for (size_t i = 0; i < vf->nalts; i++) {
 		if (strncmp(vf->alts[i], a, eoa - a) == 0) {
+			GAND_DEBUG("matched %zu-th alt, cancelling\n", i);
+			cancel_alts(vf, i);
 			return true;
 		}
 	}
@@ -265,22 +296,39 @@ match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
 #define BUF_INC			(4096)
 
 static void
-bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
+bang_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 {
-	size_t mmbsz = (*bsz & ~(BUF_INC - 1)) + BUF_INC;
+	char *s;
+	char *tmp;
 
 	/* check if we need to resize */
-	if (*bsz == 0) {
+	if (mb->all == 0) {
 		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
-		*buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
-	} else if (*bsz + lsz > mmbsz) {
-		size_t new = ((*bsz + lsz + 1) & ~(BUF_INC - 1)) + BUF_INC;
-		*buf = mremap(*buf, mmbsz, new, MREMAP_MAYMOVE);
+		mb->buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
+		mb->all = ini_sz;
+	} else if (mb->bsz + lsz + 1 > mb->all) {
+		size_t new = ((mb->bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
+		mb->buf = mremap(mb->buf, mb->all, new, MREMAP_MAYMOVE);
+		mb->all = new;
 	}
 
-	memcpy(*buf + *bsz, lin, lsz);
-	(*buf)[*bsz += lsz] = '\n';
-	(*bsz)++;
+	/* copy only interesting lines */
+	s = rawmemchr(lin, '\t');
+	tmp = rawmemchr(s + 1, '\t');
+	memcpy(mb->buf + mb->bsz, s + 1, tmp - (s + 1));
+	mb->bsz += tmp - (s + 1);
+
+	s = rawmemchr(tmp + 1, '\t');
+	tmp = rawmemchr(s + 1, '\t');
+	memcpy(mb->buf + mb->bsz, s, tmp - s);
+	mb->bsz += tmp - (s + 1);
+
+	s = rawmemchr(tmp + 1, '\t');
+	memcpy(mb->buf + mb->bsz, s, lsz - (s - lin));
+	mb->bsz += lsz - (s - lin);
+
+	/* finalise the line */
+	mb->buf[mb->bsz++] = '\n';
 	return;
 }
 
@@ -295,17 +343,17 @@ get_rolf_id(struct rolf_obj_s *robj)
 	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
 	if (LIKELY(robj->rolf_id > 0)) {
 		return robj->rolf_id;
-	} else if (grsym.buf == NULL) {
+	} else if (grsym.m.buf == NULL) {
 		return 0U;
 	}
 
 	/* set up */
 	rsym = robj->rolf_sym;
 	rssz = strlen(rsym);
-	for (const char *cand = (rest = grsym.bsz, grsym.buf);
+	for (const char *cand = (rest = grsym.m.bsz, grsym.m.buf);
 	     (cand = memmem(cand, rest, rsym, rssz)) != NULL;
-	     rest = grsym.bsz - (cand - grsym.buf)) {
-		if (cand == grsym.buf || cand[-1] == '\n') {
+	     rest = grsym.m.bsz - (cand - grsym.m.buf)) {
+		if (cand == grsym.m.buf || cand[-1] == '\n') {
 			/* we've got a prefix match */
 			cand = rawmemchr(cand, '\t');
 			rid = strtoul(cand + 1, NULL, 10);
@@ -318,16 +366,10 @@ get_rolf_id(struct rolf_obj_s *robj)
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
+	struct mmmb_s mb = {0};
+	struct mmfb_s mf = {.m = {0}, .fd = -1};
 	const char *f;
-	char *fb;
-	size_t fsz;
-	int fd;
-	size_t bsz = 0;
 	uint32_t rid;
-
-	/* init the bollocks */
-	*buf = NULL;
-	bsz = 0;
 
 	/* general checks and get us the lateglu name */
 	if (UNLIKELY(msg->nrolf_objs == 0)) {
@@ -336,26 +378,29 @@ get_ser(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_lateglu_name(rid)) == NULL) {
 		return 0UL;
-	} else if ((fsz = mmap_whole_file(&fb, &fd, f)) == 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
-	for (size_t idx = 0; idx < fsz; ) {
-		const char *lin = fb + idx;
+	for (size_t idx = 0; idx < mf.m.bsz; ) {
+		const char *lin = mf.m.buf + idx;
 		char *eol = rawmemchr(lin, '\n');
 		size_t lsz = eol - lin;
 
 		if (match_msg_p(lin, lsz, msg)) {
-			bang_line(buf, &bsz, lin, lsz);
+			bang_line(&mb, lin, lsz);
 		}
 		idx += lsz + 1;
 	}
 
+	/* prepare output */
+	mmmb_freeze(&mb);
+	*buf = mb.buf;
 	/* free the resources */
-	munmap_all(fb, fsz, fd);
+	munmap_all(&mf);
 out:
 	free_lateglu_name(f);
-	return bsz;
+	return mb.bsz;
 }
 
 static size_t
@@ -457,10 +502,10 @@ DEFUN int
 handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
 {
 	/* off with the old guy */
-	munmap_all(grsym.buf, grsym.all, grsym.fd);
+	munmap_all(&grsym);
 	/* reinit */
 	GAND_DEBUG(MOD_PRE ": building sym table ...");
-	if ((grsym.bsz = mmap_whole_file(&grsym.buf, &grsym.fd, f)) == 0) {
+	if (mmap_whole_file(&grsym, f) < 0) {
 		GAND_DBGCONT("failed\n");
 		return -1;
 	}

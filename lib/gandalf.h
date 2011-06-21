@@ -79,6 +79,7 @@ struct date_rng_s {
 struct valflav_s {
 	char *this;
 	size_t nalts;
+	size_t nall_alts;
 	char **alts;
 };
 
