@@ -57,8 +57,9 @@ typedef uint32_t idate_t;
 typedef enum {
 	GAND_MSG_UNK,
 	/* rolf show like messages */
-	GAND_MSG_GET_SERIES,
-	GAND_MSG_GET_DATE,
+	GAND_MSG_GET_SER,
+	GAND_MSG_GET_DAT,
+	GAND_MSG_GET_NFO,
 } gand_msg_type_t;
 
 struct gand_msg_hdr_s {

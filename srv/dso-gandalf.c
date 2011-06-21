@@ -170,7 +170,40 @@ make_symbol_name(void)
 static void
 free_symbol_name(const char *UNUSED(sym))
 {
+	return;
 }
+
+static const char*
+make_info_name(void)
+{
+	static const char rinf[] = "rolft_info";
+	static char f[PATH_MAX];
+	static bool inip = false;
+	size_t idx;
+
+	if (LIKELY(inip)) {
+	singleton:
+		return f;
+	} else if (UNLIKELY(trolfdir == NULL)) {
+		return NULL;
+	}
+
+	/* construct the path */
+	memcpy(f, trolfdir, (idx = ntrolfdir));
+	if (f[idx - 1] != '/') {
+		f[idx++] = '/';
+	}
+	memcpy(f + idx, rinf, sizeof(rinf) - 1);
+	inip = true;
+	goto singleton;
+}
+
+static void
+free_info_name(const char *UNUSED(sym))
+{
+	return;
+}
+
 
 static int
 mmap_whole_file(struct mmfb_s *mf, const char *f)
@@ -404,20 +437,100 @@ out:
 }
 
 static size_t
+get_nfo(char **buf, gand_msg_t msg)
+{
+	struct mmmb_s mb = {0};
+	struct mmfb_s mf = {.m = {0}, .fd = -1};
+	const char *f;
+
+	/* general checks and get us the lateglu name */
+	if (UNLIKELY(msg->nrolf_objs == 0)) {
+		return 0UL;
+	} else if ((f = make_info_name()) == NULL) {
+		return 0UL;
+	} else if (mmap_whole_file(&mf, f) < 0) {
+		goto out;
+	}
+
+	for (size_t i = 0; i < msg->nrolf_objs; i++) {
+		char rids[8];
+		struct rolf_obj_s *ro = msg->rolf_objs + i;
+		const char *p;
+		size_t q;
+		size_t rest;
+
+		if (LIKELY(ro->rolf_id > 0)) {
+			q = snprintf(rids, sizeof(rids), "%u", ro->rolf_id);
+			p = rids;
+		} else {
+			p = ro->rolf_sym;
+			q = strlen(ro->rolf_sym);
+		}
+
+		for (const char *cand = (rest = mf.m.bsz, mf.m.buf), *cend;
+		     (cand = memmem(cand, rest, p, q)) != NULL;
+		     rest = mf.m.bsz - (cand - mf.m.buf)) {
+			if (ro->rolf_id > 0) {
+				/* rolf ids are only at the
+				 * beginning of a line */
+				if (!((cand == mf.m.buf || cand[-1] == '\n') &&
+				      (cand[q] == '\t'))) {
+					continue;
+				}
+				/* otherwise its a full match */
+				cend = rawmemchr(cand, '\n');
+				goto proc;
+			}
+			if (!(cand[-1] == '\t' &&
+			      rawmemchr(cand, '@') <
+			      rawmemchr(cand, '\t'))) {
+				continue;
+			}
+			/* prefix match for rolf sym */
+			/* search for bol */
+			cend = rawmemchr(cand, '\n');
+			if ((cand = memrchr(
+				     cand, '\n', cand - mf.m.buf)) == NULL) {
+				cand = mf.m.buf;
+			}
+			/* bang the line */
+		proc:
+			bang_line(&mb, cand, cend - cand);
+			cand = cend;
+		}
+	}
+
+	/* prepare output */
+	mmmb_freeze(&mb);
+	*buf = mb.buf;
+	/* free the resources */
+	munmap_all(&mf);
+out:
+	free_info_name(f);
+	return mb.bsz;
+}
+
+static size_t
 interpret_msg(char **buf, gand_msg_t msg)
 {
 	size_t len = 0;
 
 	switch (gand_get_msg_type(msg)) {
-	case GAND_MSG_GET_SERIES:
+	case GAND_MSG_GET_SER:
 		GAND_DEBUG(MOD_PRE ": get_series msg %zu dates  %zu vfs\n",
 			   msg->ndate_rngs, msg->nvalflavs);
 		len = get_ser(buf, msg);
 		break;
 
-	case GAND_MSG_GET_DATE:
+	case GAND_MSG_GET_DAT:
 		GAND_DEBUG(MOD_PRE ": get_date msg %zu rids\n",
 			   msg->nrolf_objs);
+		break;
+
+	case GAND_MSG_GET_NFO:
+		GAND_DEBUG(MOD_PRE ": get_info msg %zu rids\n",
+			   msg->nrolf_objs);
+		len = get_nfo(buf, msg);
 		break;
 
 	default:
