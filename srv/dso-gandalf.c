@@ -459,7 +459,7 @@ out:
 	return mb.bsz;
 }
 
-static const char* __attribute__((noinline))
+static const char*
 __bol(const char *ptr, size_t bsz)
 {
 	const char *tmp;
