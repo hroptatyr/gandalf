@@ -69,13 +69,17 @@
 
 #define MOD_PRE		"mod/gandalf"
 
-/* mmap buffers */
-struct mmb_s {
+/* mmap buffers, memory and file based */
+struct mmmb_s {
 	char *buf;
 	/* real size */
 	size_t bsz;
 	/* alloc size */
 	size_t all;
+};
+
+struct mmfb_s {
+	struct mmmb_s m;
 	/* file desc */
 	int fd;
 };
@@ -83,10 +87,12 @@ struct mmb_s {
 static char *trolfdir;
 static size_t ntrolfdir;
 /* rolf symbol file */
-static struct mmb_s grsym = {
-	.buf = NULL,
-	.bsz = 0UL,
-	.all = 0UL,
+static struct mmfb_s grsym = {
+	.m = {
+		.buf = NULL,
+		.bsz = 0UL,
+		.all = 0UL,
+	},
 	.fd = -1,
 };
 
@@ -98,6 +104,13 @@ wr_fin_cb(gand_conn_t ctx)
 	char *buf = get_fd_data(ctx);
 	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
 	return 0;
+}
+
+static size_t
+mmmb_freeze(struct mmmb_s *mb)
+{
+	mb->buf = mremap(mb->buf, mb->all, mb->bsz, MREMAP_MAYMOVE);
+	return mb->all = mb->bsz;
 }
 
 static const char*
@@ -281,38 +294,39 @@ match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
 #define BUF_INC			(4096)
 
 static void
-bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
+bang_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 {
-	size_t mmbsz = ((*bsz - 1) & ~(BUF_INC - 1)) + BUF_INC;
 	char *s;
 	char *tmp;
 
 	/* check if we need to resize */
-	if (*bsz == 0) {
+	if (mb->all == 0) {
 		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
-		*buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
-	} else if (*bsz + lsz + 1 > mmbsz) {
-		size_t new = ((*bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
-		*buf = mremap(*buf, mmbsz, new, MREMAP_MAYMOVE);
+		mb->buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
+		mb->all = ini_sz;
+	} else if (mb->bsz + lsz + 1 > mb->all) {
+		size_t new = ((mb->bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
+		mb->buf = mremap(mb->buf, mb->all, new, MREMAP_MAYMOVE);
+		mb->all = new;
 	}
 
 	/* copy only interesting lines */
 	s = rawmemchr(lin, '\t');
 	tmp = rawmemchr(s + 1, '\t');
-	memcpy(*buf + *bsz, s + 1, tmp - (s + 1));
-	*bsz += tmp - (s + 1);
+	memcpy(mb->buf + mb->bsz, s + 1, tmp - (s + 1));
+	mb->bsz += tmp - (s + 1);
 
 	s = rawmemchr(tmp + 1, '\t');
 	tmp = rawmemchr(s + 1, '\t');
-	memcpy(*buf + *bsz, s, tmp - s);
-	*bsz += tmp - (s + 1);
+	memcpy(mb->buf + mb->bsz, s, tmp - s);
+	mb->bsz += tmp - (s + 1);
 
 	s = rawmemchr(tmp + 1, '\t');
-	memcpy(*buf + *bsz, s, lsz - (s - lin));
-	*bsz += lsz - (s - lin);
+	memcpy(mb->buf + mb->bsz, s, lsz - (s - lin));
+	mb->bsz += lsz - (s - lin);
 
 	/* finalise the line */
-	(*buf)[(*bsz)++] = '\n';
+	mb->buf[mb->bsz++] = '\n';
 	return;
 }
 
@@ -327,17 +341,17 @@ get_rolf_id(struct rolf_obj_s *robj)
 	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
 	if (LIKELY(robj->rolf_id > 0)) {
 		return robj->rolf_id;
-	} else if (grsym.buf == NULL) {
+	} else if (grsym.m.buf == NULL) {
 		return 0U;
 	}
 
 	/* set up */
 	rsym = robj->rolf_sym;
 	rssz = strlen(rsym);
-	for (const char *cand = (rest = grsym.bsz, grsym.buf);
+	for (const char *cand = (rest = grsym.m.bsz, grsym.m.buf);
 	     (cand = memmem(cand, rest, rsym, rssz)) != NULL;
-	     rest = grsym.bsz - (cand - grsym.buf)) {
-		if (cand == grsym.buf || cand[-1] == '\n') {
+	     rest = grsym.m.bsz - (cand - grsym.m.buf)) {
+		if (cand == grsym.m.buf || cand[-1] == '\n') {
 			/* we've got a prefix match */
 			cand = rawmemchr(cand, '\t');
 			rid = strtoul(cand + 1, NULL, 10);
@@ -354,12 +368,8 @@ get_ser(char **buf, gand_msg_t msg)
 	char *fb;
 	size_t fsz;
 	int fd;
-	size_t bsz = 0;
 	uint32_t rid;
-
-	/* init the bollocks */
-	*buf = NULL;
-	bsz = 0;
+	struct mmmb_s mb = {0};
 
 	/* general checks and get us the lateglu name */
 	if (UNLIKELY(msg->nrolf_objs == 0)) {
@@ -378,16 +388,19 @@ get_ser(char **buf, gand_msg_t msg)
 		size_t lsz = eol - lin;
 
 		if (match_msg_p(lin, lsz, msg)) {
-			bang_line(buf, &bsz, lin, lsz);
+			bang_line(&mb, lin, lsz);
 		}
 		idx += lsz + 1;
 	}
 
+	/* prepare output */
+	mmmb_freeze(&mb);
+	*buf = mb.buf;
 	/* free the resources */
 	munmap_all(fb, fsz, fd);
 out:
 	free_lateglu_name(f);
-	return bsz;
+	return mb.bsz;
 }
 
 static size_t
@@ -489,10 +502,10 @@ DEFUN int
 handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
 {
 	/* off with the old guy */
-	munmap_all(grsym.buf, grsym.all, grsym.fd);
+	munmap_all(grsym.m.buf, grsym.m.all, grsym.fd);
 	/* reinit */
 	GAND_DEBUG(MOD_PRE ": building sym table ...");
-	if ((grsym.bsz = mmap_whole_file(&grsym.buf, &grsym.fd, f)) == 0) {
+	if ((grsym.m.bsz = mmap_whole_file(&grsym.m.buf, &grsym.fd, f)) == 0) {
 		GAND_DBGCONT("failed\n");
 		return -1;
 	}
