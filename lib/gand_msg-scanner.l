@@ -85,15 +85,25 @@ date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-9]{2,2}
 range		-
 and		\+
 alt		"|"|"/"
+num		[1-9][0-9]*
 sym		[^ \t\f\n\r]+@[[:alnum:]]*
+sym2		[^ \t\f\n\r0-9][^ \t\f\n\r]*
 key		[a-z_]+
 now		now
 then		then
+filter		--filt(er)?|--flav(our)?
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
+get_nfo		get_i?nfo
+
+%x QUO
 
 %%
+
+\" {
+	BEGIN(QUO);
+}
 
 {range} {
 	RETURN_TOKEN(TOK_RANGE);
@@ -104,7 +114,7 @@ get_dat		get_date?
 	RETURN_TOKEN(TOK_DATE);
 }
 
-[1-9][0-9]* {
+{num} {
 	yylval->ival = strtol(yytext, NULL, 10);
 	RETURN_TOKEN(TOK_INUM);
 }
@@ -115,6 +125,10 @@ get_dat		get_date?
 
 {get_dat} {
 	RETURN_TOKEN(TOK_GET_DAT);
+}
+
+{get_nfo} {
+	RETURN_TOKEN(TOK_GET_NFO);
 }
 
 {now} {
@@ -135,14 +149,16 @@ get_dat		get_date?
 	RETURN_TOKEN(TOK_ALT);
 }
 
-{sym} {
+{sym}|{sym2}|{key} {
 	yylval->sval = yytext;
 	RETURN_TOKEN(TOK_SYM);
 }
 
-{key} {
+<QUO>[^\"]*\" {
 	yylval->sval = yytext;
-	RETURN_TOKEN(TOK_KEY);
+	yylval->sval[yyleng] = '\0';
+	BEGIN(INITIAL);
+	RETURN_TOKEN(TOK_SYM);
 }
 
  /* more ignored shit, whitespace et al */

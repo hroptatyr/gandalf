@@ -46,20 +46,25 @@ TOK_SYM
 TOK_KEY
 TOK_NOW
 TOK_THEN
+TOK_FILTER
 
 TOK_GET_SER
 TOK_GET_DAT
+TOK_GET_NFO
 
 %%
 
 cmd:
 cmd_get_ser {
-	gand_set_msg_type(msg, GAND_MSG_GET_SERIES);
+	gand_set_msg_type(msg, GAND_MSG_GET_SER);
 	YYACCEPT;
 } |
 cmd_get_dat {
-	gand_set_msg_type(msg, GAND_MSG_GET_DATE);
+	gand_set_msg_type(msg, GAND_MSG_GET_DAT);
 	YYACCEPT;
+} |
+cmd_get_nfo {
+	gand_set_msg_type(msg, GAND_MSG_GET_NFO);
 };
 
 cmd_get_ser:
@@ -69,6 +74,9 @@ cmd_get_ser_mand valflav_list;
 cmd_get_dat:
 cmd_get_dat_mand |
 cmd_get_dat_mand valflav_list;
+
+cmd_get_nfo:
+TOK_GET_NFO rolf_obj_list;
 
 cmd_get_ser_mand:
 TOK_GET_SER rolf_obj |
@@ -128,15 +136,15 @@ TOK_NOW |
 TOK_THEN;
 
 valflav_list:
-valflav |
+TOK_FILTER valflav |
 valflav_list TOK_AND valflav;
 
 valflav:
-TOK_KEY {
+TOK_SYM {
 	resize_valflavs(msg);
 	msg->valflavs[msg->nvalflavs++].this = strdup($<sval>1);
 } |
-valflav TOK_ALT TOK_KEY {
+valflav TOK_ALT TOK_SYM {
 	struct valflav_s *vf = msg->valflavs + msg->nvalflavs - 1;
 	resize_alts(vf);
 	vf->alts[vf->nalts++] = strdup($<sval>3);
