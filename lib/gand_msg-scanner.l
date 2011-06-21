@@ -142,14 +142,9 @@ get_nfo		get_i?nfo
 	RETURN_TOKEN(TOK_ALT);
 }
 
-{sym} {
+{sym}|{key} {
 	yylval->sval = yytext;
 	RETURN_TOKEN(TOK_SYM);
-}
-
-{key} {
-	yylval->sval = yytext;
-	RETURN_TOKEN(TOK_KEY);
 }
 
  /* more ignored shit, whitespace et al */

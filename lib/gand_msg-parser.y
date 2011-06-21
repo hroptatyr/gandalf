@@ -140,11 +140,11 @@ TOK_FILTER valflav |
 valflav_list TOK_AND valflav;
 
 valflav:
-TOK_KEY {
+TOK_SYM {
 	resize_valflavs(msg);
 	msg->valflavs[msg->nvalflavs++].this = strdup($<sval>1);
 } |
-valflav TOK_ALT TOK_KEY {
+valflav TOK_ALT TOK_SYM {
 	struct valflav_s *vf = msg->valflavs + msg->nvalflavs - 1;
 	resize_alts(vf);
 	vf->alts[vf->nalts++] = strdup($<sval>3);
