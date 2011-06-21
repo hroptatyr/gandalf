@@ -365,6 +365,29 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 	return;
 }
 
+static void
+bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
+{
+	/* check if we need to resize */
+	if (mb->all == 0) {
+		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
+		mb->buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
+		mb->all = ini_sz;
+	} else if (mb->bsz + lsz + 1 > mb->all) {
+		size_t new = ((mb->bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
+		mb->buf = mremap(mb->buf, mb->all, new, MREMAP_MAYMOVE);
+		mb->all = new;
+	}
+
+	/* copy only interesting lines */
+	memcpy(mb->buf + mb->bsz, lin, lsz);
+	mb->bsz += lsz;
+
+	/* finalise the line */
+	mb->buf[mb->bsz++] = '\n';
+	return;
+}
+
 static uint32_t
 get_rolf_id(struct rolf_obj_s *robj)
 {
@@ -436,6 +459,29 @@ out:
 	return mb.bsz;
 }
 
+static const char* __attribute__((noinline))
+__bol(const char *ptr, size_t bsz)
+{
+	const char *tmp;
+	const char *bop = ptr - bsz;
+
+	if (UNLIKELY((tmp = memrchr(bop, '\n', bsz)) == NULL)) {
+		return bop;
+	}
+	return tmp + 1;
+}
+
+static const char*
+__eol(const char *ptr, size_t bsz)
+{
+	const char *tmp = memchr(ptr, '\n', bsz);
+
+	if (UNLIKELY(tmp == NULL)) {
+		return tmp + bsz;
+	}
+	return tmp;
+}
+
 static size_t
 get_nfo(char **buf, gand_msg_t msg)
 {
@@ -477,26 +523,19 @@ get_nfo(char **buf, gand_msg_t msg)
 				      (cand[q] == '\t'))) {
 					continue;
 				}
-				/* otherwise its a full match */
-				cend = rawmemchr(cand, '\n');
-				goto proc;
-			}
-			if (!(cand[-1] == '\t' &&
-			      rawmemchr(cand, '@') <
-			      rawmemchr(cand, '\t'))) {
+			} else if (!(cand[-1] == '\t' &&
+				     rawmemchr(cand, '@') <
+				     rawmemchr(cand, '\t'))) {
 				continue;
 			}
-			/* prefix match for rolf sym */
-			/* search for bol */
-			cend = rawmemchr(cand, '\n');
-			if ((cand = memrchr(
-				     cand, '\n', cand - mf.m.buf)) == NULL) {
-				cand = mf.m.buf;
-			}
+
+			/* search for bol/eol */
+			cand = __bol(cand, cand - mf.m.buf);
+			cend = __eol(cand, mf.m.bsz - (cand - mf.m.buf));
+
 			/* bang the line */
-		proc:
-			bang_line(&mb, cand, cend - cand);
-			cand = cend;
+			bang_whole_line(&mb, cand, cend - cand);
+			cand = cend + 1;
 		}
 	}
 
