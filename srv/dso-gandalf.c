@@ -206,6 +206,18 @@ match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
 	return false;
 }
 
+static void
+cancel_alts(struct valflav_s *vf, size_t idx)
+{
+	char *tmp = vf->this;
+
+	/* swap this slot and the idx-th alternative */
+	vf->this = vf->alts[idx];
+	vf->alts[idx] = tmp;
+	vf->nalts = 0;
+	return;
+}
+
 static bool
 match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 {
@@ -220,10 +232,14 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	eoa = rawmemchr(++a, '\t');
 
 	if (strncmp(vf->this, a, eoa - a) == 0) {
+		/* never try any alternatives */
+		vf->nalts = 0;
 		return true;
 	}
 	for (size_t i = 0; i < vf->nalts; i++) {
 		if (strncmp(vf->alts[i], a, eoa - a) == 0) {
+			GAND_DEBUG("matched %zu-th alt, cancelling\n", i);
+			cancel_alts(vf, i);
 			return true;
 		}
 	}
@@ -267,14 +283,14 @@ match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
 static void
 bang_line(char **buf, size_t *bsz, const char *lin, size_t lsz)
 {
-	size_t mmbsz = (*bsz & ~(BUF_INC - 1)) + BUF_INC;
+	size_t mmbsz = ((*bsz - 1) & ~(BUF_INC - 1)) + BUF_INC;
 
 	/* check if we need to resize */
 	if (*bsz == 0) {
 		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
 		*buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
-	} else if (*bsz + lsz > mmbsz) {
-		size_t new = ((*bsz + lsz + 1) & ~(BUF_INC - 1)) + BUF_INC;
+	} else if (*bsz + lsz + 1 > mmbsz) {
+		size_t new = ((*bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
 		*buf = mremap(*buf, mmbsz, new, MREMAP_MAYMOVE);
 	}
 
