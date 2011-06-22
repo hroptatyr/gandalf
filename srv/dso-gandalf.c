@@ -459,7 +459,7 @@ out:
 	return mb.bsz;
 }
 
-static const char* __attribute__((noinline))
+static const char*
 __bol(const char *ptr, size_t bsz)
 {
 	const char *tmp;
@@ -515,7 +515,7 @@ get_nfo(char **buf, gand_msg_t msg)
 
 		for (const char *cand = (rest = mf.m.bsz, mf.m.buf), *cend;
 		     (cand = memmem(cand, rest, p, q)) != NULL;
-		     rest = mf.m.bsz - (cand - mf.m.buf)) {
+		     cand++, rest = mf.m.bsz - (cand - mf.m.buf)) {
 			if (ro->rolf_id > 0) {
 				/* rolf ids are only at the
 				 * beginning of a line */
@@ -535,7 +535,7 @@ get_nfo(char **buf, gand_msg_t msg)
 
 			/* bang the line */
 			bang_whole_line(&mb, cand, cend - cand);
-			cand = cend + 1;
+			cand = cend;
 		}
 	}
 
