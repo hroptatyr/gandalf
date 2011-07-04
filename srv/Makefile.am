@@ -23,8 +23,6 @@ dso_gandalf_la_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 dso_gandalf_la_CPPFLAGS += -I$(top_srcdir)/lib
 dso_gandalf_la_CPPFLAGS += $(LIBXML2_CFLAGS)
 dso_gandalf_la_SOURCES += dso-gandalf.c
-EXTRA_dso_gandalf_la_SOURCES += con6ity.c con6ity.h
-dso_gandalf_la_CPPFLAGS += -DHARD_INCLUDE_con6ity
 endif ## BUILD_SERVER
 
 

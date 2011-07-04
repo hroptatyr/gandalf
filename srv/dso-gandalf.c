@@ -50,22 +50,10 @@
 #include <unserding/unserding-ctx.h>
 #include <unserding/unserding-cfg.h>
 #include <unserding/module.h>
+#include <unserding/tcp-unix.h>
 
 #include "gandalf.h"
 #include "nifty.h"
-
-/* get rid of libev guts */
-#if defined HARD_INCLUDE_con6ity
-# undef DECLF
-# undef DECLF_W
-# undef DEFUN
-# undef DEFUN_W
-# define DECLF		static
-# define DEFUN		static
-# define DECLF_W	static
-# define DEFUN_W	static
-#endif	/* HARD_INCLUDE_con6ity */
-#include "con6ity.h"
 
 #define MOD_PRE		"mod/gandalf"
 
@@ -99,10 +87,11 @@ static struct mmfb_s grsym = {
 
 /* connexion<->proto glue */
 static int
-wr_fin_cb(gand_conn_t ctx)
+wr_fin_cb(ud_conn_t UNUSED(c), void *data)
 {
-	char *buf = get_fd_data(ctx);
+	char *buf = data;
 	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
+	free(buf);
 	return 0;
 }
 
@@ -167,7 +156,7 @@ make_symbol_name(void)
 	goto singleton;
 }
 
-static void
+static void __attribute__((unused))
 free_symbol_name(const char *UNUSED(sym))
 {
 	return;
@@ -584,13 +573,13 @@ interpret_msg(char **buf, gand_msg_t msg)
 /**
  * Take the stuff in MSG of size MSGLEN coming from FD and process it.
  * Return values <0 cause the handler caller to close down the socket. */
-DEFUN int
-handle_data(gand_conn_t ctx, char *msg, size_t msglen)
+static int
+handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 {
-	gand_ctx_t p = get_fd_data(ctx);
+	gand_ctx_t p = data;
 	gand_msg_t umsg;
 
-	GAND_DEBUG(MOD_PRE "/ctx: %p %zu\n", ctx, msglen);
+	GAND_DEBUG(MOD_PRE "/ctx: %p %zu\n", c, msglen);
 #if defined DEBUG_FLAG
 	/* safely write msg to logerr now */
 	fwrite(msg, msglen, 1, logout);
@@ -600,24 +589,18 @@ handle_data(gand_conn_t ctx, char *msg, size_t msglen)
 		/* definite success */
 		char *buf = NULL;
 		size_t len;
+		ud_conn_t wr = NULL;
 
 		/* serialise, put results in BUF*/
-		if ((len = interpret_msg(&buf, umsg))) {
-			gand_conn_t wr;
-
+		if ((len = interpret_msg(&buf, umsg)) &&
+		    (wr = ud_write_soon(c, buf, len, wr_fin_cb))) {
 			GAND_DEBUG(
-				MOD_PRE ": installing buf wr'er %p %zu\n",
-				buf, len);
-			/* use the write-soon service */
-			wr = write_soon(ctx, buf, len, wr_fin_cb);
-			put_fd_data(wr, buf);
-			set_conn_flag_munmap(wr);
-			put_fd_data(ctx, wr);
+				MOD_PRE ": installing buf wr'er %p %p %zu\n",
+				wr, buf, len);
+			ud_conn_put_data(wr, buf);
 			return 0;
 		}
-		/* kick original context's data */
-		put_fd_data(ctx, NULL);
-		return 0;
+		p = NULL;
 
 	} else if (/* umsg == NULL && */p == NULL) {
 		/* error occurred */
@@ -625,33 +608,31 @@ handle_data(gand_conn_t ctx, char *msg, size_t msglen)
 	} else {
 		GAND_DEBUG(MOD_PRE ": need more grub\n");
 	}
-	put_fd_data(ctx, p);
+	ud_conn_put_data(c, p);
 	return 0;
 }
-#define HAVE_handle_data
 
-DEFUN void
-handle_close(gand_conn_t ctx)
+static int
+handle_close(ud_conn_t c, void *data)
 {
-	gand_ctx_t p;
-
-	GAND_DEBUG("forgetting about %d\n", get_fd(ctx));
-	if ((p = get_fd_data(ctx)) != NULL) {
+	GAND_DEBUG("forgetting about %p\n", c);
+	if (data) {
 		/* finalise the push parser to avoid mem leaks */
-		gand_msg_t msg = gand_parse_blob_r(&p, ctx, 0);
+		gand_msg_t msg = gand_parse_blob_r(&data, data, 0);
 
 		if (UNLIKELY(msg != NULL)) {
 			/* sigh */
 			gand_free_msg(msg);
 		}
 	}
-	put_fd_data(ctx, NULL);
-	return;
+	ud_conn_put_data(c, NULL);
+	return 0;
 }
-#define HAVE_handle_close
 
-DEFUN int
-handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
+static int
+handle_inot(
+	ud_conn_t c, const char *f,
+	const struct stat *UNUSED(st), void *UNUSED(data))
 {
 	/* off with the old guy */
 	munmap_all(&grsym);
@@ -664,54 +645,33 @@ handle_inot(gand_conn_t ctx, const char *f, const struct stat *UNUSED(st))
 	GAND_DBGCONT("done\n");
 	return 0;
 }
-#define HAVE_handle_inot
 
 
-/* our connectivity cruft */
-#if defined HARD_INCLUDE_con6ity
-# include "con6ity.c"
-#endif	/* HARD_INCLUDE_con6ity */
-
-
-static void
-gand_init_inot(ud_ctx_t ctx, const char *file)
+static ud_conn_t
+gand_init_inot(ud_ctx_t UNUSED(ctx), const char *file)
 {
-	init_stat_watchers(ctx->mainloop, file);
+	ud_conn_t res = make_inot_conn(file, handle_inot, NULL);
 	/* god i'm a hacker */
-	handle_inot(NULL, file, NULL);
-	return;
+	handle_inot(res, file, NULL, NULL);
+	return res;
 }
 
-static int
+static ud_conn_t
 gand_init_uds_sock(const char **sock_path, ud_ctx_t ctx, void *settings)
 {
 	volatile int res = -1;
 
 	udcfg_tbl_lookup_s(sock_path, ctx, settings, "sock");
-	if (*sock_path != NULL &&
-	    (res = conn_listener_uds(*sock_path)) > 0) {
-		/* set up the IO watcher and timer */
-		init_conn_watchers(ctx->mainloop, res);
-	} else {
-		/* make sure we don't accidentally delete arbitrary files */
-		*sock_path = NULL;
-	}
-	return res;
+	return make_unix_conn(*sock_path, handle_data, handle_close, NULL);
 }
 
-static int
+static ud_conn_t
 gand_init_net_sock(ud_ctx_t ctx, void *settings)
 {
-	volatile int res = -1;
 	int port;
 
 	port = udcfg_tbl_lookup_i(ctx, settings, "port");
-	if (port &&
-	    (res = conn_listener_net(port)) > 0) {
-		/* set up the IO watcher and timer */
-		init_conn_watchers(ctx->mainloop, res);
-	}
-	return res;
+	return make_tcp_conn(port, handle_data, handle_close, NULL);
 }
 
 static size_t
@@ -734,8 +694,8 @@ gand_get_trolfdir(char **tgt, ud_ctx_t ctx, void *settings)
 
 
 /* unserding bindings */
-static volatile int gand_sock_net = -1;
-static volatile int gand_sock_uds = -1;
+static ud_conn_t __cnet = NULL;
+static ud_conn_t __cuds = NULL;
 /* path to unix domain socket */
 static const char *gand_sock_path;
 
@@ -754,9 +714,9 @@ init(void *clo)
 	}
 	GAND_DBGCONT("\n");
 	/* obtain the unix domain sock from our settings */
-	gand_sock_uds = gand_init_uds_sock(&gand_sock_path, ctx, settings);
+	__cuds = gand_init_uds_sock(&gand_sock_path, ctx, settings);
 	/* obtain port number for our network socket */
-	gand_sock_net = gand_init_net_sock(ctx, settings);
+	__cnet = gand_init_net_sock(ctx, settings);
 	ntrolfdir = gand_get_trolfdir(&trolfdir, ctx, settings);
 	/* inotify the symbol file */
 	gand_init_inot(ctx, make_symbol_name());
@@ -776,15 +736,15 @@ reinit(void *UNUSED(clo))
 }
 
 void
-deinit(void *clo)
+deinit(void *UNUSED(clo))
 {
-	ud_ctx_t ctx = clo;
-
 	GAND_DEBUG(MOD_PRE ": unloading ...");
-	deinit_conn_watchers(ctx->mainloop);
-	deinit_stat_watchers(ctx->mainloop);
-	gand_sock_net = -1;
-	gand_sock_uds = -1;
+	if (__cnet) {
+		ud_conn_fini(__cnet);
+	}
+	if (__cuds) {
+		ud_conn_fini(__cuds);
+	}
 	if (trolfdir) {
 		free(trolfdir);
 	}
