@@ -342,8 +342,8 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 
 	s = rawmemchr(tmp + 1, '\t');
 	tmp = rawmemchr(s + 1, '\t');
-	memcpy(mb->buf + mb->bsz, s, tmp - s);
-	mb->bsz += tmp - (s + 1);
+	memcpy(mb->buf + mb->bsz, s, tmp - s + 1);
+	mb->bsz += tmp - s;
 
 	s = rawmemchr(tmp + 1, '\t');
 	memcpy(mb->buf + mb->bsz, s, lsz - (s - lin));
