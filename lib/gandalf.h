@@ -108,7 +108,7 @@ struct gand_msg_s {
 	size_t nvalflavs;
 	struct valflav_s *valflavs;
 
-	uint8_t sel;
+	uint32_t sel;
 };
 
 #define GAND_MSG_ROLF_OBJS_INC	(16)
