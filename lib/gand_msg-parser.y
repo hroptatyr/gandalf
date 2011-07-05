@@ -41,7 +41,6 @@ TOK_DATE
 TOK_INUM
 TOK_RANGE
 TOK_AND
-TOK_COMMA
 TOK_ALT
 TOK_SYM
 TOK_KEY
@@ -70,20 +69,21 @@ cmd_get_nfo {
 };
 
 cmd_get_ser:
-cmd_get_ser_mand |
 cmd_get_ser_mand opt_lists;
 
 cmd_get_dat:
-cmd_get_dat_mand |
 cmd_get_dat_mand opt_lists;
 
 cmd_get_nfo:
 TOK_GET_NFO rolf_obj_list;
 
 opt_lists:
+|
+opt_lists opt_list;
+
+opt_list:
 valflav_list |
-select_list |
-valflav_list select_list;
+select_list;
 
 cmd_get_ser_mand:
 TOK_GET_SER rolf_obj |
@@ -159,7 +159,7 @@ valflav TOK_ALT TOK_SYM {
 
 select_list:
 TOK_SELECT select |
-select_list TOK_COMMA select;
+select_list TOK_AND select;
 
 select:
 TOK_SYM {

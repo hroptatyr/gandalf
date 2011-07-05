@@ -82,9 +82,8 @@ extern int yyparse(void *scanner, gand_msg_t msg);
 
 ws		[ \t\f\n\r]+
 date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-9]{2,2}
-comma		,
 range		-
-and		\+
+and		"+"|","
 alt		"|"|"/"
 num		[1-9][0-9]*
 sym		[^ \t\f\n\r]+@[[:alnum:]]*
@@ -109,10 +108,6 @@ get_nfo		get_i?nfo
 
 {range} {
 	RETURN_TOKEN(TOK_RANGE);
-}
-
-{comma} {
-	RETURN_TOKEN(TOK_COMMA);
 }
 
 {date} {
