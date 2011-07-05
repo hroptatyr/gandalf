@@ -41,12 +41,14 @@ TOK_DATE
 TOK_INUM
 TOK_RANGE
 TOK_AND
+TOK_COMMA
 TOK_ALT
 TOK_SYM
 TOK_KEY
 TOK_NOW
 TOK_THEN
 TOK_FILTER
+TOK_SELECT
 
 TOK_GET_SER
 TOK_GET_DAT
@@ -69,14 +71,19 @@ cmd_get_nfo {
 
 cmd_get_ser:
 cmd_get_ser_mand |
-cmd_get_ser_mand valflav_list;
+cmd_get_ser_mand opt_lists;
 
 cmd_get_dat:
 cmd_get_dat_mand |
-cmd_get_dat_mand valflav_list;
+cmd_get_dat_mand opt_lists;
 
 cmd_get_nfo:
 TOK_GET_NFO rolf_obj_list;
+
+opt_lists:
+valflav_list |
+select_list |
+valflav_list select_list;
 
 cmd_get_ser_mand:
 TOK_GET_SER rolf_obj |
@@ -148,6 +155,31 @@ valflav TOK_ALT TOK_SYM {
 	struct valflav_s *vf = msg->valflavs + msg->nvalflavs - 1;
 	resize_alts(vf);
 	vf->alts[vf->nalts++] = strdup($<sval>3);
+};
+
+select_list:
+TOK_SELECT select |
+select_list TOK_COMMA select;
+
+select:
+TOK_SYM {
+	if (strcmp($<sval>1, "sym") == 0) {
+		msg->sel |= SEL_SYM;
+	} else if (strcmp($<sval>1, "rid") == 0) {
+		msg->sel |= SEL_RID;
+	} else if (strcmp($<sval>1, "tid") == 0) {
+		msg->sel |= SEL_TID;
+	} else if (strcmp($<sval>1, "d") == 0 ||
+		   strcmp($<sval>1, "date") == 0) {
+		msg->sel |= SEL_DATE;
+	} else if (strcmp($<sval>1, "vfid") == 0) {
+		msg->sel |= SEL_VFID;
+	} else if (strcmp($<sval>1, "vflav") == 0) {
+		msg->sel |= SEL_VFLAV;
+	} else if (strcmp($<sval>1, "v") == 0 ||
+		   strcmp($<sval>1, "value") == 0) {
+		msg->sel |= SEL_VALUE;
+	}
 };
 
 %%

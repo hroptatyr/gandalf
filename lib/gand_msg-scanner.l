@@ -82,6 +82,7 @@ extern int yyparse(void *scanner, gand_msg_t msg);
 
 ws		[ \t\f\n\r]+
 date		(19|20)[0-9]{2,2}-[0-9]{2,2}-[0-9]{2,2}
+comma		,
 range		-
 and		\+
 alt		"|"|"/"
@@ -92,6 +93,7 @@ key		[a-z_]+
 now		now
 then		then
 filter		--filt(er)?|--flav(our)?
+select		--sel(ect)?
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
@@ -107,6 +109,10 @@ get_nfo		get_i?nfo
 
 {range} {
 	RETURN_TOKEN(TOK_RANGE);
+}
+
+{comma} {
+	RETURN_TOKEN(TOK_COMMA);
 }
 
 {date} {
@@ -151,6 +157,10 @@ get_nfo		get_i?nfo
 
 {filter} {
 	RETURN_TOKEN(TOK_FILTER);
+}
+
+{select} {
+	RETURN_TOKEN(TOK_SELECT);
 }
 
 {sym}|{sym2}|{key} {
