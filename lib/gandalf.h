@@ -84,6 +84,18 @@ struct valflav_s {
 	char **alts;
 };
 
+enum select_e {
+	SEL_ALL = -1,
+	SEL_NOTHING = 0,
+	SEL_SYM = 1,
+	SEL_RID = 2,
+	SEL_TID = 4,
+	SEL_DATE = 8,
+	SEL_VFID = 16,
+	SEL_VFLAV = 32,
+	SEL_VALUE = 64,
+};
+
 struct gand_msg_s {
 	struct gand_msg_hdr_s hdr;
 
@@ -95,6 +107,8 @@ struct gand_msg_s {
 
 	size_t nvalflavs;
 	struct valflav_s *valflavs;
+
+	uint32_t sel;
 };
 
 #define GAND_MSG_ROLF_OBJS_INC	(16)
