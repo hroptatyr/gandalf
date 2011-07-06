@@ -89,15 +89,18 @@ enum select_e {
 	SEL_NOTHING = 0,
 	SEL_SYM = 1,
 	SEL_RID = 2,
-	SEL_TID = 4,
-	SEL_DATE = 8,
-	SEL_VFID = 16,
-	SEL_VFLAV = 32,
-	SEL_VALUE = 64,
+	SEL_QID = 4,
+	SEL_TID = 8,
+	SEL_DATE = 16,
+	SEL_VFID = 32,
+	SEL_VFLAV = 64,
+	SEL_VALUE = 128,
+	SEL_DISC = 256,
 };
 
 struct gand_msg_s {
 	struct gand_msg_hdr_s hdr;
+	uint32_t sel;
 
 	size_t nrolf_objs;
 	struct rolf_obj_s *rolf_objs;
@@ -107,8 +110,6 @@ struct gand_msg_s {
 
 	size_t nvalflavs;
 	struct valflav_s *valflavs;
-
-	uint32_t sel;
 };
 
 #define GAND_MSG_ROLF_OBJS_INC	(16)
