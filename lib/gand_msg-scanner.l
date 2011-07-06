@@ -86,8 +86,7 @@ range		-
 and		"+"|","
 alt		"|"|"/"
 num		[1-9][0-9]*
-sym		[^ \t\f\n\r]+@[[:alnum:]]*
-sym2		[^ \t\f\n\r0-9-][^ \t\f\n\r,+|/]*
+sym		[!#-&()*.0-9\-:;<=>?@A-Za-z\[\]^_`{}~]+
 key		[a-z_]+
 now		now
 then		then
@@ -158,14 +157,14 @@ get_nfo		get_i?nfo
 	RETURN_TOKEN(TOK_SELECT);
 }
 
-{sym}|{sym2}|{key} {
+{sym}|{key} {
 	yylval->sval = yytext;
 	RETURN_TOKEN(TOK_SYM);
 }
 
 <QUO>[^\"]*\" {
+	yytext[yyleng - 1] = '\0';
 	yylval->sval = yytext;
-	yylval->sval[yyleng] = '\0';
 	BEGIN(INITIAL);
 	RETURN_TOKEN(TOK_SYM);
 }
