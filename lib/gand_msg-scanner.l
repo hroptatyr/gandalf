@@ -189,7 +189,17 @@ __parse(gand_msg_t msg, const char *s, size_t l)
 	int res;
 
 	yylex_init(&scanner);
-	buf = yy_scan_string(s, scanner);
+	/* hack to avoid string dup'ing */
+	if (l < 4094) {
+		union {char *p; const char *c;} trick = {
+			.c = s
+		};
+		trick.p[l++] = '\0';
+		trick.p[l++] = '\0';
+		buf = yy_scan_buffer(trick.p, l, scanner);
+	} else {
+		buf = yy_scan_bytes(s, l, scanner);
+	}
 	/* parse him */
 	res = yyparse(scanner, msg);
 	yy_delete_buffer(buf, scanner);
