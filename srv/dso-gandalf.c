@@ -672,7 +672,6 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 #endif	/* DEBUG_FLAG */
 
 	/* just to avoid confusion */
-	msg[msglen] = '\0';
 	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
 		/* definite success */
 		char *buf = NULL;
