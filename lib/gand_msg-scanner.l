@@ -87,7 +87,7 @@ and		"+"|","
 alt		"|"|"/"
 num		[1-9][0-9]*
 sym		[^ \t\f\n\r]+@[[:alnum:]]*
-sym2		[^ \t\f\n\r0-9-][^ \t\f\n\r]*
+sym2		[^ \t\f\n\r0-9-][^ \t\f\n\r,+|/]*
 key		[a-z_]+
 now		now
 then		then
