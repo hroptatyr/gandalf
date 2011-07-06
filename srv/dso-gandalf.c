@@ -393,7 +393,7 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 static void
 bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 {
-	const char *tabs[8];
+	const char *tabs[9];
 
 	/* check if we need to resize */
 	mmmbuf_check_resize(mb, lsz);
@@ -407,6 +407,7 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	tabs[5] = rawmemchr(tabs[4] + 1, '\t');
 	tabs[6] = rawmemchr(tabs[5] + 1, '\t');
 	tabs[7] = rawmemchr(tabs[6] + 1, '\t');
+	tabs[8] = rawmemchr(tabs[7] + 1, '\t');
 
 	/* copy only interesting lines */
 	if (sel & SEL_RID) {
@@ -423,6 +424,18 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 
 	if (sel & SEL_DATE) {
 		copy_between(mb, tabs[4] + 1, tabs[5] + 1);
+	}
+
+	if (sel & SEL_VALUE) {
+		copy_between(mb, tabs[5] + 1, tabs[6] + 1);
+	}
+
+	if (sel & SEL_VFID) {
+		copy_between(mb, tabs[6] + 1, tabs[7] + 1);
+	}
+
+	if (sel & SEL_DISC) {
+		copy_between(mb, tabs[7] + 1, tabs[8] + 1);
 	}
 
 	/* finalise the line */

@@ -95,6 +95,7 @@ enum select_e {
 	SEL_VFID = 32,
 	SEL_VFLAV = 64,
 	SEL_VALUE = 128,
+	SEL_DISC = 256,
 };
 
 struct gand_msg_s {

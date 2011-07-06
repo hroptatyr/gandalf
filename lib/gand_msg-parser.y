@@ -182,6 +182,9 @@ TOK_SYM {
 	} else if (strcmp($<sval>1, "v") == 0 ||
 		   strcmp($<sval>1, "value") == 0) {
 		msg->sel |= SEL_VALUE;
+	} else if (strcmp($<sval>1, "disc") == 0 ||
+		   strcmp($<sval>1, "discont") == 0) {
+		msg->sel |= SEL_DISC;
 	}
 };
 
