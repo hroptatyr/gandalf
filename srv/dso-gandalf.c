@@ -326,11 +326,8 @@ copy_between(struct mmmb_s *mb, const char *from, const char *to)
 }
 
 static void
-bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint8_t sel)
+mmmbuf_check_resize(struct mmmb_s *mb, size_t lsz)
 {
-	const char *tabs[6];
-
-	/* check if we need to resize */
 	if (mb->all == 0) {
 		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
 		mb->buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
@@ -340,6 +337,16 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint8_t sel)
 		mb->buf = mremap(mb->buf, mb->all, new, MREMAP_MAYMOVE);
 		mb->all = new;
 	}
+	return;
+}
+
+static void
+bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
+{
+	const char *tabs[6];
+
+	/* check if we need to resize */
+	mmmbuf_check_resize(mb, lsz);
 
 	/* find all tabs first */
 	tabs[0] = rawmemchr(lin, '\t');
@@ -384,18 +391,50 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint8_t sel)
 }
 
 static void
+bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
+{
+	const char *tabs[8];
+
+	/* check if we need to resize */
+	mmmbuf_check_resize(mb, lsz);
+
+	/* find all tabs first */
+	tabs[0] = rawmemchr(lin, '\t');
+	tabs[1] = rawmemchr(tabs[0] + 1, '\t');
+	tabs[2] = rawmemchr(tabs[1] + 1, '\t');
+	tabs[3] = rawmemchr(tabs[2] + 1, '\t');
+	tabs[4] = rawmemchr(tabs[3] + 1, '\t');
+	tabs[5] = rawmemchr(tabs[4] + 1, '\t');
+	tabs[6] = rawmemchr(tabs[5] + 1, '\t');
+	tabs[7] = rawmemchr(tabs[6] + 1, '\t');
+
+	/* copy only interesting lines */
+	if (sel & SEL_RID) {
+		copy_between(mb, lin, tabs[0] + 1);
+	}
+
+	if (sel & SEL_QID) {
+		copy_between(mb, tabs[0] + 1, tabs[1] + 1);
+	}
+
+	if (sel & SEL_SYM) {
+		copy_between(mb, tabs[1] + 1, tabs[2] + 1);
+	}
+
+	if (sel & SEL_DATE) {
+		copy_between(mb, tabs[4] + 1, tabs[5] + 1);
+	}
+
+	/* finalise the line */
+	mb->buf[mb->bsz - 1] = '\n';
+	return;
+}
+
+static void
 bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 {
 	/* check if we need to resize */
-	if (mb->all == 0) {
-		size_t ini_sz = (lsz & ~(BUF_INC - 1)) + BUF_INC;
-		mb->buf = mmap(NULL, ini_sz, PROT_MEM, MAP_MEM, 0, 0);
-		mb->all = ini_sz;
-	} else if (mb->bsz + lsz + 1 > mb->all) {
-		size_t new = ((mb->bsz + lsz) & ~(BUF_INC - 1)) + BUF_INC;
-		mb->buf = mremap(mb->buf, mb->all, new, MREMAP_MAYMOVE);
-		mb->all = new;
-	}
+	mmmbuf_check_resize(mb, lsz);
 
 	/* copy only interesting lines */
 	memcpy(mb->buf + mb->bsz, lin, lsz);
@@ -553,7 +592,11 @@ get_nfo(char **buf, gand_msg_t msg)
 			cend = __eol(cand, mf.m.bsz - (cand - mf.m.buf));
 
 			/* bang the line */
-			bang_whole_line(&mb, cand, cend - cand);
+			if (msg->sel == SEL_ALL || msg->sel == SEL_NOTHING) {
+				bang_whole_line(&mb, cand, cend - cand);
+			} else {
+				bang_nfo_line(&mb, cand, cend - cand, msg->sel);
+			}
 			cand = cend;
 		}
 	}

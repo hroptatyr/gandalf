@@ -75,7 +75,8 @@ cmd_get_dat:
 cmd_get_dat_mand opt_lists;
 
 cmd_get_nfo:
-TOK_GET_NFO rolf_obj_list;
+TOK_GET_NFO rolf_obj_list |
+TOK_GET_NFO rolf_obj_list select_list;
 
 opt_lists:
 |
@@ -167,6 +168,8 @@ TOK_SYM {
 		msg->sel |= SEL_SYM;
 	} else if (strcmp($<sval>1, "rid") == 0) {
 		msg->sel |= SEL_RID;
+	} else if (strcmp($<sval>1, "qid") == 0) {
+		msg->sel |= SEL_QID;
 	} else if (strcmp($<sval>1, "tid") == 0) {
 		msg->sel |= SEL_TID;
 	} else if (strcmp($<sval>1, "d") == 0 ||
