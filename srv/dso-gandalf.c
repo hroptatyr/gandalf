@@ -195,19 +195,21 @@ free_info_name(const char *UNUSED(sym))
 
 
 static int
-mmap_whole_file(struct mmfb_s *mf, const char *f)
+mmap_whole_file(struct mmfb_s *mf, const char *f, size_t fsz)
 {
-	struct stat st[1];
-
-	if (UNLIKELY(stat(f, st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
+	if (LIKELY(fsz == 0)) {
+		struct stat st[1];
+		if (UNLIKELY(stat(f, st) < 0 || (fsz = st->st_size) == 0)) {
+			return -1;
+		}
+	}
+	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
 		return -1;
 	}
 
 	/* mmap the file */
-	mf->m.buf = mmap(NULL, st->st_size, PROT_READ, MAP_SHARED, mf->fd, 0);
-	return mf->m.all = mf->m.bsz = st->st_size;
+	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
+	return mf->m.all = mf->m.bsz = fsz;
 }
 
 static void
@@ -495,21 +497,19 @@ get_rolf_id(struct rolf_obj_s *robj)
 }
 
 static size_t
-get_ser(char **buf, gand_msg_t msg)
+__get_ser(char **buf, gand_msg_t msg, struct rolf_obj_s *rob)
 {
 	struct mmmb_s mb = {0};
 	struct mmfb_s mf = {.m = {0}, .fd = -1};
 	const char *f;
 	uint32_t rid;
 
-	/* general checks and get us the lateglu name */
-	if (UNLIKELY(msg->nrolf_objs == 0)) {
-		return 0UL;
-	} else if ((rid = get_rolf_id(msg->rolf_objs)) == 0) {
+	/* get us the lateglu name */
+	if ((rid = get_rolf_id(rob)) == 0) {
 		return 0UL;
 	} else if ((f = make_lateglu_name(rid)) == NULL) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f) < 0) {
+	} else if (mmap_whole_file(&mf, f, 0) < 0) {
 		goto out;
 	}
 
@@ -533,6 +533,15 @@ get_ser(char **buf, gand_msg_t msg)
 out:
 	free_lateglu_name(f);
 	return mb.bsz;
+}
+
+static size_t
+get_ser(char **buf, gand_msg_t msg)
+{
+	if (UNLIKELY(msg->nrolf_objs == 0)) {
+		return 0UL;
+	}
+	return __get_ser(buf, msg, msg->rolf_objs);
 }
 
 static const char*
@@ -570,7 +579,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_info_name()) == NULL) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f) < 0) {
+	} else if (mmap_whole_file(&mf, f, 0) < 0) {
 		goto out;
 	}
 
@@ -644,6 +653,7 @@ interpret_msg(char **buf, gand_msg_t msg)
 	case GAND_MSG_GET_DAT:
 		GAND_DEBUG(MOD_PRE ": get_date msg %zu rids\n",
 			   msg->nrolf_objs);
+		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_NFO:
@@ -727,7 +737,9 @@ handle_inot(
 	const struct stat *st, void *UNUSED(data))
 {
 	/* check if someone trunc'd us the file */
-	if (st->st_size == 0) {
+	if (UNLIKELY(st == NULL)) {
+		/* good */
+	} else if (UNLIKELY(st->st_size == 0)) {
 		return -1;
 	}
 
@@ -735,7 +747,7 @@ handle_inot(
 	munmap_all(&grsym);
 	/* reinit */
 	GAND_DEBUG(MOD_PRE ": building sym table ...");
-	if (mmap_whole_file(&grsym, f) < 0) {
+	if (mmap_whole_file(&grsym, f, st ? st->st_size : 0) < 0) {
 		GAND_DBGCONT("failed\n");
 		return -1;
 	}
@@ -744,7 +756,7 @@ handle_inot(
 }
 
 
-static ud_conn_t
+static ud_conn_t __attribute__((noinline))
 gand_init_inot(ud_ctx_t UNUSED(ctx), const char *file)
 {
 	ud_conn_t res = make_inot_conn(file, handle_inot, NULL);
