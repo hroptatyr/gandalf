@@ -87,11 +87,10 @@ static struct mmfb_s grsym = {
 
 /* connexion<->proto glue */
 static int
-wr_fin_cb(ud_conn_t UNUSED(c), void *data)
+wr_fin_cb(ud_conn_t UNUSED(c), char *buf, size_t bsz, void *UNUSED(data))
 {
-	char *buf = data;
 	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
-	free(buf);
+	munmap(buf, bsz);
 	return 0;
 }
 
@@ -465,12 +464,12 @@ bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 	return;
 }
 
-static uint32_t
-get_rolf_id(struct rolf_obj_s *robj)
+static uint32_t __attribute__((noinline))
+get_rolf_id(const char **state, struct rolf_obj_s *robj)
 {
-	uint32_t rid = 0U;
 	const char *rsym;
 	size_t rssz;
+	const char *cand;
 	size_t rest;
 
 	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
@@ -483,65 +482,81 @@ get_rolf_id(struct rolf_obj_s *robj)
 	/* set up */
 	rsym = robj->rolf_sym;
 	rssz = strlen(rsym);
-	for (const char *cand = (rest = grsym.m.bsz, grsym.m.buf);
-	     (cand = memmem(cand, rest, rsym, rssz)) != NULL;
-	     rest = grsym.m.bsz - (cand - grsym.m.buf)) {
+	if (UNLIKELY(state && *state)) {
+		cand = *state;
+		rest = grsym.m.bsz - (*state - grsym.m.buf);
+	} else {
+		cand = grsym.m.buf;
+		rest = grsym.m.bsz;
+	}
+	while ((cand = memmem(cand, rest, rsym, rssz))) {
 		if (cand == grsym.m.buf || cand[-1] == '\n') {
 			/* we've got a prefix match */
-			cand = rawmemchr(cand, '\t');
+			uint32_t rid;
+
+			rest = grsym.m.bsz - (cand - grsym.m.buf);
+			cand = memchr(cand, '\t', rest);
 			rid = strtoul(cand + 1, NULL, 10);
-			break;
+			*state = cand + 1;
+			return rid;
 		}
+		rest = grsym.m.bsz - (cand - grsym.m.buf);
 	}
-	return rid;
+	*state = NULL;
+	return 0U;
 }
 
-static size_t
-__get_ser(char **buf, gand_msg_t msg, struct rolf_obj_s *rob)
+static void
+__get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 {
-	struct mmmb_s mb = {0};
 	struct mmfb_s mf = {.m = {0}, .fd = -1};
 	const char *f;
-	uint32_t rid;
 
+	GAND_DEBUG("get_ser(%u)\n", rid);
 	/* get us the lateglu name */
-	if ((rid = get_rolf_id(rob)) == 0) {
-		return 0UL;
-	} else if ((f = make_lateglu_name(rid)) == NULL) {
-		return 0UL;
+	if ((f = make_lateglu_name(rid)) == NULL) {
+		return;
 	} else if (mmap_whole_file(&mf, f, 0) < 0) {
 		goto out;
 	}
 
 	for (size_t idx = 0; idx < mf.m.bsz; ) {
 		const char *lin = mf.m.buf + idx;
-		char *eol = rawmemchr(lin, '\n');
+		char *eol = memchr(lin, '\n', mf.m.bsz - idx);
 		size_t lsz = eol - lin;
 
 #define DEFAULT_SEL	(SEL_SYM | SEL_DATE | SEL_VFLAV | SEL_VALUE)
 		if (match_msg_p(lin, lsz, msg)) {
-			bang_line(&mb, lin, lsz, msg->sel ?: DEFAULT_SEL);
+			bang_line(mb, lin, lsz, msg->sel ?: DEFAULT_SEL);
 		}
 		idx += lsz + 1;
 	}
 
-	/* prepare output */
-	mmmb_freeze(&mb);
-	*buf = mb.buf;
 	/* free the resources */
 	munmap_all(&mf);
 out:
 	free_lateglu_name(f);
-	return mb.bsz;
+	return;
 }
 
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
-	if (UNLIKELY(msg->nrolf_objs == 0)) {
-		return 0UL;
+	struct mmmb_s mb = {0};
+
+	for (size_t i = 0; i < msg->nrolf_objs; i++) {
+		uint32_t rid;
+		const char *st = NULL;
+
+		while ((rid = get_rolf_id(&st, msg->rolf_objs + i))) {
+			__get_ser(&mb, msg, rid);
+		}
 	}
-	return __get_ser(buf, msg, msg->rolf_objs);
+
+	/* prepare output */
+	mmmb_freeze(&mb);
+	*buf = mb.buf;
+	return mb.bsz;
 }
 
 static const char*
@@ -756,7 +771,7 @@ handle_inot(
 }
 
 
-static ud_conn_t __attribute__((noinline))
+static ud_conn_t
 gand_init_inot(ud_ctx_t UNUSED(ctx), const char *file)
 {
 	ud_conn_t res = make_inot_conn(file, handle_inot, NULL);
