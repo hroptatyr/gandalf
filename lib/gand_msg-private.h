@@ -4,6 +4,10 @@
 #include <sys/mman.h>
 #include "gandalf.h"
 
+#if !defined UNUSED
+# define UNUSED(_x)	_x __attribute__((unused))
+#endif	/* !UNUSED */
+
 static inline void
 resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {
@@ -19,7 +23,7 @@ resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 }
 
 static inline void
-unsize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
+unsize_mall(void **ptr, size_t cnt, size_t UNUSED(blksz), size_t UNUSED(inc))
 {
 	if (*ptr == NULL || cnt == 0) {
 		return;
