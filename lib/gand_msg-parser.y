@@ -95,8 +95,8 @@ TOK_GET_SER rolf_obj |
 TOK_GET_SER rolf_obj date_range_list;
 
 cmd_get_dat_mand:
-TOK_GET_DAT date |
-TOK_GET_DAT date rolf_obj_list;
+TOK_GET_DAT date_range |
+TOK_GET_DAT date_range rolf_obj_list;
 
 rolf_obj_list:
 rolf_obj |
