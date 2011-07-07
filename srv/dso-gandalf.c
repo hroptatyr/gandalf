@@ -232,9 +232,11 @@ match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
 	const char *dt;
 	idate_t idt;
 
-	dt = rawmemchr(ln, '\t');
-	dt = rawmemchr(dt + 1, '\t');
-	dt = rawmemchr(dt + 1, '\t');
+	if ((dt = memchr(ln, '\t', lsz)) == NULL ||
+	    (dt = memchr(dt + 1, '\t', lsz)) == NULL ||
+	    (dt = memchr(dt + 1, '\t', lsz)) == NULL) {
+		return false;
+	}
 
 	idt = __to_idate(dt + 1);
 	if (idt >= dr->beg && idt <= dr->end) {
@@ -261,12 +263,15 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	const char *a;
 	const char *eoa;
 
-	a = rawmemchr(ln, '\t');
-	a = rawmemchr(a + 1, '\t');
-	a = rawmemchr(a + 1, '\t');
-	a = rawmemchr(a + 1, '\t');
-	a = rawmemchr(a + 1, '\t');
-	eoa = rawmemchr(++a, '\t');
+	if ((a = memchr(ln, '\t', lsz)) == NULL ||
+	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
+	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
+	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
+	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
+	    (eoa = memchr(++a, '\t', lsz)) == NULL) {
+		/* no chance to match if we cant even find it */
+		return false;
+	}
 
 	if (strncmp(vf->this, a, eoa - a) == 0) {
 		/* never try any alternatives */
@@ -718,9 +723,14 @@ handle_close(ud_conn_t c, void *data)
 
 static int
 handle_inot(
-	ud_conn_t c, const char *f,
-	const struct stat *UNUSED(st), void *UNUSED(data))
+	ud_conn_t UNUSED(c), const char *f,
+	const struct stat *st, void *UNUSED(data))
 {
+	/* check if someone trunc'd us the file */
+	if (st->st_size == 0) {
+		return -1;
+	}
+
 	/* off with the old guy */
 	munmap_all(&grsym);
 	/* reinit */
