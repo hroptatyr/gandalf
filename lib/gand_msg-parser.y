@@ -21,8 +21,12 @@ extern int yylex(void*, void *scanner);
 #define YYLTYPE_IS_TRIVIAL	1
 #define YYSTACK_USE_ALLOCA	1
 
+#if !defined UNUSED
+# define UNUSED(_x)	_x __attribute__((unused))
+#endif	/* !UNUSED */
+
 static int
-yyerror(void *sca, gand_msg_t msg, char *s)
+yyerror(void *UNUSED(sca), gand_msg_t UNUSED(msg), char *UNUSED(s))
 {
 	return -1;
 }
