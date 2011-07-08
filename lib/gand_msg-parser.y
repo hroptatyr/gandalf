@@ -140,6 +140,28 @@ date TOK_RANGE date {
 		msg->date_rngs[idx].end = idt1;
 	}
 	msg->ndate_rngs++;
+} |
+date TOK_RANGE TOK_INUM {
+	/* special syntax 2010-02-19 -3, 3 points till 2010-02-19 */
+	size_t idx = msg->ndate_rngs;
+	idate_t idt1 = $<ival>1;
+	idate_t idt2 = $<ival>3;
+
+	resize_date_rngs(msg);
+	msg->date_rngs[idx].beg = idt2;
+	msg->date_rngs[idx].end = idt1;
+	msg->ndate_rngs++;
+} |
+date TOK_AND TOK_INUM {
+	/* special syntax 2010-02-19 +3, 3 points from 2010-02-19 */
+	size_t idx = msg->ndate_rngs;
+	idate_t idt1 = $<ival>1;
+	idate_t idt2 = $<ival>3;
+
+	resize_date_rngs(msg);
+	msg->date_rngs[idx].beg = idt1;
+	msg->date_rngs[idx].end = idt2;
+	msg->ndate_rngs++;
 };
 
 date:
