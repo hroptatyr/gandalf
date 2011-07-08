@@ -72,6 +72,8 @@ struct rolf_obj_s {
 	char *rolf_sym;
 };
 
+#define DATE_RNG_NOW	(99991232)
+#define DATE_RNG_THEN	(10000000)
 struct date_rng_s {
 	idate_t beg;
 	idate_t end;

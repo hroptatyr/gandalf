@@ -132,12 +132,12 @@ get_nfo		get_i?nfo
 }
 
 {now} {
-	yylval->ival = 99991232;
+	yylval->ival = DATE_RNG_NOW;
 	RETURN_TOKEN(TOK_NOW);
 }
 
 {then} {
-	yylval->ival = 0;
+	yylval->ival = DATE_RNG_THEN;
 	RETURN_TOKEN(TOK_THEN);
 }
 
