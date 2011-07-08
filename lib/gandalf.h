@@ -53,6 +53,10 @@ typedef struct gand_msg_s *gand_msg_t;
 
 typedef uint32_t idate_t;
 
+typedef struct valflav_s *valflav_t;
+typedef struct rolf_obj_s *rolf_obj_t;
+typedef struct date_rng_s *date_rng_t;
+
 /* message types */
 typedef enum {
 	GAND_MSG_UNK,
