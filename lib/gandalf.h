@@ -53,6 +53,10 @@ typedef struct gand_msg_s *gand_msg_t;
 
 typedef uint32_t idate_t;
 
+typedef struct valflav_s *valflav_t;
+typedef struct rolf_obj_s *rolf_obj_t;
+typedef struct date_rng_s *date_rng_t;
+
 /* message types */
 typedef enum {
 	GAND_MSG_UNK,
@@ -72,6 +76,8 @@ struct rolf_obj_s {
 	char *rolf_sym;
 };
 
+#define DATE_RNG_NOW	(99991232)
+#define DATE_RNG_THEN	(10000000)
 struct date_rng_s {
 	idate_t beg;
 	idate_t end;

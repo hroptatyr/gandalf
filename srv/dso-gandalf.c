@@ -84,6 +84,14 @@ static struct mmfb_s grsym = {
 	.fd = -1,
 };
 
+/* match state */
+struct ms_s {
+	int cnt;
+	/* the date that made a match */
+	idate_t m_date;
+	idate_t last;
+};
+
 
 /* connexion<->proto glue */
 static int
@@ -228,7 +236,7 @@ munmap_all(struct mmfb_s *mf)
 }
 
 static bool
-match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
+match_date1_p(struct ms_s *state, const char *ln, size_t lsz, date_rng_t dr)
 {
 	const char *dt;
 	idate_t idt;
@@ -240,8 +248,22 @@ match_date1_p(const char *ln, size_t lsz, struct date_rng_s *dr)
 	}
 
 	idt = __to_idate(dt + 1);
-	if (idt >= dr->beg && idt <= dr->end) {
-		return true;
+	if (dr->beg >= DATE_RNG_THEN && dr->end >= DATE_RNG_THEN) {
+		if (idt >= dr->beg && idt <= dr->end) {
+			return true;
+		}
+	} else {
+		/* special thing to write 1992-03-03 -3 */
+		if (dr->beg >= DATE_RNG_THEN && idt >= dr->beg) {
+			if (idt == state->last) {
+				/* trivially true */
+				return true;
+			} else if (state->cnt++ < dr->end) {
+				state->last = idt;
+				return true;
+			}
+			return false;
+		}
 	}
 	return false;
 }
@@ -290,13 +312,15 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 }
 
 static bool
-match_msg_p(const char *ln, size_t lsz, gand_msg_t msg)
+match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
 {
+/* special date syntax 2010-02-19 -3 means
+ * 2010-02-19 and 2 points before that */
 	bool res;
 
 	res = msg->ndate_rngs == 0;
 	for (size_t i = 0; i < msg->ndate_rngs; i++) {
-		if (match_date1_p(ln, lsz, msg->date_rngs + i)) {
+		if (match_date1_p(state, ln, lsz, msg->date_rngs + i)) {
 			res = true;
 			break;
 		}
@@ -510,6 +534,7 @@ static void
 __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 {
 	struct mmfb_s mf = {.m = {0}, .fd = -1};
+	struct ms_s state = {0};
 	const char *f;
 
 	GAND_DEBUG("get_ser(%u)\n", rid);
@@ -526,7 +551,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 		size_t lsz = eol - lin;
 
 #define DEFAULT_SEL	(SEL_SYM | SEL_DATE | SEL_VFLAV | SEL_VALUE)
-		if (match_msg_p(lin, lsz, msg)) {
+		if (match_msg_p(&state, lin, lsz, msg)) {
 			bang_line(mb, lin, lsz, msg->sel ?: DEFAULT_SEL);
 		}
 		idx += lsz + 1;

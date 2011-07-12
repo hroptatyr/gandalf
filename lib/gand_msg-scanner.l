@@ -86,7 +86,7 @@ range		-
 and		"+"|","
 alt		"|"|"/"
 num		[1-9][0-9]*
-sym		[!#-&()*.0-9\-:;<=>?@A-Za-z\[\]^_`{}~]+
+sym		[!#-&()*.:;<=>?0@A-Za-z\[\]^_`{}~][!#-&()*.0-9\-:;<=>?@A-Za-z\[\]^_`{}~]*
 key		[a-z_]+
 now		now
 then		then
@@ -132,12 +132,12 @@ get_nfo		get_i?nfo
 }
 
 {now} {
-	yylval->ival = 99991232;
+	yylval->ival = DATE_RNG_NOW;
 	RETURN_TOKEN(TOK_NOW);
 }
 
 {then} {
-	yylval->ival = 0;
+	yylval->ival = DATE_RNG_THEN;
 	RETURN_TOKEN(TOK_THEN);
 }
 
