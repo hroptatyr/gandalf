@@ -524,6 +524,7 @@ get_rolf_id(const char **state, struct rolf_obj_s *robj)
 			*state = cand + 1;
 			return rid;
 		}
+		cand++;
 		rest = grsym.m.bsz - (cand - grsym.m.buf);
 	}
 	*state = NULL;
