@@ -494,7 +494,7 @@ get_rolf_id(const char **state, struct rolf_obj_s *robj)
 	const char *rsym;
 	size_t rssz;
 	const char *cand;
-	size_t rest;
+	ssize_t rest;
 
 	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
 	if (LIKELY(robj->rolf_id > 0)) {
@@ -517,15 +517,17 @@ get_rolf_id(const char **state, struct rolf_obj_s *robj)
 		if (cand == grsym.m.buf || cand[-1] == '\n') {
 			/* we've got a prefix match */
 			uint32_t rid;
+			char *next = NULL;
 
 			rest = grsym.m.bsz - (cand - grsym.m.buf);
 			cand = memchr(cand, '\t', rest);
-			rid = strtoul(cand + 1, NULL, 10);
-			*state = cand + 1;
+			rid = strtoul(cand + 1, &next, 10);
+			*state = next ?: cand + 1;
 			return rid;
 		}
-		cand++;
-		rest = grsym.m.bsz - (cand - grsym.m.buf);
+		if ((rest = grsym.m.bsz - (++cand - grsym.m.buf)) <= 0) {
+			break;
+		}
 	}
 	*state = NULL;
 	return 0U;
