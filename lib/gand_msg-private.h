@@ -3,6 +3,7 @@
 
 #include <sys/mman.h>
 #include "gandalf.h"
+#include "nifty.h"
 
 #if !defined UNUSED
 # define UNUSED(_x)	_x __attribute__((unused))
@@ -63,7 +64,6 @@ unsize_mmap(void **ptr, size_t cnt, size_t blksz, size_t inc)
 	}
 
 	sz = (cnt / inc + 1) * inc * blksz;
-	fprintf(stderr, "munmapping %p %zu\n", *ptr, sz);
 	munmap(*ptr, sz);
 	*ptr = NULL;
 	return;

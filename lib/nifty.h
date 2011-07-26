@@ -80,15 +80,15 @@
 #if defined DEBUG_FLAG
 # include <stdio.h>
 # define GAND_DEBUG(args...)			\
-	fprintf(logout, "[gand] " args)
+	fprintf(gand_logout, "[gand] " args)
 # define GAND_DBGCONT(args...)			\
-	fprintf(logout, args)
+	fprintf(gand_logout, args)
 #else  /* !DEBUG_FLAG */
 # define GAND_DEBUG(args...)
 # define GAND_DBGCONT(args...)
 #endif	/* DEBUG_FLAG */
 
 /* fixme, any chance we can get that one from the server? */
-#define logout		stderr
+extern void *gand_logout;
 
 #endif	/* INCLUDED_nifty_h_ */

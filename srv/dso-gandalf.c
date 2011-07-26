@@ -55,7 +55,11 @@
 #include "gandalf.h"
 #include "nifty.h"
 
-#define MOD_PRE		"mod/gandalf"
+/* we assume unserding with logger feature */
+#define GAND_MOD		"[mod/gand]"
+#define GAND_INFO_LOG(args...)	UD_SYSLOG(LOG_INFO, GAND_MOD " " args)
+#define GAND_ERR_LOG(args...)	UD_SYSLOG(LOG_ERR, GAND_MOD " ERROR " args)
+#define GAND_CRIT_LOG(args...)	UD_SYSLOG(LOG_CRIT, GAND_MOD " CRITICAL " args)
 
 /* mmap buffers, memory and file based */
 struct mmmb_s {
@@ -97,7 +101,7 @@ struct ms_s {
 static int
 wr_fin_cb(ud_conn_t UNUSED(c), char *buf, size_t bsz, void *UNUSED(data))
 {
-	GAND_DEBUG(MOD_PRE ": finished writing buf %p\n", buf);
+	GAND_INFO_LOG("finished writing buf %p", buf);
 	munmap(buf, bsz);
 	return 0;
 }
@@ -303,7 +307,9 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	}
 	for (size_t i = 0; i < vf->nalts; i++) {
 		if (strncmp(vf->alts[i], a, eoa - a) == 0) {
-			GAND_DEBUG("matched %zu-th alt, cancelling\n", i);
+			GAND_DEBUG(
+				GAND_MOD " matched %zu-th alt, cancelling\n",
+				i);
 			cancel_alts(vf, i);
 			return true;
 		}
@@ -540,7 +546,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	struct ms_s state = {0};
 	const char *f;
 
-	GAND_DEBUG("get_ser(%u)\n", rid);
+	GAND_INFO_LOG("get_ser(%u)", rid);
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
@@ -688,25 +694,24 @@ interpret_msg(char **buf, gand_msg_t msg)
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SER:
-		GAND_DEBUG(MOD_PRE ": get_series msg %zu dates  %zu vfs\n",
-			   msg->ndate_rngs, msg->nvalflavs);
+		GAND_INFO_LOG(
+			"get_series msg %zu dates  %zu vfs",
+			msg->ndate_rngs, msg->nvalflavs);
 		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_DAT:
-		GAND_DEBUG(MOD_PRE ": get_date msg %zu rids\n",
-			   msg->nrolf_objs);
+		GAND_INFO_LOG("get_date msg %zu rids", msg->nrolf_objs);
 		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_NFO:
-		GAND_DEBUG(MOD_PRE ": get_info msg %zu rids\n",
-			   msg->nrolf_objs);
+		GAND_INFO_LOG("get_info msg %zu rids", msg->nrolf_objs);
 		len = get_nfo(buf, msg);
 		break;
 
 	default:
-		GAND_DEBUG(MOD_PRE ": unknown message %u\n", msg->hdr.mt);
+		GAND_ERR_LOG("unknown message %u", msg->hdr.mt);
 		break;
 	}
 	/* free 'im 'ere */
@@ -723,11 +728,12 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 	gand_ctx_t p = data;
 	gand_msg_t umsg;
 
-	GAND_DEBUG(MOD_PRE "/ctx: %p %zu\n", c, msglen);
+	GAND_DEBUG(GAND_MOD "/ctx: %p %zu\n", c, msglen);
 #if defined DEBUG_FLAG
 	/* safely write msg to logerr now */
 	fwrite(msg, msglen, 1, logout);
 #endif	/* DEBUG_FLAG */
+	GAND_INFO_LOG("%s", msg);
 
 	/* just to avoid confusion */
 	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
@@ -739,19 +745,21 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 		/* serialise, put results in BUF*/
 		if ((len = interpret_msg(&buf, umsg)) &&
 		    (wr = ud_write_soon(c, buf, len, wr_fin_cb))) {
-			GAND_DEBUG(
-				MOD_PRE ": installing buf wr'er %p %p %zu\n",
+			GAND_INFO_LOG(
+				"installing buf wr'er %p %p %zu",
 				wr, buf, len);
 			ud_conn_put_data(wr, buf);
 			return 0;
+		} else if (buf && len) {
+			wr_fin_cb(NULL, buf, len, NULL);
 		}
 		p = NULL;
 
 	} else if (/* umsg == NULL && */p == NULL) {
 		/* error occurred */
-		GAND_DEBUG(MOD_PRE ": ERROR\n");
+		GAND_ERR_LOG("context has disappeared, cleaning up");
 	} else {
-		GAND_DEBUG(MOD_PRE ": need more grub\n");
+		GAND_INFO_LOG("need more grub");
 	}
 	ud_conn_put_data(c, p);
 	return 0;
@@ -760,7 +768,7 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 static int
 handle_close(ud_conn_t c, void *data)
 {
-	GAND_DEBUG("forgetting about %p\n", c);
+	GAND_INFO_LOG("forgetting about %p", c);
 	if (data) {
 		/* finalise the push parser to avoid mem leaks */
 		gand_msg_t msg = gand_parse_blob_r(&data, data, 0);
@@ -789,12 +797,12 @@ handle_inot(
 	/* off with the old guy */
 	munmap_all(&grsym);
 	/* reinit */
-	GAND_DEBUG(MOD_PRE ": building sym table ...");
+	GAND_INFO_LOG("building sym table ...");
 	if (mmap_whole_file(&grsym, f, st ? st->st_size : 0) < 0) {
-		GAND_DBGCONT("failed\n");
+		GAND_ERR_LOG("sym table building failed");
 		return -1;
 	}
-	GAND_DBGCONT("done\n");
+	GAND_INFO_LOG("new sym table built");
 	return 0;
 }
 
@@ -850,6 +858,7 @@ static ud_conn_t __cnet = NULL;
 static ud_conn_t __cuds = NULL;
 /* path to unix domain socket */
 static const char *gand_sock_path;
+void *gand_logout;
 
 void
 init(void *clo)
@@ -857,14 +866,13 @@ init(void *clo)
 	ud_ctx_t ctx = clo;
 	void *settings;
 
-	GAND_DEBUG(MOD_PRE ": loading ...");
+	GAND_INFO_LOG("loading gandalf module");
 
 	/* glue to lua settings */
 	if ((settings = udctx_get_setting(ctx)) == NULL) {
-		GAND_DBGCONT("failed\n");
+		GAND_ERR_LOG("settings could not be read\n");
 		return;
 	}
-	GAND_DBGCONT("\n");
 	/* obtain the unix domain sock from our settings */
 	__cuds = gand_init_uds_sock(&gand_sock_path, ctx, settings);
 	/* obtain port number for our network socket */
@@ -873,7 +881,13 @@ init(void *clo)
 	/* inotify the symbol file */
 	gand_init_inot(ctx, make_symbol_name());
 
-	GAND_DEBUG(MOD_PRE ": ... loaded (%s)\n", trolfdir);
+	GAND_INFO_LOG("successfully loaded, trolfdir is %s", trolfdir);
+
+#if defined DEBUG_FLAG
+	gand_logout = stderr;
+#else  /* !DEBUG_FLAG */
+	gand_logout = fopen("/dev/null", "w");
+#endif	/* DEBUG_FLAG */
 
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
@@ -883,14 +897,14 @@ init(void *clo)
 void
 reinit(void *UNUSED(clo))
 {
-	GAND_DEBUG(MOD_PRE ": reloading ...done\n");
+	GAND_INFO_LOG("reloading gandalf module ... done");
 	return;
 }
 
 void
 deinit(void *UNUSED(clo))
 {
-	GAND_DEBUG(MOD_PRE ": unloading ...");
+	GAND_INFO_LOG("unloading gandalf module");
 	if (__cnet) {
 		ud_conn_fini(__cnet);
 	}
@@ -904,7 +918,8 @@ deinit(void *UNUSED(clo))
 	if (gand_sock_path != NULL) {
 		unlink(gand_sock_path);
 	}
-	GAND_DBGCONT("done\n");
+	fclose(gand_logout);
+	GAND_INFO_LOG("gandalf successfully unloaded");
 	return;
 }
 
