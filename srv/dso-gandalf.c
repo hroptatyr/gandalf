@@ -750,6 +750,8 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 				wr, buf, len);
 			ud_conn_put_data(wr, buf);
 			return 0;
+		} else if (buf && len) {
+			wr_fin_cb(NULL, buf, len, NULL);
 		}
 		p = NULL;
 
