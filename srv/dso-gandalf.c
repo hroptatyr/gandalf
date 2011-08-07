@@ -101,7 +101,6 @@ struct ms_s {
 static int
 wr_fin_cb(ud_conn_t UNUSED(c), char *buf, size_t bsz, void *UNUSED(data))
 {
-	GAND_INFO_LOG("finished writing buf %p", buf);
 	munmap(buf, bsz);
 	return 0;
 }
@@ -703,19 +702,14 @@ interpret_msg(char **buf, gand_msg_t msg)
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SER:
-		GAND_INFO_LOG(
-			"get_series msg %zu dates  %zu vfs",
-			msg->ndate_rngs, msg->nvalflavs);
 		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_DAT:
-		GAND_INFO_LOG("get_date msg %zu rids", msg->nrolf_objs);
 		len = get_ser(buf, msg);
 		break;
 
 	case GAND_MSG_GET_NFO:
-		GAND_INFO_LOG("get_info msg %zu rids", msg->nrolf_objs);
 		len = get_nfo(buf, msg);
 		break;
 
@@ -754,9 +748,6 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 		/* serialise, put results in BUF*/
 		if ((len = interpret_msg(&buf, umsg)) &&
 		    (wr = ud_write_soon(c, buf, len, wr_fin_cb))) {
-			GAND_INFO_LOG(
-				"installing buf wr'er %p %p %zu",
-				wr, buf, len);
 			ud_conn_put_data(wr, buf);
 			return 0;
 		} else if (buf && len) {
@@ -777,7 +768,6 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 static int
 handle_close(ud_conn_t c, void *data)
 {
-	GAND_INFO_LOG("forgetting about %p", c);
 	if (data) {
 		/* finalise the push parser to avoid mem leaks */
 		gand_msg_t msg = gand_parse_blob_r(&data, data, 0);
