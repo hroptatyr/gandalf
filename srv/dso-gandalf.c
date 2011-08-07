@@ -503,9 +503,16 @@ get_rolf_id(const char **state, struct rolf_obj_s *robj)
 	ssize_t rest;
 
 	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
-	if (LIKELY(robj->rolf_id > 0)) {
+	if (LIKELY(robj->rolf_id > 0 && (state == NULL || *state == NULL))) {
+		if (state) {
+			*state = grsym.m.buf;
+		}
 		return robj->rolf_id;
+	} else if (LIKELY(robj->rolf_id > 0)) {
+		/* repeated query */
+		return 0U;
 	} else if (grsym.m.buf == NULL) {
+		*state = NULL;
 		return 0U;
 	}
 
@@ -578,11 +585,13 @@ get_ser(char **buf, gand_msg_t msg)
 {
 	struct mmmb_s mb = {0};
 
+	GAND_DEBUG("nrolf_objs %zu\n", msg->nrolf_objs);
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
 		uint32_t rid;
 		const char *st = NULL;
 
 		while ((rid = get_rolf_id(&st, msg->rolf_objs + i))) {
+			GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
 			__get_ser(&mb, msg, rid);
 		}
 	}
@@ -731,7 +740,7 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 	GAND_DEBUG(GAND_MOD "/ctx: %p %zu\n", c, msglen);
 #if defined DEBUG_FLAG
 	/* safely write msg to logerr now */
-	fwrite(msg, msglen, 1, logout);
+	fwrite(msg, msglen, 1, gand_logout);
 #endif	/* DEBUG_FLAG */
 	GAND_INFO_LOG("%s", msg);
 
