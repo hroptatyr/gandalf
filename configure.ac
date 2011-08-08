@@ -29,7 +29,7 @@ AM_INIT_AUTOMAKE([foreign])
 ## initialise our cool message nest levels
 SXE_INIT_MSG_LEVEL
 
-if test -n "${CFLAGS}"; then
+if test -z "${CFLAGS}"; then
 	CFLAGS="-g -O3 -Wall -Wunused -Wunused-function"
 fi
 
