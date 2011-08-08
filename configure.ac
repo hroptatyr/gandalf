@@ -71,7 +71,10 @@ AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
-AM_CONDITIONAL([BUILD_LIBRARY], [test "yes" = "yes"])
+AC_ARG_ENABLE([library], [
+AS_HELP_STRING([--enable-library], [Build the library, default: yes.])],
+	[enable_library="${enableval}"], [enable_library="yes"])
+AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
