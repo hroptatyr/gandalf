@@ -10,6 +10,8 @@ BUILT_SOURCES =
 CLEANFILES =
 
 if BUILD_SERVER
+pkgconfigdir = ${libdir}/pkgconfig
+pkgconfig_DATA = gandalf.pc
 moddir = $(libdir)/unserding
 mod_LTLIBRARIES = dso-gandalf.la
 dso_gandalf_la_SOURCES = dso-gandalf.c

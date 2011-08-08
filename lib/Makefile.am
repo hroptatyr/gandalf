@@ -15,6 +15,8 @@ if BUILD_LIBRARY
 lib_LTLIBRARIES = libgandalf.la
 aouhdrdir = $(includedir)/aou
 aouhdr_HEADERS = gandalf.h
+pkgconfigdir = ${libdir}/pkgconfig
+pkgconfig_DATA = libgandalf.pc
 else
 noinst_LTLIBRARIES = libgandalf.la
 noinst_HEADERS += gandalf.h
