@@ -60,7 +60,7 @@ fi
 popdef([use_libxml2])
 
 ## check for unserding
-PKG_CHECK_MODULES([unserding], [unserding >= 0.1.1])
+PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [:], [enable_server="no"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
