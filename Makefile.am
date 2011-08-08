@@ -5,9 +5,6 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = lib cli srv
 
-pkgconfigdir = @libdir@/pkgconfig
-pkgconfig_DATA = gandalf.pc
-
 EXTRA_DIST = .version git-version-gen
 
 # Version string management.  There are two files to be aware of:

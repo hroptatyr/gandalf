@@ -29,6 +29,10 @@ AM_INIT_AUTOMAKE([foreign])
 ## initialise our cool message nest levels
 SXE_INIT_MSG_LEVEL
 
+if test -n "${CFLAGS}"; then
+	CFLAGS="-g -O3 -Wall -Wunused -Wunused-function"
+fi
+
 ## the build chain
 AC_PROG_CC(["icc -static-intel" icc gcc cc])
 AC_PROG_CC_C99
@@ -42,10 +46,6 @@ AC_CHECK_HEADERS([fcntl.h])
 ## event loop
 SXE_CHECK_LIBEV
 
-## database stuff
-SXE_CHECK_MYSQL
-SXE_CHECK_SQLITE
-
 ## check for libxml to process fixml
 PKG_CHECK_MODULES([LIBXML2], [libxml-2.0 >= 2.7])
 pushdef([use_libxml2], [test -n "${LIBXML2_LIBS}"])
@@ -56,35 +56,54 @@ fi
 popdef([use_libxml2])
 
 ## check for unserding
-PKG_CHECK_MODULES([unserding], [unserding >= 0.1.1])
+PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [:], [enable_server="no"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: no.])],
-	[enable_server="${enableval}"], [enable_server="no"])
+AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
+	[enable_server="${enableval}"], [enable_server="yes"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
-AM_CONDITIONAL([BUILD_LIBRARY], [test "yes" = "yes"])
+AC_ARG_ENABLE([library], [
+AS_HELP_STRING([--enable-library], [Build the library, default: no.])],
+	[enable_library="${enableval}"], [enable_library="no"])
+AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([lib/Makefile])
 AC_CONFIG_FILES([srv/Makefile])
-AC_CONFIG_FILES([gandalf.pc])
+AC_CONFIG_FILES([srv/gandalf.pc])
+AC_CONFIG_FILES([lib/libgandalf.pc])
 AC_OUTPUT
+
+if test -n "${BUILD_SERVER_FALSE}"; then
+	BUILD_SRV="yes"
+else
+	BUILD_SRV="no"
+fi
+if test -n "${BUILD_CLIAPPS_FALSE}"; then
+	BUILD_CLI="yes"
+else
+	BUILD_CLI="no"
+fi
+if test -n "${BUILD_LIBRARY_FALSE}"; then
+	BUILD_LIB="yes"
+else
+	BUILD_LIB="no"
+fi
 
 echo
 echo
 echo "Build summary"
 echo "============="
 echo
-echo "Build server: ${BUILD_SERVER_FALSE:+yes}"
-echo "Build cliapps: ${BUILD_CLIAPPS_FALSE:+yes}"
-echo "Build library: ${BUILD_LIBRARY_FALSE:+yes}"
-echo "DBMS:${DBMS}"
+echo "Build server: ${BUILD_SRV}"
+echo "Build cliapps: ${BUILD_CLI}"
+echo "Build library: ${BUILD_LIB}"
 echo "XML: ${USE_LIBXML2_FALSE:+libxml2}"
 echo
 
