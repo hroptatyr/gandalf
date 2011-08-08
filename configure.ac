@@ -46,10 +46,6 @@ AC_CHECK_HEADERS([fcntl.h])
 ## event loop
 SXE_CHECK_LIBEV
 
-## database stuff
-SXE_CHECK_MYSQL
-SXE_CHECK_SQLITE
-
 ## check for libxml to process fixml
 PKG_CHECK_MODULES([LIBXML2], [libxml-2.0 >= 2.7])
 pushdef([use_libxml2], [test -n "${LIBXML2_LIBS}"])
@@ -107,7 +103,6 @@ echo
 echo "Build server: ${BUILD_SRV}"
 echo "Build cliapps: ${BUILD_CLI}"
 echo "Build library: ${BUILD_LIB}"
-echo "DBMS:${DBMS}"
 echo "XML: ${USE_LIBXML2_FALSE:+libxml2}"
 echo
 
