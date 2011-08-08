@@ -3,17 +3,15 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
-moddir = $(libdir)/unserding
-
 bin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
-mod_LTLIBRARIES =
 BUILT_SOURCES =
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES =
 
 if BUILD_SERVER
-mod_LTLIBRARIES += dso-gandalf.la
+moddir = $(libdir)/unserding
+mod_LTLIBRARIES = dso-gandalf.la
 dso_gandalf_la_SOURCES = dso-gandalf.c
 EXTRA_dso_gandalf_la_SOURCES =
 dso_gandalf_la_LDFLAGS = -module
