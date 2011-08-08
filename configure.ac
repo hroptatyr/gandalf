@@ -64,7 +64,7 @@ PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [:], [enable_server="no"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: no.])],
+AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="no"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
@@ -72,8 +72,8 @@ AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library, default: yes.])],
-	[enable_library="${enableval}"], [enable_library="yes"])
+AS_HELP_STRING([--enable-library], [Build the library, default: no.])],
+	[enable_library="${enableval}"], [enable_library="no"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
