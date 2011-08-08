@@ -80,14 +80,30 @@ AC_CONFIG_FILES([srv/Makefile])
 AC_CONFIG_FILES([gandalf.pc])
 AC_OUTPUT
 
+if test -n "${BUILD_SERVER_FALSE}"; then
+	BUILD_SRV="yes"
+else
+	BUILD_SRV="no"
+fi
+if test -n "${BUILD_CLIAPPS_FALSE}"; then
+	BUILD_CLI="yes"
+else
+	BUILD_CLI="no"
+fi
+if test -n "${BUILD_LIBRARY_FALSE}"; then
+	BUILD_LIB="yes"
+else
+	BUILD_LIB="no"
+fi
+
 echo
 echo
 echo "Build summary"
 echo "============="
 echo
-echo "Build server: ${BUILD_SERVER_FALSE:+yes}"
-echo "Build cliapps: ${BUILD_CLIAPPS_FALSE:+yes}"
-echo "Build library: ${BUILD_LIBRARY_FALSE:+yes}"
+echo "Build server: ${BUILD_SRV}"
+echo "Build cliapps: ${BUILD_CLI}"
+echo "Build library: ${BUILD_LIB}"
 echo "DBMS:${DBMS}"
 echo "XML: ${USE_LIBXML2_FALSE:+libxml2}"
 echo
