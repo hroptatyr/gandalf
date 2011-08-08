@@ -61,7 +61,7 @@ PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [:], [enable_server="no"])
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
-	[enable_server="${enableval}"], [enable_server="no"])
+	[enable_server="${enableval}"], [enable_server="yes"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
