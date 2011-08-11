@@ -106,7 +106,9 @@ enum select_e {
 
 struct gand_msg_s {
 	struct gand_msg_hdr_s hdr;
+
 	uint32_t sel;
+	uint32_t igncase:1;
 
 	size_t nrolf_objs;
 	struct rolf_obj_s *rolf_objs;

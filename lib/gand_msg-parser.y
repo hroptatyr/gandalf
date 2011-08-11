@@ -52,6 +52,7 @@ TOK_NOW
 TOK_THEN
 TOK_FILTER
 TOK_SELECT
+TOK_IGNCASE
 
 TOK_GET_SER
 TOK_GET_DAT
@@ -87,6 +88,9 @@ opt_lists:
 opt_lists opt_list;
 
 opt_list:
+TOK_IGNCASE {
+	msg->igncase = 1;
+} |
 valflav_list |
 select_list;
 
