@@ -57,9 +57,21 @@
 
 /* we assume unserding with logger feature */
 #define GAND_MOD		"[mod/gand]"
-#define GAND_INFO_LOG(args...)	UD_SYSLOG(LOG_INFO, GAND_MOD " " args)
-#define GAND_ERR_LOG(args...)	UD_SYSLOG(LOG_ERR, GAND_MOD " ERROR " args)
-#define GAND_CRIT_LOG(args...)	UD_SYSLOG(LOG_CRIT, GAND_MOD " CRITICAL " args)
+#define GAND_INFO_LOG(args...)				\
+	do {						\
+		UD_SYSLOG(LOG_INFO, GAND_MOD " " args);	\
+		GAND_DEBUG("INFO " args);		\
+	} while (0)
+#define GAND_ERR_LOG(args...)					\
+	do {							\
+		UD_SYSLOG(LOG_ERR, GAND_MOD " ERROR " args);	\
+		GAND_DEBUG("ERROR " args);			\
+	} while (0)
+#define GAND_CRIT_LOG(args...)						\
+	do {								\
+		UD_SYSLOG(LOG_CRIT, GAND_MOD " CRITICAL " args);	\
+		GAND_DEBUG("CRITICAL " args);				\
+	} while (0)
 
 /* mmap buffers, memory and file based */
 struct mmmb_s {
@@ -500,7 +512,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	struct ms_s state = {0};
 	const char *f;
 
-	GAND_INFO_LOG("get_ser(%u)", rid);
+	GAND_INFO_LOG("get_ser(%u)\n", rid);
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
@@ -769,7 +781,7 @@ interpret_msg(char **buf, gand_msg_t msg)
 		break;
 
 	default:
-		GAND_ERR_LOG("unknown message %u", msg->hdr.mt);
+		GAND_ERR_LOG("unknown message %u\n", msg->hdr.mt);
 		break;
 	}
 	/* free 'im 'ere */
@@ -791,7 +803,7 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 	/* safely write msg to logerr now */
 	fwrite(msg, msglen, 1, gand_logout);
 #endif	/* DEBUG_FLAG */
-	GAND_INFO_LOG("%s", msg);
+	GAND_INFO_LOG("%s\n", msg);
 
 	/* just to avoid confusion */
 	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
@@ -812,9 +824,9 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 
 	} else if (/* umsg == NULL && */p == NULL) {
 		/* error occurred */
-		GAND_ERR_LOG("context has disappeared, cleaning up");
+		GAND_ERR_LOG("context has disappeared, cleaning up\n");
 	} else {
-		GAND_INFO_LOG("need more grub");
+		GAND_INFO_LOG("need more grub\n");
 	}
 	ud_conn_put_data(c, p);
 	return 0;
@@ -852,10 +864,10 @@ handle_inot(
 	/* reinit */
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
 	if (mmap_whole_file(data, f, st ? st->st_size : 0) < 0) {
-		GAND_ERR_LOG("sym table building failed");
+		GAND_ERR_LOG("sym table building failed\n");
 		return -1;
 	}
-	GAND_INFO_LOG("new sym table built");
+	GAND_INFO_LOG("new sym table built\n");
 	return 0;
 }
 
@@ -921,7 +933,13 @@ init(void *clo)
 	ud_ctx_t ctx = clo;
 	void *settings;
 
-	GAND_INFO_LOG("loading gandalf module");
+#if defined DEBUG_FLAG
+	gand_logout = stderr;
+#else  /* !DEBUG_FLAG */
+	gand_logout = fopen("/dev/null", "w");
+#endif	/* DEBUG_FLAG */
+
+	GAND_INFO_LOG("loading gandalf module\n");
 
 	/* glue to lua settings */
 	if ((settings = udctx_get_setting(ctx)) == NULL) {
@@ -946,13 +964,7 @@ init(void *clo)
 		__symu_inot = gand_init_inot(tmp, &grsymu);
 	}
 
-	GAND_INFO_LOG("successfully loaded, trolfdir is %s", trolfdir);
-
-#if defined DEBUG_FLAG
-	gand_logout = stderr;
-#else  /* !DEBUG_FLAG */
-	gand_logout = fopen("/dev/null", "w");
-#endif	/* DEBUG_FLAG */
+	GAND_INFO_LOG("successfully loaded, trolfdir is %s\n", trolfdir);
 
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
@@ -962,14 +974,14 @@ init(void *clo)
 void
 reinit(void *UNUSED(clo))
 {
-	GAND_INFO_LOG("reloading gandalf module ... done");
+	GAND_INFO_LOG("reloading gandalf module ... done\n");
 	return;
 }
 
 void
 deinit(void *UNUSED(clo))
 {
-	GAND_INFO_LOG("unloading gandalf module");
+	GAND_INFO_LOG("unloading gandalf module\n");
 	if (__cnet) {
 		ud_conn_fini(__cnet);
 	}
@@ -989,8 +1001,10 @@ deinit(void *UNUSED(clo))
 	if (gand_sock_path != NULL) {
 		unlink(gand_sock_path);
 	}
-	fclose(gand_logout);
-	GAND_INFO_LOG("gandalf successfully unloaded");
+	if (gand_logout) {
+		fclose(gand_logout);
+	}
+	GAND_INFO_LOG("gandalf successfully unloaded\n");
 	return;
 }
 
