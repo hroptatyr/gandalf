@@ -162,10 +162,10 @@ free_lateglu_name(const char *UNUSED(name))
 	return;
 }
 
-static char*
+static const char*
 make_trolf_name(const char *post, size_t plen)
 {
-	char *f;
+	static char f[PATH_MAX];
 	size_t idx;
 
 	if (UNLIKELY(trolfdir == NULL)) {
@@ -173,13 +173,11 @@ make_trolf_name(const char *post, size_t plen)
 	}
 
 	/* construct the path */
-	f = malloc(ntrolfdir + plen + 1);
-	memcpy(f, trolfdir, ntrolfdir);
-	if (f[(idx = ntrolfdir) - 1] != '/') {
+	memcpy(f, trolfdir, (idx = ntrolfdir));
+	if (f[idx - 1] != '/') {
 		f[idx++] = '/';
 	}
 	memcpy(f + idx, post, plen);
-	f[idx + plen] = '\0';
 	return f;
 }
 
@@ -955,7 +953,7 @@ init(void *clo)
 	{
 		static const char symn[] = "rolft_symbol";
 		static const char symun[] = "rolft_symbol_u";
-		char *tmp;
+		const char *tmp;
 
 		tmp = make_trolf_name(symn, sizeof(symn) - 1);
 		__sym_inot = gand_init_inot(tmp, &grsym);
