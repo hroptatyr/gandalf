@@ -627,12 +627,12 @@ get_ser(char **buf, gand_msg_t msg)
 		struct rolf_obj_s *robj = msg->rolf_objs + i;
 		struct get_rid_iter_s st;
 
-		if (UNLIKELY(robj->rolf_sym == NULL)) {
-			continue;
-		} else if (LIKELY(robj->rolf_id > 0)) {
+		if (LIKELY(robj->rolf_id > 0)) {
 			rid = robj->rolf_id;
 			fini_rid_iter(&st);
 			goto proc;
+		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
+			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
 			char *sym = robj->rolf_sym;
 			size_t len = __upcase(sym);
