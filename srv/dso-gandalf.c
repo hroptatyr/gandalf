@@ -88,6 +88,15 @@ static struct mmfb_s grsym = {
 	.fd = -1,
 };
 
+static struct mmfb_s grsymu = {
+	.m = {
+		.buf = NULL,
+		.bsz = 0UL,
+		.all = 0UL,
+	},
+	.fd = -1,
+};
+
 /* match state */
 struct ms_s {
 	int cnt;
@@ -141,35 +150,25 @@ free_lateglu_name(const char *UNUSED(name))
 	return;
 }
 
-static const char*
-make_symbol_name(void)
+static char*
+make_trolf_name(const char *post, size_t plen)
 {
-	static const char rsym[] = "rolft_symbol";
-	static char f[PATH_MAX];
-	static bool inip = false;
+	char *f;
 	size_t idx;
 
-	if (LIKELY(inip)) {
-	singleton:
-		return f;
-	} else if (UNLIKELY(trolfdir == NULL)) {
+	if (UNLIKELY(trolfdir == NULL)) {
 		return NULL;
 	}
 
 	/* construct the path */
-	memcpy(f, trolfdir, (idx = ntrolfdir));
-	if (f[idx - 1] != '/') {
+	f = malloc(ntrolfdir + plen + 1);
+	memcpy(f, trolfdir, ntrolfdir);
+	if (f[(idx = ntrolfdir) - 1] != '/') {
 		f[idx++] = '/';
 	}
-	memcpy(f + idx, rsym, sizeof(rsym) - 1);
-	inip = true;
-	goto singleton;
-}
-
-static void __attribute__((unused))
-free_symbol_name(const char *UNUSED(sym))
-{
-	return;
+	memcpy(f + idx, post, plen);
+	f[idx + plen] = '\0';
+	return f;
 }
 
 static const char*
@@ -493,57 +492,6 @@ bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 	return;
 }
 
-static uint32_t __attribute__((noinline))
-get_rolf_id(const char **state, struct rolf_obj_s *robj)
-{
-	const char *rsym;
-	size_t rssz;
-	const char *cand;
-	ssize_t rest;
-
-	/* REPLACE THE LOOKUP PART WITH A PREFIX TREE */
-	if (LIKELY(robj->rolf_id > 0 && (state == NULL || *state == NULL))) {
-		if (state) {
-			*state = grsym.m.buf;
-		}
-		return robj->rolf_id;
-	} else if (LIKELY(robj->rolf_id > 0)) {
-		/* repeated query */
-		return 0U;
-	} else if (grsym.m.buf == NULL) {
-		*state = NULL;
-		return 0U;
-	}
-
-	/* set up */
-	rsym = robj->rolf_sym;
-	rssz = strlen(rsym);
-	if (UNLIKELY(state && *state)) {
-		cand = *state;
-		rest = grsym.m.bsz - (*state - grsym.m.buf);
-	} else {
-		cand = grsym.m.buf;
-		rest = grsym.m.bsz;
-	}
-	while ((cand = memmem(cand, rest, rsym, rssz))) {
-		if (cand == grsym.m.buf || cand[-1] == '\n') {
-			/* we've got a prefix match */
-			uint32_t rid;
-			char *next = NULL;
-
-			rest = grsym.m.bsz - (cand - grsym.m.buf);
-			cand = memchr(cand, '\t', rest);
-			rid = strtoul(cand + 1, &next, 10);
-			*state = next ?: cand + 1;
-			return rid;
-		}
-		if ((rest = grsym.m.bsz - (++cand - grsym.m.buf)) <= 0) {
-			break;
-		}
-	}
-	*state = NULL;
-	return 0U;
-}
 
 static void
 __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
@@ -579,6 +527,95 @@ out:
 	return;
 }
 
+
+struct get_rid_iter_s {
+	const struct mmfb_s *symbuf;
+	const char *bufpos;
+	const char *sym;
+	size_t ssz;
+};
+
+static inline struct get_rid_iter_s
+init_rid_iter(const struct mmfb_s *symbuf, const char *sym, size_t len)
+{
+	struct get_rid_iter_s res = {
+		.symbuf = symbuf,
+		.bufpos = NULL,
+		.sym = sym,
+		.ssz = len,
+	};
+	return res;
+}
+
+static inline void
+fini_rid_iter(struct get_rid_iter_s *s)
+{
+	s->symbuf = NULL;
+	s->bufpos = NULL;
+	s->sym = NULL;
+	s->ssz = 0;
+	return;
+}
+
+static inline bool
+rid_iter_next_p(struct get_rid_iter_s *s)
+{
+	return s->symbuf != NULL && s->ssz == 0;
+}
+
+static uint32_t
+rid_iter(struct get_rid_iter_s *st)
+{
+	const struct mmfb_s *symbuf = st->symbuf;
+	const char *sym = st->sym;
+	size_t ssz = st->ssz;
+	const char *cand;
+	ssize_t rest;
+
+	/* set up */
+	if (UNLIKELY(st->bufpos != NULL)) {
+		cand = st->bufpos;
+		rest = symbuf->m.bsz - (st->bufpos - symbuf->m.buf);
+	} else {
+		cand = symbuf->m.buf;
+		rest = symbuf->m.bsz;
+	}
+	while ((cand = memmem(cand, rest, sym, ssz))) {
+		if (cand == symbuf->m.buf || cand[-1] == '\n') {
+			/* we've got a prefix match */
+			uint32_t rid;
+			char *next = NULL;
+
+			rest = symbuf->m.bsz - (cand - symbuf->m.buf);
+			cand = memchr(cand, '\t', rest);
+			rid = strtoul(cand + 1, &next, 10);
+			st->bufpos = next ?: cand + 1;
+			return rid;
+		}
+		if ((rest = symbuf->m.bsz - (++cand - symbuf->m.buf)) <= 0) {
+			break;
+		}
+	}
+	fini_rid_iter(st);
+	return 0U;
+}
+
+static size_t
+__upcase(char *str)
+{
+	size_t len;
+
+	for (len = 0; *str; len++, str++) {
+		switch (*str) {
+		case 'a' ... 'z':
+			*str -= 0x20;
+		default:
+			break;
+		}
+	}
+	return len;
+}
+
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
@@ -587,12 +624,30 @@ get_ser(char **buf, gand_msg_t msg)
 	GAND_DEBUG("nrolf_objs %zu\n", msg->nrolf_objs);
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
 		uint32_t rid;
-		const char *st = NULL;
+		struct rolf_obj_s *robj = msg->rolf_objs + i;
+		struct get_rid_iter_s st;
 
-		while ((rid = get_rolf_id(&st, msg->rolf_objs + i))) {
+		if (LIKELY(robj->rolf_id > 0)) {
+			rid = robj->rolf_id;
+			fini_rid_iter(&st);
+			goto proc;
+		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
+			continue;
+		} else if (UNLIKELY(msg->igncase == 1)) {
+			char *sym = robj->rolf_sym;
+			size_t len = __upcase(sym);
+			st = init_rid_iter(&grsymu, sym, len);
+		} else {
+			const char *sym = robj->rolf_sym;
+			size_t len = strlen(sym);
+			st = init_rid_iter(&grsym, sym, len);
+		}
+		do {
+			rid = rid_iter(&st);
+		proc:
 			GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
 			__get_ser(&mb, msg, rid);
-		}
+		} while (rid_iter_next_p(&st));
 	}
 
 	/* prepare output */
@@ -783,8 +838,7 @@ handle_close(ud_conn_t c, void *data)
 
 static int
 handle_inot(
-	ud_conn_t UNUSED(c), const char *f,
-	const struct stat *st, void *UNUSED(data))
+	ud_conn_t UNUSED(c), const char *f, const struct stat *st, void *data)
 {
 	/* check if someone trunc'd us the file */
 	if (UNLIKELY(st == NULL)) {
@@ -794,10 +848,10 @@ handle_inot(
 	}
 
 	/* off with the old guy */
-	munmap_all(&grsym);
+	munmap_all(data);
 	/* reinit */
-	GAND_INFO_LOG("building sym table ...");
-	if (mmap_whole_file(&grsym, f, st ? st->st_size : 0) < 0) {
+	GAND_INFO_LOG("building sym table \"%s\" ...", f);
+	if (mmap_whole_file(data, f, st ? st->st_size : 0) < 0) {
 		GAND_ERR_LOG("sym table building failed");
 		return -1;
 	}
@@ -807,11 +861,11 @@ handle_inot(
 
 
 static ud_conn_t
-gand_init_inot(ud_ctx_t UNUSED(ctx), const char *file)
+gand_init_inot(const char *file, struct mmfb_s *symbuf)
 {
-	ud_conn_t res = make_inot_conn(file, handle_inot, NULL);
+	ud_conn_t res = make_inot_conn(file, handle_inot, symbuf);
 	/* god i'm a hacker */
-	handle_inot(res, file, NULL, NULL);
+	handle_inot(res, file, NULL, symbuf);
 	return res;
 }
 
@@ -855,6 +909,8 @@ gand_get_trolfdir(char **tgt, ud_ctx_t ctx, void *settings)
 /* unserding bindings */
 static ud_conn_t __cnet = NULL;
 static ud_conn_t __cuds = NULL;
+static ud_conn_t __sym_inot = NULL;
+static ud_conn_t __symu_inot = NULL;
 /* path to unix domain socket */
 static const char *gand_sock_path;
 void *gand_logout;
@@ -878,7 +934,17 @@ init(void *clo)
 	__cnet = gand_init_net_sock(ctx, settings);
 	ntrolfdir = gand_get_trolfdir(&trolfdir, ctx, settings);
 	/* inotify the symbol file */
-	gand_init_inot(ctx, make_symbol_name());
+	{
+		static const char symn[] = "rolft_symbol";
+		static const char symun[] = "rolft_symbol_u";
+		char *tmp;
+
+		tmp = make_trolf_name(symn, sizeof(symn) - 1);
+		__sym_inot = gand_init_inot(tmp, &grsym);
+
+		tmp = make_trolf_name(symun, sizeof(symun) - 1);
+		__symu_inot = gand_init_inot(tmp, &grsymu);
+	}
 
 	GAND_INFO_LOG("successfully loaded, trolfdir is %s", trolfdir);
 
@@ -909,6 +975,12 @@ deinit(void *UNUSED(clo))
 	}
 	if (__cuds) {
 		ud_conn_fini(__cuds);
+	}
+	if (__sym_inot) {
+		ud_conn_fini(__sym_inot);
+	}
+	if (__symu_inot) {
+		ud_conn_fini(__symu_inot);
 	}
 	if (trolfdir) {
 		free(trolfdir);

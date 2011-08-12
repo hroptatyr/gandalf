@@ -92,6 +92,7 @@ now		now
 then		then
 filter		--filt(er)?|--flav(our)?
 select		--sel(ect)?
+igncase		--ignore-case|-i
 
 get_ser		get_ser(ies)?
 get_dat		get_date?
@@ -155,6 +156,10 @@ get_nfo		get_i?nfo
 
 {select} {
 	RETURN_TOKEN(TOK_SELECT);
+}
+
+{igncase} {
+	RETURN_TOKEN(TOK_IGNCASE);
 }
 
 {sym}|{key} {
