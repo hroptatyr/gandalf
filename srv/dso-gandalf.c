@@ -803,7 +803,7 @@ handle_data(ud_conn_t c, char *msg, size_t msglen, void *data)
 	/* safely write msg to logerr now */
 	fwrite(msg, msglen, 1, gand_logout);
 #endif	/* DEBUG_FLAG */
-	GAND_INFO_LOG("%s\n", msg);
+	GAND_INFO_LOG("%s", msg);
 
 	/* just to avoid confusion */
 	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
