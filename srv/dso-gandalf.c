@@ -408,7 +408,6 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	tabs[2] = rawmemchr(tabs[1] + 1, '\t');
 	tabs[3] = rawmemchr(tabs[2] + 1, '\t');
 	tabs[4] = rawmemchr(tabs[3] + 1, '\t');
-	tabs[5] = rawmemchr(tabs[4] + 1, '\t');
 
 	/* copy only interesting lines */
 	if (sel & SEL_RID) {
@@ -427,16 +426,12 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 		copy_between(mb, tabs[2] + 1, tabs[3] + 1);
 	}
 
-	if (sel & SEL_VFID) {
+	if (sel & SEL_VFLAV) {
 		copy_between(mb, tabs[3] + 1, tabs[4] + 1);
 	}
 
-	if (sel & SEL_VFLAV) {
-		copy_between(mb, tabs[4] + 1, tabs[5] + 1);
-	}
-
 	if (sel & SEL_VALUE) {
-		copy_between(mb, tabs[5] + 1, lin + lsz);
+		copy_between(mb, tabs[4] + 1, lin + lsz);
 	}
 
 	/* finalise the line */
