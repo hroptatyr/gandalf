@@ -117,6 +117,13 @@ struct ms_s {
 	idate_t last;
 };
 
+/* match direction */
+typedef enum {
+	MDIR_NEVER = -1,
+	MDIR_NOMATCH = 0,
+	MDIR_MATCH,
+} mdir_t;
+
 
 /* connexion<->proto glue */
 static int
@@ -247,37 +254,40 @@ munmap_all(struct mmfb_s *mf)
 	return;
 }
 
-static bool
+static mdir_t
 match_date1_p(struct ms_s *state, const char *ln, size_t lsz, date_rng_t dr)
 {
+/* assume strict orderedness and fuck off early otherwise */
 	const char *dt;
 	idate_t idt;
 
 	if ((dt = memchr(ln, '\t', lsz)) == NULL ||
 	    (dt = memchr(dt + 1, '\t', lsz)) == NULL ||
 	    (dt = memchr(dt + 1, '\t', lsz)) == NULL) {
-		return false;
+		return MDIR_NOMATCH;
 	}
 
 	idt = __to_idate(dt + 1);
 	if (dr->beg >= DATE_RNG_THEN && dr->end >= DATE_RNG_THEN) {
 		if (idt >= dr->beg && idt <= dr->end) {
-			return true;
+			return MDIR_MATCH;
+		} else if (idt > dr->end) {
+			return MDIR_NEVER;
 		}
 	} else {
 		/* special thing to write 1992-03-03 -3 */
 		if (dr->beg >= DATE_RNG_THEN && idt >= dr->beg) {
 			if (idt == state->last) {
 				/* trivially true */
-				return true;
+				return MDIR_MATCH;
 			} else if (state->cnt++ < dr->end) {
 				state->last = idt;
-				return true;
+				return MDIR_MATCH;
 			}
-			return false;
+			return MDIR_NOMATCH;
 		}
 	}
-	return false;
+	return MDIR_NOMATCH;
 }
 
 static void
@@ -325,36 +335,36 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	return false;
 }
 
-static bool
+static mdir_t
 match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
 {
 /* special date syntax 2010-02-19 -3 means
  * 2010-02-19 and 2 points before that */
-	bool res;
+	mdir_t res;
 
 	res = msg->ndate_rngs == 0;
 	for (size_t i = 0; i < msg->ndate_rngs; i++) {
-		if (match_date1_p(state, ln, lsz, msg->date_rngs + i)) {
-			res = true;
+		date_rng_t mrng = msg->date_rngs + i;
+		if ((res = match_date1_p(state, ln, lsz, mrng)) == MDIR_MATCH) {
 			break;
 		}
 	}
 	/* check */
-	if (!res) {
-		return false;
+	if (res < MDIR_MATCH) {
+		return res;
 	}
 
 	res = msg->nvalflavs == 0;
 	for (size_t i = 0; i < msg->nvalflavs; i++) {
 		if (match_valflav1_p(ln, lsz, msg->valflavs + i)) {
-			res = true;
+			res = MDIR_MATCH;
 			break;
 		}
 	}
-	if (!res) {
-		return false;
+	if (res < MDIR_MATCH) {
+		return res;
 	}
-	return true;
+	return MDIR_MATCH;
 }
 
 #define PROT_MEM		(PROT_READ | PROT_WRITE)
@@ -522,10 +532,14 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 		const char *lin = mf.m.buf + idx;
 		char *eol = memchr(lin, '\n', mf.m.bsz - idx);
 		size_t lsz = eol - lin;
+		int mdir;
 
 #define DEFAULT_SEL	(SEL_SYM | SEL_DATE | SEL_VFLAV | SEL_VALUE)
-		if (match_msg_p(&state, lin, lsz, msg)) {
+		if ((mdir = match_msg_p(&state, lin, lsz, msg)) > 0) {
 			bang_line(mb, lin, lsz, msg->sel ?: DEFAULT_SEL);
+		} else if (mdir < 0) {
+			/* there can't be any matches in this file */
+			break;
 		}
 		idx += lsz + 1;
 	}
