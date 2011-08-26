@@ -312,7 +312,6 @@ match_valflav1_p(const char *ln, size_t lsz, struct valflav_s *vf)
 	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
 	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
 	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
-	    (a = memchr(a + 1, '\t', lsz)) == NULL ||
 	    (eoa = memchr(++a, '\t', lsz)) == NULL) {
 		/* no chance to match if we cant even find it */
 		return false;
