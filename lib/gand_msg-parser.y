@@ -52,6 +52,7 @@ TOK_NOW
 TOK_THEN
 TOK_FILTER
 TOK_SELECT
+TOK_IGNCASE
 
 TOK_GET_SER
 TOK_GET_DAT
@@ -87,6 +88,9 @@ opt_lists:
 opt_lists opt_list;
 
 opt_list:
+TOK_IGNCASE {
+	msg->igncase = 1;
+} |
 valflav_list |
 select_list;
 
@@ -203,9 +207,12 @@ TOK_SYM {
 		msg->sel |= SEL_DATE;
 	} else if (strcmp($<sval>1, "vfid") == 0) {
 		msg->sel |= SEL_VFID;
-	} else if (strcmp($<sval>1, "vflav") == 0) {
+	} else if (strcmp($<sval>1, "vflav") == 0 ||
+		   strcmp($<sval>1, "vf") == 0 ||
+		   strcmp($<sval>1, "valflav") == 0) {
 		msg->sel |= SEL_VFLAV;
 	} else if (strcmp($<sval>1, "v") == 0 ||
+		   strcmp($<sval>1, "val") == 0 ||
 		   strcmp($<sval>1, "value") == 0) {
 		msg->sel |= SEL_VALUE;
 	} else if (strcmp($<sval>1, "disc") == 0 ||
