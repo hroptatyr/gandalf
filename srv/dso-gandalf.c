@@ -221,9 +221,11 @@ free_info_name(const char *UNUSED(sym))
 
 
 static int
-mmap_whole_file(struct mmfb_s *mf, const char *f, size_t fsz)
+mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 {
-	if (LIKELY(fsz == 0)) {
+	size_t fsz;
+
+	if (fst == NULL || S_ISLNK(fst->st_mode)) {
 		struct stat st[1];
 		if (UNLIKELY(stat(f, st) < 0 || (fsz = st->st_size) == 0)) {
 			return -1;
@@ -869,7 +871,7 @@ handle_inot(
 	munmap_all(data);
 	/* reinit */
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
-	if (mmap_whole_file(data, f, st ? st->st_size : 0) < 0) {
+	if (mmap_whole_file(data, f, st) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
 		return -1;
 	}
