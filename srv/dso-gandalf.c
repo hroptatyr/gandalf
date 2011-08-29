@@ -580,7 +580,7 @@ fini_rid_iter(struct get_rid_iter_s *s)
 static inline bool
 rid_iter_next_p(struct get_rid_iter_s *s)
 {
-	return s->symbuf != NULL && s->ssz == 0;
+	return s->symbuf != NULL && s->ssz != 0;
 }
 
 static uint32_t
