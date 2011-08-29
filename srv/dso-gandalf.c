@@ -341,7 +341,7 @@ match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
  * 2010-02-19 and 2 points before that */
 	mdir_t res;
 
-	res = msg->ndate_rngs == 0;
+	res = msg->ndate_rngs == 0 ? MDIR_MATCH : MDIR_NOMATCH;
 	for (size_t i = 0; i < msg->ndate_rngs; i++) {
 		date_rng_t mrng = msg->date_rngs + i;
 		if ((res = match_date1_p(state, ln, lsz, mrng)) == MDIR_MATCH) {
@@ -353,7 +353,7 @@ match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
 		return res;
 	}
 
-	res = msg->nvalflavs == 0;
+	res = msg->nvalflavs == 0 ? MDIR_MATCH : MDIR_NOMATCH;
 	for (size_t i = 0; i < msg->nvalflavs; i++) {
 		if (match_valflav1_p(ln, lsz, msg->valflavs + i)) {
 			res = MDIR_MATCH;
