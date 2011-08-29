@@ -221,9 +221,11 @@ free_info_name(const char *UNUSED(sym))
 
 
 static int
-mmap_whole_file(struct mmfb_s *mf, const char *f, size_t fsz)
+mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 {
-	if (LIKELY(fsz == 0)) {
+	size_t fsz;
+
+	if (fst == NULL || S_ISLNK(fst->st_mode)) {
 		struct stat st[1];
 		if (UNLIKELY(stat(f, st) < 0 || (fsz = st->st_size) == 0)) {
 			return -1;
@@ -341,7 +343,7 @@ match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
  * 2010-02-19 and 2 points before that */
 	mdir_t res;
 
-	res = msg->ndate_rngs == 0;
+	res = msg->ndate_rngs == 0 ? MDIR_MATCH : MDIR_NOMATCH;
 	for (size_t i = 0; i < msg->ndate_rngs; i++) {
 		date_rng_t mrng = msg->date_rngs + i;
 		if ((res = match_date1_p(state, ln, lsz, mrng)) == MDIR_MATCH) {
@@ -353,7 +355,7 @@ match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
 		return res;
 	}
 
-	res = msg->nvalflavs == 0;
+	res = msg->nvalflavs == 0 ? MDIR_MATCH : MDIR_NOMATCH;
 	for (size_t i = 0; i < msg->nvalflavs; i++) {
 		if (match_valflav1_p(ln, lsz, msg->valflavs + i)) {
 			res = MDIR_MATCH;
@@ -578,7 +580,7 @@ fini_rid_iter(struct get_rid_iter_s *s)
 static inline bool
 rid_iter_next_p(struct get_rid_iter_s *s)
 {
-	return s->symbuf != NULL && s->ssz == 0;
+	return s->symbuf != NULL && s->ssz != 0;
 }
 
 static uint32_t
@@ -869,7 +871,7 @@ handle_inot(
 	munmap_all(data);
 	/* reinit */
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
-	if (mmap_whole_file(data, f, st ? st->st_size : 0) < 0) {
+	if (mmap_whole_file(data, f, st) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
 		return -1;
 	}
