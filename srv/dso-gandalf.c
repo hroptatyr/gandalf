@@ -464,28 +464,28 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 		copy_between(mb, lin, tabs[0] + 1);
 	}
 
-	if (sel & SEL_QID) {
-		copy_between(mb, tabs[0] + 1, tabs[1] + 1);
-	}
-
 	if (sel & SEL_SYM) {
 		copy_between(mb, tabs[1] + 1, tabs[2] + 1);
 	}
 
-	if (sel & SEL_DATE) {
+	if (sel & SEL_DTRNG) {
 		copy_between(mb, tabs[4] + 1, tabs[5] + 1);
 	}
 
-	if (sel & SEL_VALUE) {
+	if (sel & SEL_NPNT) {
 		copy_between(mb, tabs[5] + 1, tabs[6] + 1);
 	}
 
-	if (sel & SEL_VFID) {
+	if (sel & SEL_ALTSYM) {
 		copy_between(mb, tabs[6] + 1, tabs[7] + 1);
 	}
 
 	if (sel & SEL_DISC) {
 		copy_between(mb, tabs[7] + 1, tabs[8] + 1);
+	}
+
+	if (sel & SEL_DESCR) {
+		copy_between(mb, tabs[8] + 1, lin + lsz);
 	}
 
 	/* finalise the line */
