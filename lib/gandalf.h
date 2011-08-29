@@ -98,10 +98,14 @@ enum select_e {
 	SEL_QID = 4,
 	SEL_TID = 8,
 	SEL_DATE = 16,
+	SEL_DTRNG = 16,
 	SEL_VFID = 32,
+	SEL_ALTSYM = 32,
 	SEL_VFLAV = 64,
 	SEL_VALUE = 128,
+	SEL_NPNT = 128,
 	SEL_DISC = 256,
+	SEL_DESCR = 512,
 };
 
 struct gand_msg_s {

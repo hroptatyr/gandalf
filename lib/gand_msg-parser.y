@@ -198,15 +198,19 @@ TOK_SYM {
 		msg->sel |= SEL_SYM;
 	} else if (strcmp($<sval>1, "rid") == 0) {
 		msg->sel |= SEL_RID;
-	} else if (strcmp($<sval>1, "qid") == 0) {
-		msg->sel |= SEL_QID;
 	} else if (strcmp($<sval>1, "tid") == 0) {
 		msg->sel |= SEL_TID;
 	} else if (strcmp($<sval>1, "d") == 0 ||
 		   strcmp($<sval>1, "date") == 0) {
 		msg->sel |= SEL_DATE;
+	} else if (strcmp($<sval>1, "dr") == 0 ||
+		   strcmp($<sval>1, "dtrng") == 0) {
+		msg->sel |= SEL_DTRNG;
 	} else if (strcmp($<sval>1, "vfid") == 0) {
 		msg->sel |= SEL_VFID;
+	} else if (strcmp($<sval>1, "as") == 0 ||
+		   strcmp($<sval>1, "altsym") == 0) {
+		msg->sel |= SEL_ALTSYM;
 	} else if (strcmp($<sval>1, "vflav") == 0 ||
 		   strcmp($<sval>1, "vf") == 0 ||
 		   strcmp($<sval>1, "valflav") == 0) {
@@ -215,9 +219,14 @@ TOK_SYM {
 		   strcmp($<sval>1, "val") == 0 ||
 		   strcmp($<sval>1, "value") == 0) {
 		msg->sel |= SEL_VALUE;
+	} else if (strcmp($<sval>1, "npnt") == 0) {
+		msg->sel |= SEL_NPNT;
 	} else if (strcmp($<sval>1, "disc") == 0 ||
 		   strcmp($<sval>1, "discont") == 0) {
 		msg->sel |= SEL_DISC;
+	} else if (strcmp($<sval>1, "desc") == 0 ||
+		   strcmp($<sval>1, "descr") == 0) {
+		msg->sel |= SEL_DESCR;
 	}
 };
 
