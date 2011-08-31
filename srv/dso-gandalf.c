@@ -668,7 +668,9 @@ get_ser(char **buf, gand_msg_t msg)
 			rid = rid_iter(&st);
 		proc:
 			GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
-			__get_ser(&mb, msg, rid);
+			if (LIKELY(rid != 0)) {
+				__get_ser(&mb, msg, rid);
+			}
 		} while (rid_iter_next_p(&st));
 	}
 
