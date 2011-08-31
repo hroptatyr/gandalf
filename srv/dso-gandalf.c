@@ -227,7 +227,9 @@ mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 
 	if (fst == NULL || S_ISLNK(fst->st_mode)) {
 		struct stat st[1];
-		if (UNLIKELY(stat(f, st) < 0 || (fsz = st->st_size) == 0)) {
+		if (UNLIKELY(stat(f, st) < 0)) {
+			return -1;
+		} else if (UNLIKELY((fsz = st->st_size) == 0)) {
 			return -1;
 		}
 	}
@@ -666,7 +668,9 @@ get_ser(char **buf, gand_msg_t msg)
 			rid = rid_iter(&st);
 		proc:
 			GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
-			__get_ser(&mb, msg, rid);
+			if (LIKELY(rid != 0)) {
+				__get_ser(&mb, msg, rid);
+			}
 		} while (rid_iter_next_p(&st));
 	}
 
@@ -873,9 +877,10 @@ handle_inot(
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
 	if (mmap_whole_file(data, f, st) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
-		return -1;
+	} else {
+		GAND_INFO_LOG("new sym table built\n");
 	}
-	GAND_INFO_LOG("new sym table built\n");
+	/* never lose interest in these files */
 	return 0;
 }
 
