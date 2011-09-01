@@ -74,6 +74,7 @@ AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
+AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([lib/Makefile])
 AC_CONFIG_FILES([srv/Makefile])
 AC_CONFIG_FILES([srv/gandalf.pc])

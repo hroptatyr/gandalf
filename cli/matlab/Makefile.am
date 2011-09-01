@@ -3,13 +3,20 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
-SUBDIRS = matlab
+MATLABROOT = /opt/Matlab/R2010b
+moddir = $(libdir)/gandalf/matlab
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
+
+mod_LTLIBRARIES = gand_get_series.la
+gand_get_series_la_LDFLAGS = -module -shrext ".mexa64"
+gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS) -DMATLAB_MEX_FILE
+gand_get_series_la_CPPFLAGS += -I$(MATLABROOT)/extern/include
+gand_get_series_la_SOURCES = gand_get_series.c
 
 # 
 # Help the developers get nice post-processed source files
