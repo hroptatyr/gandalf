@@ -21,7 +21,7 @@ struct gand_res_s {
  *
  * \param SRV service string, either HOST:PORT or PATH or unix:PATH
  *   for ipv6 addresses use [ADDR]:PORT */
-extern gand_ctx_t gand_open(const char *srv);
+extern gand_ctx_t gand_open(const char *srv, int timeout);
 
 /**
  * Close a gandalf connection, and free associated resources. */
@@ -32,11 +32,11 @@ extern void gand_close(gand_ctx_t);
 extern int
 gand_get_series(
 	gand_ctx_t,
-	const char *qry, size_t qsz, int timeout,
+	const char *qry, const char *valflav[], size_t nvalflav,
 	int(*)(gand_res_t, void *closure), void *closure);
 
 /* lower level stuff */
-extern int gand_send(gand_ctx_t g, const char *qry, size_t qsz, int timeout);
-extern ssize_t gand_recv(gand_ctx_t g, const char **buf, int timeout);
+extern int gand_send(gand_ctx_t g, const char *qry, size_t qsz);
+extern ssize_t gand_recv(gand_ctx_t g, const char **buf);
 
 #endif	/* INCLUDED_gandapi_h_ */

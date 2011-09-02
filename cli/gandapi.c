@@ -32,8 +32,10 @@ struct __ctx_s {
 	/* buffer */
 	char *buf;
 	size_t bsz;
+	/* timeout */
+	int32_t timeo;
 	/* number of events in the following flex array */
-	size_t nev;
+	int32_t nev;
 	/* flex array of events, 8b-aligned */
 	struct epoll_event ev[1];
 };
@@ -90,8 +92,95 @@ ep_wait(__ctx_t g, int timeout)
 	return epoll_wait(g->eps, g->ev, g->nev, timeout);
 }
 
+static int
+init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
+{
+	struct hostent *hi;
+	struct sockaddr_in6 *n = (void*)sa;
+
+	n->sin6_family = AF_INET6;
+	n->sin6_port = htons(port);
+	if ((hi = gethostbyname2(host, AF_INET6)) == NULL) {
+		return -1;
+	}
+	memcpy(&n->sin6_addr, hi->h_addr, sizeof(n->sin6_addr));
+	*len = sizeof(*n);
+	return 0;
+}
+
+
+/* exported functions */
+#define PROT_MEM		(PROT_READ | PROT_WRITE)
+#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
+
+gand_ctx_t
+gand_open(const char *srv, int timeout)
+{
+	volatile int ns;
+	struct sockaddr_storage sa = {0};
+	size_t sa_len = sizeof(sa);
+	int fam;
+	struct __ctx_s *res = calloc(1, sizeof(*res));
+	/* to parse the service string */
+	char *p;
+
+	if ((p = strrchr(srv, ':')) == NULL) {
+		/* must be a unix socket then */
+		fam = PF_LOCAL;
+		;
+	} else {
+		uint16_t port = strtoul(p + 1, NULL, 10) ?: 8624;
+		char host[p - srv + 1];
+
+		fam = PF_INET6;
+		if (srv[0] == '[' && p[-1] == ']') {
+			memcpy(host, srv + 1, p - srv - 2);
+			host[p - srv - 2] = '\0';
+		} else {
+			memcpy(host, srv, p - srv);
+			host[p - srv] = '\0';
+		}
+		if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
+			return res;
+		}
+	}
+
+	if ((ns = socket(fam, SOCK_STREAM, 0)) < 0) {
+		return res;
+	} else if (connect(ns, (void*)&sa, sa_len) < 0) {
+		return res;
+	}
+
+	/* init structure */
+	res->eps = epoll_create1(0);
+	res->gs = ns;
+	res->nev = countof(res->ev);
+
+	res->bsz = 16 * 4096;
+	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
+
+	res->timeo = timeout;
+
+	/* set up epoll */
+	setsock_nonblock(res->eps);
+	setsock_nonblock(res->gs);
+	return res;
+}
+
+void
+gand_close(gand_ctx_t ug)
+{
+	struct __ctx_s *g = ug;
+	/* stop waiting for events */
+	ep_fini(g, g->gs);
+	shut_sock(g->eps);
+	munmap(g->buf, g->bsz);
+	free(g);
+	return;
+}
+
 int
-gand_send(gand_ctx_t ug, const char *qry, size_t qsz, int timeout)
+gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 {
 	__ctx_t g = ug;
 	int nfds __attribute__((unused)) = 1;
@@ -133,12 +222,12 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz, int timeout)
 		} else {
 			break;
 		}
-	} while ((nfds = ep_wait(g, timeout)) > 0);
+	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	return -1;
 }
 
 ssize_t
-gand_recv(gand_ctx_t ug, const char **buf, int timeout)
+gand_recv(gand_ctx_t ug, const char **buf)
 {
 /* coroutine */
 	__ctx_t g = ug;
@@ -195,100 +284,15 @@ find:
 		} else {
 			break;
 		}
-	} while ((nfds = ep_wait(g, timeout)) > 0);
+	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	/* rinse */
 	return 0;
 }
 
-static int
-init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
-{
-	struct hostent *hi;
-	struct sockaddr_in6 *n = (void*)sa;
-
-	n->sin6_family = AF_INET6;
-	n->sin6_port = htons(port);
-	if ((hi = gethostbyname2(host, AF_INET6)) == NULL) {
-		return -1;
-	}
-	memcpy(&n->sin6_addr, hi->h_addr, sizeof(n->sin6_addr));
-	*len = sizeof(*n);
-	return 0;
-}
-
-
-/* exported functions */
-#define PROT_MEM		(PROT_READ | PROT_WRITE)
-#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
-
-gand_ctx_t
-gand_open(const char *srv)
-{
-	volatile int ns;
-	struct sockaddr_storage sa = {0};
-	size_t sa_len = sizeof(sa);
-	int fam;
-	struct __ctx_s *res = calloc(1, sizeof(*res));
-	/* to parse the service string */
-	char *p;
-
-	if ((p = strrchr(srv, ':')) == NULL) {
-		/* must be a unix socket then */
-		fam = PF_LOCAL;
-		;
-	} else {
-		uint16_t port = strtoul(p + 1, NULL, 10) ?: 8624;
-		char host[p - srv + 1];
-
-		fam = PF_INET6;
-		if (srv[0] == '[' && p[-1] == ']') {
-			memcpy(host, srv + 1, p - srv - 2);
-			host[p - srv - 2] = '\0';
-		} else {
-			memcpy(host, srv, p - srv);
-			host[p - srv] = '\0';
-		}
-		if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
-			return res;
-		}
-	}
-
-	if ((ns = socket(fam, SOCK_STREAM, 0)) < 0) {
-		return res;
-	} else if (connect(ns, (void*)&sa, sa_len) < 0) {
-		return res;
-	}
-
-	/* init structure */
-	res->eps = epoll_create1(0);
-	res->gs = ns;
-	res->nev = countof(res->ev);
-
-	res->bsz = 16 * 4096;
-	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
-
-	/* set up epoll */
-	setsock_nonblock(res->eps);
-	setsock_nonblock(res->gs);
-	return res;
-}
-
-void
-gand_close(gand_ctx_t ug)
-{
-	struct __ctx_s *g = ug;
-	/* stop waiting for events */
-	ep_fini(g, g->gs);
-	shut_sock(g->eps);
-	munmap(g->buf, g->bsz);
-	free(g);
-	return;
-}
-
 int
-gand_query(
+gand_get_series(
 	gand_ctx_t g,
-	const char *qry, size_t qsz, int timeout,
+	const char *sym, const char *valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
 	struct __ctx_s *__g = g;
