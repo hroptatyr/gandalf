@@ -3,13 +3,18 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
-SUBDIRS = . matlab
+SUBDIRS = .
+if BUILD_MATCLI
+SUBDIRS += matlab
+endif
 
+if BUILD_CLIAPPS
 noinst_LTLIBRARIES = libgandapi.la
 libgandapi_la_SOURCES = gandapi.c gandapi.h
 
 #noinst_PROGRAMS = gandqry
 #gandqry_LDADD = libgandapi.la
+endif
 
 # 
 # Help the developers get nice post-processed source files

@@ -72,6 +72,18 @@ AS_HELP_STRING([--enable-library], [Build the library, default: no.])],
 	[enable_library="${enableval}"], [enable_library="no"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
+AC_ARG_WITH([matlab], [
+AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
+	[dnl
+		SXE_CHECK_MATLAB([${withval}])
+		if test "${enable_cliapps}" != "no" -a \
+			-n "${sxe_cv_matlabroot}"; then
+			with_matlab="yes"
+			CLIAPPS="${CLIAPPS} matlab"
+		fi
+	], [with_matlab="no"])
+AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
+
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])

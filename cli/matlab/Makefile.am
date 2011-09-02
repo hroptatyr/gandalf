@@ -3,7 +3,6 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
-MATLABROOT = /opt/Matlab/R2011a
 moddir = $(libdir)/gandalf/matlab
 
 mod_LTLIBRARIES = gand_get_series.la
