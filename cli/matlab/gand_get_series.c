@@ -37,6 +37,8 @@ struct __recv_st_s {
 };
 
 
+#define RESIZE_STEP	(1024)
+
 static int
 find_valflav(const char *vf, struct __recv_st_s *st)
 {
@@ -54,21 +56,16 @@ static void
 check_resize(struct __recv_st_s *st)
 {
 	/* check for resize */
-	if (st->lidx % 1024) {
+	if (st->lidx % RESIZE_STEP) {
 		return;
 	}
 	/* yep, resize */
-	st->d = mxRealloc(st->d, (st->lidx + 1024) * sizeof(double));
+	st->d = mxRealloc(st->d, (st->lidx + RESIZE_STEP) * sizeof(double));
 	if (st->ncol) {
 		size_t row_sz = st->ncol * sizeof(double);
-		size_t new_sz = (st->lidx + 1024) * row_sz;
+		size_t new_sz = (st->lidx + RESIZE_STEP) * row_sz;
 
 		st->v = mxRealloc(st->v, new_sz);
-		for (size_t r = st->lidx; r > 0; r--) {
-			size_t old_j = (r - 1) * st->ncol;
-			size_t new_j = (r + 1024 - 1) * st->ncol;
-			memmove(st->v + new_j, st->v + old_j, row_sz);
-		}
 	}
 	return;
 }
@@ -140,11 +137,23 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
 	mxSetPr(plhs[0], rst.d);
 	mxSetM(plhs[0], rst.lidx);
-	if (nlhs > 1) {
+	if (nlhs > 1 && rst.ncol == 1) {
 		plhs[1] = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
-		fprintf(stderr, "%p\n", rst.v);
 		mxSetPr(plhs[1], rst.v);
 		mxSetM(plhs[1], rst.lidx);
+	} else if (nlhs > 1) {
+		/* since matlab is col oriented, transpose the matrix */
+		double *pr;
+		plhs[1] = mxCreateDoubleMatrix(rst.lidx, rst.ncol, mxREAL);
+		pr = mxGetPr(plhs[1]);
+		for (size_t c = 0; c < rst.ncol; c++) {
+			for (size_t r = 0; r < rst.lidx; r++) {
+				size_t old_pos = r * rst.ncol + c;
+				size_t new_pos = c * rst.lidx + r;
+				pr[new_pos] = rst.v[old_pos];
+			}
+		}
+		mxFree(rst.v);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
