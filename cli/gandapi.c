@@ -10,6 +10,8 @@
 /* epoll stuff */
 #include <sys/epoll.h>
 #include <fcntl.h>
+/* mmap stuff */
+#include <sys/mman.h>
 /* our decls */
 #include "gandapi.h"
 
@@ -27,6 +29,9 @@ struct __ctx_s {
 	/* generic index */
 	uint32_t idx;
 	uint32_t nrd;
+	/* buffer */
+	char *buf;
+	size_t bsz;
 	/* number of events in the following flex array */
 	size_t nev;
 	/* flex array of events, 8b-aligned */
@@ -105,7 +110,7 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz, int timeout)
 			/* must be garbage, wipe it */
 			ssize_t nrd;
 			size_t tot = 0;
-			while ((nrd = read(fd, gbuf, sizeof(gbuf))) > 0) {
+			while ((nrd = read(fd, g->buf, g->bsz)) > 0) {
 				tot += nrd;
 			}
 
@@ -141,19 +146,19 @@ gand_recv(gand_ctx_t ug, const char **buf, int timeout)
 
 find:
 	if (g->idx < g->nrd) {
-		char *p = memchr(gbuf + g->idx, '\n', g->nrd - g->idx);
+		char *p = memchr(g->buf + g->idx, '\n', g->nrd - g->idx);
 		if (p) {
-			size_t res = p - (gbuf + g->idx);
+			size_t res = p - (g->buf + g->idx);
 			*p = '\0';
-			*buf = gbuf + g->idx;
+			*buf = g->buf + g->idx;
 			g->idx += res + 1;
 			return res;
 		}
 		/* memmove what we've got */
-		memmove(gbuf, gbuf + g->idx, g->nrd - g->idx);
+		memmove(g->buf, g->buf + g->idx, g->nrd - g->idx);
 		g->idx = g->nrd - g->idx;
 
-	} else if (g->nrd > 0 && g->nrd < countof(gbuf)) {
+	} else if (g->nrd > 0 && g->nrd < g->bsz) {
 		/* message has been finished prematurely, we assume thats it
 		 * ATTENTION this might go wrong if the total message size
 		 * is divisible by the buffer size, in which case we wait
@@ -175,7 +180,7 @@ find:
 		if (LIKELY(ev & EPOLLIN)) {
 			ssize_t nrd;
 
-			if ((nrd = read(fd, gbuf, sizeof(gbuf) - g->idx)) > 0) {
+			if ((nrd = read(fd, g->buf, g->bsz - g->idx)) > 0) {
 				g->nrd = nrd;
 				goto find;
 			} else if (nrd == 0) {
@@ -213,6 +218,9 @@ init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
 
 
 /* exported functions */
+#define PROT_MEM		(PROT_READ | PROT_WRITE)
+#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
+
 gand_ctx_t
 gand_open(const char *srv)
 {
@@ -256,6 +264,9 @@ gand_open(const char *srv)
 	res->gs = ns;
 	res->nev = countof(res->ev);
 
+	res->bsz = 16 * 4096;
+	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
+
 	/* set up epoll */
 	setsock_nonblock(res->eps);
 	setsock_nonblock(res->gs);
@@ -263,12 +274,13 @@ gand_open(const char *srv)
 }
 
 void
-gand_close(gand_ctx_t g)
+gand_close(gand_ctx_t ug)
 {
-	struct __ctx_s *__g = g;
+	struct __ctx_s *g = ug;
 	/* stop waiting for events */
-	ep_fini(__g, __g->gs);
-	shut_sock(__g->eps);
+	ep_fini(g, g->gs);
+	shut_sock(g->eps);
+	munmap(g->buf, g->bsz);
 	free(g);
 	return;
 }
