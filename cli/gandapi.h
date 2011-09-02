@@ -32,7 +32,7 @@ extern void gand_close(gand_ctx_t);
 extern int
 gand_get_series(
 	gand_ctx_t,
-	const char *qry, const char *valflav[], size_t nvalflav,
+	const char *qry, const char *const valflav[], size_t nvalflav,
 	int(*)(gand_res_t, void *closure), void *closure);
 
 /* lower level stuff */

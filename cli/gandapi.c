@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-/* socket stuff */
+#include <stdio.h>
 #include <unistd.h>
+/* socket stuff */
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
@@ -15,9 +16,19 @@
 /* our decls */
 #include "gandapi.h"
 
+#if !defined LIKELY
+# define LIKELY(_x)	__builtin_expect((_x), 1)
+#endif
+#if !defined UNLIKELY
+# define UNLIKELY(_x)	__builtin_expect((_x), 0)
+#endif
+#if !defined UNUSED
+# define UNUSED(_x)	_x __attribute__((unused))
+#endif	/* !UNUSED */
+#define ALGN16(_x)	__attribute__((aligned(16))) _x
+
 #define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
-#define LIKELY(x)	(x)
 
 typedef struct __ctx_s *__ctx_t;
 
@@ -106,6 +117,80 @@ init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
 	memcpy(&n->sin6_addr, hi->h_addr, sizeof(n->sin6_addr));
 	*len = sizeof(*n);
 	return 0;
+}
+
+
+/* parser goodies */
+static int
+xisspace(char tmp)
+{
+	switch (tmp) {
+	case ' ':
+	case '\t':
+	case '\n':
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static char*
+__p2c(const char *str)
+{
+	union {
+		const char *c;
+		char *p;
+	} this = {.c = str};
+	return this.p;
+}
+
+static idate_t
+read_date(const char *str, char **restrict ptr)
+{
+#define C(x)	(x - '0')
+	idate_t res = 0;
+	const char *tmp;
+
+	tmp = str;
+	res = C(tmp[0]) * 10 + C(tmp[1]);
+	tmp = tmp + 2 + (tmp[2] == '-');
+
+	if (*tmp == '\0' || xisspace(*tmp)) {
+		if (ptr) {
+			*ptr = __p2c(tmp);
+		}
+		return res;
+	}
+
+	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
+	tmp = tmp + 2 + (tmp[2] == '-');
+
+	if (*tmp == '\0' || xisspace(*tmp)) {
+		if (ptr) {
+			*ptr = __p2c(tmp);
+		}
+		return res;
+	}
+
+	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
+	tmp = tmp + 2 + (tmp[2] == '-');
+
+	if (*tmp == '\0' || xisspace(*tmp)) {
+		/* date is fucked? */
+		if (ptr) {
+			*ptr = __p2c(tmp);
+		}
+		return 0;
+	}
+
+	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
+	tmp = tmp + 2;
+
+	if (ptr) {
+		*ptr = __p2c(tmp);
+	}
+#undef C
+	return res;
 }
 
 
@@ -291,87 +376,76 @@ find:
 
 int
 gand_get_series(
-	gand_ctx_t g,
-	const char *sym, const char *valflav[], size_t nvalflav,
+	gand_ctx_t ug,
+	const char *sym, const char *const valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
-	struct __ctx_s *__g = g;
+	static const char dflt[] = "fix/stl/close/unknown";
+	struct __ctx_s *g = ug;
+	/* we just use g's buffer to offload our query */
+	size_t gqlen;
+	/* result buffer */
+	const char *rb;
 
-	return 0;
-}
+	gqlen = snprintf(
+		g->buf, g->bsz,
+		"get_series \"%s\" --select sym,d,vf,v -i --filter ", sym);
 
-
-/* parser */
-static int
-xisspace(char tmp)
-{
-	switch (tmp) {
-	case ' ':
-	case '\t':
-	case '\n':
-		return 1;
-	default:
-		return 0;
+	if (valflav == NULL || nvalflav == 0) {
+		memcpy(g->buf + gqlen, dflt, countof(dflt));
+		gqlen += countof(dflt) - 1;
+	} else {
+		for (size_t i = 0; i < nvalflav; i++) {
+			const char *vf = valflav[i];
+			size_t vflen = strlen(vf);
+
+			if (UNLIKELY(gqlen + vflen >= g->bsz)) {
+				break;
+			}
+			memcpy(g->buf + gqlen, vf, vflen);
+			g->buf[gqlen += vflen] = '+';
+			gqlen++;
+		}
+		--gqlen;
 	}
-}
 
-static char*
-__p2c(const char *str)
-{
-	union {
-		const char *c;
+	/* query is ready now */
+	if (gand_send(g, g->buf, gqlen) < 0) {
+		return -1;
+	}
+
+	while (gand_recv(g, &rb) > 0) {
+		struct gand_res_s res;
 		char *p;
-	} this = {.c = str};
-	return this.p;
-}
 
-static idate_t
-read_date(const char *str, char **restrict ptr)
-{
-#define C(x)	(x - '0')
-	idate_t res = 0;
-	const char *tmp;
-
-	tmp = str;
-	res = C(tmp[0]) * 10 + C(tmp[1]);
-	tmp = tmp + 2 + (tmp[2] == '-');
-
-	if (*tmp == '\0' || xisspace(*tmp)) {
-		if (ptr) {
-			*ptr = __p2c(tmp);
+		/* find end of symbol */
+		if (UNLIKELY((p = strchr(rb, '\t')) == NULL)) {
+			continue;
 		}
-		return res;
-	}
+		*p = '\0';
+		res.symbol = rb;
 
-	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
-	tmp = tmp + 2 + (tmp[2] == '-');
-
-	if (*tmp == '\0' || xisspace(*tmp)) {
-		if (ptr) {
-			*ptr = __p2c(tmp);
+		/* p + 1 has the date now */
+		if (UNLIKELY((p = strchr((rb = p + 1), '\t')) == NULL)) {
+			continue;
 		}
-		return res;
-	}
+		*p = '\0';
+		res.date = read_date(rb, NULL);
 
-	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
-	tmp = tmp + 2 + (tmp[2] == '-');
-
-	if (*tmp == '\0' || xisspace(*tmp)) {
-		/* date is fucked? */
-		if (ptr) {
-			*ptr = __p2c(tmp);
+		/* p + 1 is the valflav */
+		if (UNLIKELY((p = strchr((rb = p + 1), '\t')) == NULL)) {
+			continue;
 		}
-		return 0;
-	}
+		*p = '\0';
+		res.valflav = rb;
 
-	res = (res * 10 + C(tmp[0])) * 10 + C(tmp[1]);
-	tmp = tmp + 2;
+		/* and finally the value */
+		res.value = strtod(p + 1, NULL);
 
-	if (ptr) {
-		*ptr = __p2c(tmp);
+		/* do the call */
+		qcb(&res, closure);
 	}
-#undef C
-	return res;
+	return 0;
 }
 
 /* gandapi.c ends here */
