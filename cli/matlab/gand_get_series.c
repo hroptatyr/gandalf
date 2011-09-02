@@ -32,7 +32,8 @@ struct __recv_st_s {
 	mxArray *d;
 	mxArray *v;
 	const char **vf;
-	size_t nvf;
+	uint32_t nvf;
+	uint32_t ncol;
 };
 
 
@@ -56,9 +57,9 @@ qcb(gand_res_t res, void *clo)
 	int this_vf;
 
 	if (res->date > st->ldat) {
-		if (st->ldat > 0) {
-			st->lidx++;
-		}
+		double *pr;
+
+		st->lidx++;
 		/* check for resize */
 		if (st->lidx % 1024 == 0) {
 			/* yep */
@@ -68,13 +69,19 @@ qcb(gand_res_t res, void *clo)
 			}
 		}
 		/* set the date */
-		mxGetPr(st->d)[st->lidx] = st->ldat = res->date;
+		if ((pr = mxGetPr(st->d))) {
+			pr[st->lidx] = st->ldat = res->date;
+		}
 	}
 
 	if (st->v &&
 	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
 		/* also fill the second matrix */
-		mxGetPr(st->d)[st->lidx * mxGetN(st->d) + this_vf] = res->value;
+		double *pr;
+
+		if ((pr = mxGetPr(st->v))) {
+			pr[st->lidx * st->ncol + this_vf] = res->value;
+		}
 	}
 	return 0;
 }
@@ -86,9 +93,8 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	gand_ctx_t gctx;
 	const char *srv;
 	const char *sym;
-	const char *vfs[nrhs - 2];
 	/* state for retrieval */
-	struct __recv_st_s recv_st = {0};
+	struct __recv_st_s rst = {0};
 
 	if (nrhs == 0 ||
 	    (srv = mxArrayToString(prhs[0])) == NULL) {
@@ -97,8 +103,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		   (sym = mxArrayToString(prhs[1])) == NULL) {
 		mexErrMsgTxt("symbol not given\n");
 	} else if (nrhs > 2) {
-		recv_st.vf = vfs;
-		recv_st.nvf = nrhs - 2;
+		rst.vf = calloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
 	if (nlhs == 0) {
@@ -106,28 +111,33 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	}
 	for (size_t i = 0; i < nrhs - 2; i++) {
 		const char *vf = mxArrayToString(prhs[i + 2]);
-		vfs[i] = vf;
+		rst.vf[i] = vf;
 	}
 
 	/* set up the closure */
-	recv_st.d = plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
+	rst.d = plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
 	if (nlhs > 1) {
-		int ncols = nrhs - 2 ?: 1;
-		recv_st.v = plhs[1] = mxCreateDoubleMatrix(0, ncols, mxREAL);
+		rst.ncol = nrhs - 2 ?: 1;
+		rst.v = plhs[1] = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
 	}
+	/* start with a negative index */
+	rst.lidx = -1;
 
 	/* open the gandalf handle */
 	gctx = gand_open(srv, /*timeout*/2000);
-	gand_get_series(gctx, sym, vfs, nrhs - 2, qcb, &recv_st);
+	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
 	/* and fuck off again */
 	gand_close(gctx);
 
 	/* now reset the matrices to their true dimensions */
-	recv_st.lidx = recv_st.ldat > 0 ? recv_st.lidx + 1 : 0;
+	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
 
-	mxSetM(plhs[0], recv_st.lidx);
+	mxSetM(plhs[0], rst.lidx);
 	if (nlhs > 1) {
-		mxSetM(plhs[1], recv_st.lidx);
+		mxSetM(plhs[1], rst.lidx);
+	}
+	if (rst.vf) {
+		free(rst.vf);
 	}
 	return;
 }
