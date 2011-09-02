@@ -29,9 +29,9 @@ extern void mexFunction(int, mxArray*[], int, const mxArray*[]);
 struct __recv_st_s {
 	idate_t ldat;
 	uint32_t lidx;
-	mxArray *d;
-	mxArray *v;
-	const char **vf;
+	double *d;
+	double *v;
+	char **vf;
 	uint32_t nvf;
 	uint32_t ncol;
 };
@@ -50,38 +50,46 @@ find_valflav(const char *vf, struct __recv_st_s *st)
 	return st->nvf ? -1 : 0;
 }
 
-int
+static void
+check_resize(struct __recv_st_s *st)
+{
+	/* check for resize */
+	if (st->lidx % 1024) {
+		return;
+	}
+	/* yep, resize */
+	st->d = mxRealloc(st->d, (st->lidx + 1024) * sizeof(double));
+	if (st->ncol) {
+		size_t row_sz = st->ncol * sizeof(double);
+		size_t new_sz = (st->lidx + 1024) * row_sz;
+
+		st->v = mxRealloc(st->v, new_sz);
+		for (size_t r = st->lidx; r > 0; r--) {
+			size_t old_j = (r - 1) * st->ncol;
+			size_t new_j = (r + 1024 - 1) * st->ncol;
+			memmove(st->v + new_j, st->v + old_j, row_sz);
+		}
+	}
+	return;
+}
+
+static int
 qcb(gand_res_t res, void *clo)
 {
 	struct __recv_st_s *st = clo;
 	int this_vf;
 
 	if (res->date > st->ldat) {
-		double *pr;
-
 		st->lidx++;
-		/* check for resize */
-		if (st->lidx % 1024 == 0) {
-			/* yep */
-			mxSetM(st->d, st->lidx + 1024);
-			if (st->v) {
-				mxSetM(st->v, st->lidx + 1024);
-			}
-		}
+		check_resize(st);
 		/* set the date */
-		if ((pr = mxGetPr(st->d))) {
-			pr[st->lidx] = st->ldat = res->date;
-		}
+		st->d[st->lidx] = st->ldat = res->date;
 	}
 
 	if (st->v &&
 	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
 		/* also fill the second matrix */
-		double *pr;
-
-		if ((pr = mxGetPr(st->v))) {
-			pr[st->lidx * st->ncol + this_vf] = res->value;
-		}
+		st->v[st->lidx * st->ncol + this_vf] = res->value;
 	}
 	return 0;
 }
@@ -102,23 +110,20 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	} else if (nrhs == 1 ||
 		   (sym = mxArrayToString(prhs[1])) == NULL) {
 		mexErrMsgTxt("symbol not given\n");
+	} else if (nlhs == 0) {
+		return;
 	} else if (nrhs > 2) {
 		rst.vf = calloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
-	if (nlhs == 0) {
-		return;
-	}
 	for (size_t i = 0; i < nrhs - 2; i++) {
 		const char *vf = mxArrayToString(prhs[i + 2]);
-		rst.vf[i] = vf;
+		rst.vf[i] = strdup(vf);
 	}
 
 	/* set up the closure */
-	rst.d = mxCreateDoubleMatrix(0, 1, mxREAL);
 	if (nlhs > 1) {
 		rst.ncol = nrhs - 2 ?: 1;
-		rst.v = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
 	}
 	/* start with a negative index */
 	rst.lidx = -1;
@@ -132,11 +137,19 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	/* now reset the matrices to their true dimensions */
 	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
 
-	mxSetM(plhs[0] = rst.d, rst.lidx);
+	plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
+	mxSetPr(plhs[0], rst.d);
+	mxSetM(plhs[0], rst.lidx);
 	if (nlhs > 1) {
-		mxSetM(plhs[1] = rst.v, rst.lidx);
+		plhs[1] = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
+		fprintf(stderr, "%p\n", rst.v);
+		mxSetPr(plhs[1], rst.v);
+		mxSetM(plhs[1], rst.lidx);
 	}
 	if (rst.vf) {
+		for (size_t i = 0; i < rst.nvf; i++) {
+			free(rst.vf[i]);
+		}
 		free(rst.vf);
 	}
 	return;
