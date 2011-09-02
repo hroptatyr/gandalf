@@ -115,10 +115,10 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	}
 
 	/* set up the closure */
-	rst.d = plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
+	rst.d = mxCreateDoubleMatrix(0, 1, mxREAL);
 	if (nlhs > 1) {
 		rst.ncol = nrhs - 2 ?: 1;
-		rst.v = plhs[1] = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
+		rst.v = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
 	}
 	/* start with a negative index */
 	rst.lidx = -1;
@@ -132,9 +132,9 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	/* now reset the matrices to their true dimensions */
 	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
 
-	mxSetM(plhs[0], rst.lidx);
+	mxSetM(plhs[0] = rst.d, rst.lidx);
 	if (nlhs > 1) {
-		mxSetM(plhs[1], rst.lidx);
+		mxSetM(plhs[1] = rst.v, rst.lidx);
 	}
 	if (rst.vf) {
 		free(rst.vf);
