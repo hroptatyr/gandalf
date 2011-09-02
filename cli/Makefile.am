@@ -5,13 +5,11 @@ AM_LDFLAGS =
 
 SUBDIRS = . matlab
 
-noinst_PROGRAMS = gandqry
-noinst_HEADERS =
-
 noinst_LTLIBRARIES = libgandapi.la
 libgandapi_la_SOURCES = gandapi.c gandapi.h
 
-gandqry_LDADD = libgandapi.la
+#noinst_PROGRAMS = gandqry
+#gandqry_LDADD = libgandapi.la
 
 # 
 # Help the developers get nice post-processed source files

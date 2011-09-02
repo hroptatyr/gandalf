@@ -6,16 +6,12 @@ AM_LDFLAGS =
 MATLABROOT = /opt/Matlab/R2010b
 moddir = $(libdir)/gandalf/matlab
 
-bin_PROGRAMS =
-noinst_PROGRAMS =
-noinst_HEADERS =
-BUILT_SOURCES =
-CLEANFILES = $(BUILT_SOURCES)
-
 mod_LTLIBRARIES = gand_get_series.la
 gand_get_series_la_LDFLAGS = -module -shrext ".mexa64"
 gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS) -DMATLAB_MEX_FILE
+gand_get_series_la_CPPFLAGS += -I$(top_srcdir)/cli
 gand_get_series_la_CPPFLAGS += -I$(MATLABROOT)/extern/include
+gand_get_series_la_LIBADD = $(top_builddir)/cli/libgandapi.la
 gand_get_series_la_SOURCES = gand_get_series.c
 
 # 
