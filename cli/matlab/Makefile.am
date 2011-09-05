@@ -3,9 +3,10 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
-moddir = $(libdir)/gandalf/matlab
+moddir = $(HOME)/.matlab/$(shell basename "$(MATLABROOT)")/toolbox/gandalf
 
 mod_LTLIBRARIES = gand_get_series.la
+mod_DATA = gand_get_series.m
 gand_get_series_la_LDFLAGS = -module -shrext ".mexa64"
 gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS) -DMATLAB_MEX_FILE
 gand_get_series_la_CPPFLAGS += -I$(top_srcdir)/cli
