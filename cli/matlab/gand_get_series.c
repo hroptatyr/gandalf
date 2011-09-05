@@ -1,3 +1,40 @@
+/*** gand_get_series.c -- obtain time series from gandalf server
+ *
+ * Copyright (C) 2011 Sebastian Freundt
+ *
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
+ *
+ * This file is part of gandalf.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the author nor the names of any contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ***/
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -6,18 +43,7 @@
 /* matlab stuff */
 #include "mex.h"
 
-/**
- * [d, p] = gand_get_series(service, symbol, valflav, ...)
- *          reads a gandalf time series
- *
- * Input:
- * symbol
- * optional: valflav cell array
- *
- * Output:
- * date, price time series, one column per valflav
- *
- **/
+/* see gand_get_series.m for details */
 
 #define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
@@ -32,6 +58,7 @@ struct __recv_st_s {
 	double *d;
 	double *v;
 	char **vf;
+	char **res_vf;
 	uint32_t nvf;
 	uint32_t ncol;
 };
@@ -42,10 +69,15 @@ struct __recv_st_s {
 static int
 find_valflav(const char *vf, struct __recv_st_s *st)
 {
+	size_t vflen = strlen(vf);
 
 	for (size_t i = 0; i < st->nvf; i++) {
 		const char *p = st->vf[i];
-		if (strcmp(p, vf) == 0) {
+		const char *tmp;
+
+		if ((tmp = strstr(p, vf)) &&
+		    (tmp == p || tmp[-1] == '/') &&
+		    (tmp[vflen] == '\0' || tmp[vflen] == '/')) {
 			return i;
 		}
 	}
@@ -87,6 +119,9 @@ qcb(gand_res_t res, void *clo)
 	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
 		/* also fill the second matrix */
 		st->v[st->lidx * st->ncol + this_vf] = res->value;
+		if (st->res_vf && st->res_vf[this_vf] == NULL) {
+			st->res_vf[this_vf] = strdup(res->valflav);
+		}
 	}
 	return 0;
 }
@@ -122,6 +157,9 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	if (nlhs > 1) {
 		rst.ncol = nrhs - 2 ?: 1;
 	}
+	if (nlhs > 2) {
+		rst.res_vf = calloc(rst.nvf, sizeof(*rst.res_vf));
+	}
 	/* start with a negative index */
 	rst.lidx = -1;
 
@@ -154,6 +192,17 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			}
 		}
 		mxFree(rst.v);
+	}
+	if (nlhs > 2 && rst.res_vf) {
+		/* also bang the fields */
+		mwSize dim = rst.nvf;
+		mxArray *ca = plhs[2] = mxCreateCellArray(1, &dim);
+		for (size_t i = 0; i < rst.nvf; i++) {
+			mxArray *s = mxCreateString(rst.res_vf[i]);
+			mxSetCell(ca, i, s);
+			free(rst.res_vf[i]);
+		}
+		free(rst.res_vf);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
