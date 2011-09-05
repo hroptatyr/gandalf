@@ -7,15 +7,17 @@
 #include "mex.h"
 
 /**
- * [d, p] = gand_get_series(service, symbol, valflav, ...)
+ * [d, p, fields] = gand_get_series(service, symbol, valflav, ...)
  *          reads a gandalf time series
  *
  * Input:
  * symbol
- * optional: valflav cell array
+ * optional: valflav strings
  *
  * Output:
- * date, price time series, one column per valflav
+ * D date
+ * P price time series, one column per valflav
+ * FIELDS names of the matching valflav
  *
  **/
 
@@ -32,6 +34,7 @@ struct __recv_st_s {
 	double *d;
 	double *v;
 	char **vf;
+	char **res_vf;
 	uint32_t nvf;
 	uint32_t ncol;
 };
@@ -92,6 +95,9 @@ qcb(gand_res_t res, void *clo)
 	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
 		/* also fill the second matrix */
 		st->v[st->lidx * st->ncol + this_vf] = res->value;
+		if (st->res_vf && st->res_vf[this_vf] == NULL) {
+			st->res_vf[this_vf] = strdup(res->valflav);
+		}
 	}
 	return 0;
 }
@@ -127,6 +133,9 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	if (nlhs > 1) {
 		rst.ncol = nrhs - 2 ?: 1;
 	}
+	if (nlhs > 2) {
+		rst.res_vf = calloc(rst.nvf, sizeof(*rst.res_vf));
+	}
 	/* start with a negative index */
 	rst.lidx = -1;
 
@@ -159,6 +168,17 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			}
 		}
 		mxFree(rst.v);
+	}
+	if (nlhs > 2 && rst.res_vf) {
+		/* also bang the fields */
+		mwSize dim = rst.nvf;
+		mxArray *ca = plhs[2] = mxCreateCellArray(1, &dim);
+		for (size_t i = 0; i < rst.nvf; i++) {
+			mxArray *s = mxCreateString(rst.res_vf[i]);
+			mxSetCell(ca, i, s);
+			free(rst.res_vf[i]);
+		}
+		free(rst.res_vf);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
