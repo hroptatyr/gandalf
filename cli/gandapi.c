@@ -258,6 +258,7 @@ gand_close(gand_ctx_t ug)
 	struct __ctx_s *g = ug;
 	/* stop waiting for events */
 	ep_fini(g, g->gs);
+	shut_sock(g->gs);
 	shut_sock(g->eps);
 	munmap(g->buf, g->bsz);
 	free(g);
