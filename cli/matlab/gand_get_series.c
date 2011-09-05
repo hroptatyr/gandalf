@@ -48,9 +48,12 @@
 #define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
 #define LIKELY(x)	(x)
+#define UNLIKELY(x)	(x)
 
 /* grrrr */
 extern void mexFunction(int, mxArray*[], int, const mxArray*[]);
+
+typedef uint32_t daysi_t;
 
 struct __recv_st_s {
 	idate_t ldat;
@@ -62,6 +65,35 @@ struct __recv_st_s {
 	uint32_t nvf;
 	uint32_t ncol;
 };
+
+
+/* date helpers */
+#define BASE_YEAR	(1917)
+#define TO_BASE(x)	((x) - BASE_YEAR)
+#define TO_YEAR(x)	((x) + BASE_YEAR)
+
+static uint16_t dm[] = {
+/* this is \sum ml, first element is a bit set of leap days to add */
+	0xfff8, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365
+};
+
+static daysi_t
+idate_to_daysi(idate_t dt)
+{
+/* compute days since 1917-01-01 (Mon),
+ * if year slot is absent in D compute the day in the year of D instead. */
+	int y = dt / 10000;
+	int m = (dt / 100) % 100;
+	int d = dt % 100;
+	daysi_t res = dm[m] + d;
+	int dy = (y - BASE_YEAR);
+
+	res += dy * 365 + dy / 4;
+	if (UNLIKELY(dy % 4 == 3)) {
+		res += (dm[0] >> (m)) & 1;
+	}
+	return res + 700170;
+}
 
 
 #define RESIZE_STEP	(1024)
@@ -112,7 +144,7 @@ qcb(gand_res_t res, void *clo)
 		st->lidx++;
 		check_resize(st);
 		/* set the date */
-		st->d[st->lidx] = st->ldat = res->date;
+		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
 	}
 
 	if (st->v &&
@@ -164,7 +196,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	rst.lidx = -1;
 
 	/* open the gandalf handle */
-	gctx = gand_open(srv, /*timeout*/2000);
+	gctx = gand_open(srv, /*timeout*/60000);
 	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
 	/* and fuck off again */
 	gand_close(gctx);
