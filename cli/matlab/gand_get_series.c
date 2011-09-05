@@ -143,7 +143,6 @@ qcb(gand_res_t res, void *clo)
 	if (res->date > st->ldat) {
 		st->lidx++;
 		check_resize(st);
-		fprintf(stderr, "%u\n", res->date);
 		/* set the date */
 		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
 	}
