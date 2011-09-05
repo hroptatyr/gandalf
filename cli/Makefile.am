@@ -12,8 +12,8 @@ if BUILD_CLIAPPS
 noinst_LTLIBRARIES = libgandapi.la
 libgandapi_la_SOURCES = gandapi.c gandapi.h
 
-#noinst_PROGRAMS = gandqry
-#gandqry_LDADD = libgandapi.la
+noinst_PROGRAMS = gandqry
+gandqry_LDADD = libgandapi.la
 endif
 
 # 
