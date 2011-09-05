@@ -163,8 +163,8 @@ void
 mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 	gand_ctx_t gctx;
-	const char *srv;
-	const char *sym;
+	char *srv;
+	char *sym;
 	/* state for retrieval */
 	struct __recv_st_s rst = {0};
 
@@ -173,16 +173,19 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		mexErrMsgTxt("service string not defined\n");
 	} else if (nrhs == 1 ||
 		   (sym = mxArrayToString(prhs[1])) == NULL) {
+		mxFree(srv);
 		mexErrMsgTxt("symbol not given\n");
 	} else if (nlhs == 0) {
+		mxFree(srv);
+		mxFree(sym);
 		return;
 	} else if (nrhs > 2) {
-		rst.vf = calloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
+		rst.vf = mxCalloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
 	for (size_t i = 0; i < nrhs - 2; i++) {
-		const char *vf = mxArrayToString(prhs[i + 2]);
-		rst.vf[i] = strdup(vf);
+		char *vf = mxArrayToString(prhs[i + 2]);
+		rst.vf[i] = vf;
 	}
 
 	/* set up the closure */
@@ -190,7 +193,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		rst.ncol = nrhs - 2 ?: 1;
 	}
 	if (nlhs > 2) {
-		rst.res_vf = calloc(rst.nvf, sizeof(*rst.res_vf));
+		rst.res_vf = mxCalloc(rst.nvf, sizeof(*rst.res_vf));
 	}
 	/* start with a negative index */
 	rst.lidx = -1;
@@ -234,14 +237,16 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			mxSetCell(ca, i, s);
 			free(rst.res_vf[i]);
 		}
-		free(rst.res_vf);
+		mxFree(rst.res_vf);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
-			free(rst.vf[i]);
+			mxFree(rst.vf[i]);
 		}
-		free(rst.vf);
+		mxFree(rst.vf);
 	}
+	mxFree(srv);
+	mxFree(sym);
 	return;
 }
 
