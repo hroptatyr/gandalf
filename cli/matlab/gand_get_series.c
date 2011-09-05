@@ -42,10 +42,15 @@ struct __recv_st_s {
 static int
 find_valflav(const char *vf, struct __recv_st_s *st)
 {
+	size_t vflen = strlen(vf);
 
 	for (size_t i = 0; i < st->nvf; i++) {
 		const char *p = st->vf[i];
-		if (strcmp(p, vf) == 0) {
+		const char *tmp;
+
+		if ((tmp = strstr(p, vf)) &&
+		    (tmp == p || tmp[-1] == '/') &&
+		    (tmp[vflen] == '\0' || tmp[vflen] == '/')) {
 			return i;
 		}
 	}
