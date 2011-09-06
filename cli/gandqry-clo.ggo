@@ -1,0 +1,16 @@
+args "--unamed-opts=SYMBOL"
+package "gandqry"
+description "Query a gandalf server"
+
+## common to all modes
+option "valflav" f
+	"Valflav to filter on"
+	string optional multiple
+
+option "service" s
+	"Speak to Round positions to integer values"
+	string typestr="HOST:PORT"
+
+option "timeout" w
+	"Timeout in milliseconds to wait before a connection is considered dead"
+	int optional default="2000"

@@ -1,3 +1,4 @@
+/*** gandqry.c -- example gandalf client using the gandapi */
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -18,7 +19,7 @@ cb(gand_res_t UNUSED(res), void *UNUSED(clo))
 	return 0;
 }
 
-#if defined STANDALONE
+
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
 #endif	/* __INTEL_COMPILER */
@@ -29,19 +30,28 @@ cb(gand_res_t UNUSED(res), void *UNUSED(clo))
 #endif	/* __INTEL_COMPILER */
 
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
+	/* args */
+	struct gengetopt_args_info argi[1];
 	gand_ctx_t g;
-	const char *vf[] = {{"open"}, {"high"}, {"low"}, {"close"}};
 
-	for (size_t i = 0; i < 100; i++) {
-		npkt = 0;
-		g = gand_open("gonzo:8624", 2000);
-		gand_get_series(g, "988006@comd", vf, 4, cb, NULL);
-		gand_close(g);
-		fprintf(stdout, "number of packets %zu\n", npkt);
+	if (cmdline_parser(argc, argv, argi)) {
+		exit(1);
 	}
 
+	g = gand_open(argi->service_arg, argi->timeout_arg);
+	for (size_t i = 0; i < argi->inputs_num; i++) {
+		npkt = 0;
+		gand_get_series(
+			g, argi->inputs[i],
+			argi->valflav_arg, argi->valflav_given,
+			cb, NULL);
+		fprintf(stdout, "number of packets %zu\n", npkt);
+	}
+	gand_close(g);
+
+	cmdline_parser_free(argi);
 	return 0;
 }
 

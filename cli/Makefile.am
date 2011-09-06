@@ -3,6 +3,9 @@
 AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
+EXTRA_DIST = $(BUILT_SOURCES)
+BUILT_SOURCES =
+
 SUBDIRS = .
 if BUILD_MATCLI
 SUBDIRS += matlab
@@ -14,6 +17,7 @@ libgandapi_la_SOURCES = gandapi.c gandapi.h
 
 noinst_PROGRAMS = gandqry
 gandqry_LDADD = libgandapi.la
+BUILT_SOURCES += gandqry-clo.c gandqry-clo.h
 endif
 
 ## ggo rule
