@@ -199,7 +199,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	rst.lidx = -1;
 
 	/* open the gandalf handle */
-	gctx = gand_open(srv, /*timeout*/60000);
+	gctx = gand_open(srv, /*timeout*/2500);
 	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
 	/* and fuck off again */
 	gand_close(gctx);
