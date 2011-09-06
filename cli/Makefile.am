@@ -16,6 +16,10 @@ noinst_PROGRAMS = gandqry
 gandqry_LDADD = libgandapi.la
 endif
 
+## ggo rule
+%.c %.h: %.ggo
+	gengetopt -l -i $< -F $*
+
 # 
 # Help the developers get nice post-processed source files
 

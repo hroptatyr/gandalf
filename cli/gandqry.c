@@ -18,6 +18,16 @@ cb(gand_res_t UNUSED(res), void *UNUSED(clo))
 	return 0;
 }
 
+#if defined STANDALONE
+#if defined __INTEL_COMPILER
+# pragma warning (disable:593)
+#endif	/* __INTEL_COMPILER */
+#include "gandqry-clo.h"
+#include "gandqry-clo.c"
+#if defined __INTEL_COMPILER
+# pragma warning (default:593)
+#endif	/* __INTEL_COMPILER */
+
 int
 main(int argc, const char *argv[])
 {
