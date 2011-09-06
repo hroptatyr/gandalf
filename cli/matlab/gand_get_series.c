@@ -131,7 +131,7 @@ check_resize(struct __recv_st_s *st)
 		size_t new_sz = (st->lidx + RESIZE_STEP) * row_sz;
 
 		st->v = mxRealloc(st->v, new_sz);
-		memset(st->v + st->lidx, -1, RESIZE_STEP * row_sz);
+		memset(st->v + st->lidx * st->ncol, -1, RESIZE_STEP * row_sz);
 	}
 	return;
 }
