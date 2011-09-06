@@ -48,9 +48,12 @@
 #define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
 #define LIKELY(x)	(x)
+#define UNLIKELY(x)	(x)
 
 /* grrrr */
 extern void mexFunction(int, mxArray*[], int, const mxArray*[]);
+
+typedef uint32_t daysi_t;
 
 struct __recv_st_s {
 	idate_t ldat;
@@ -62,6 +65,35 @@ struct __recv_st_s {
 	uint32_t nvf;
 	uint32_t ncol;
 };
+
+
+/* date helpers */
+#define BASE_YEAR	(1917)
+#define TO_BASE(x)	((x) - BASE_YEAR)
+#define TO_YEAR(x)	((x) + BASE_YEAR)
+
+static uint16_t dm[] = {
+/* this is \sum ml, first element is a bit set of leap days to add */
+	0xfff8, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365
+};
+
+static daysi_t
+idate_to_daysi(idate_t dt)
+{
+/* compute days since 1917-01-01 (Mon),
+ * if year slot is absent in D compute the day in the year of D instead. */
+	int y = dt / 10000;
+	int m = (dt / 100) % 100;
+	int d = dt % 100;
+	daysi_t res = dm[m] + d;
+	int dy = (y - BASE_YEAR);
+
+	res += dy * 365 + dy / 4;
+	if (UNLIKELY(dy % 4 == 3)) {
+		res += (dm[0] >> (m)) & 1;
+	}
+	return res + 700170;
+}
 
 
 #define RESIZE_STEP	(1024)
@@ -93,11 +125,13 @@ check_resize(struct __recv_st_s *st)
 	}
 	/* yep, resize */
 	st->d = mxRealloc(st->d, (st->lidx + RESIZE_STEP) * sizeof(double));
+	memset(st->d + st->lidx, -1, RESIZE_STEP * sizeof(double));
 	if (st->ncol) {
 		size_t row_sz = st->ncol * sizeof(double);
 		size_t new_sz = (st->lidx + RESIZE_STEP) * row_sz;
 
 		st->v = mxRealloc(st->v, new_sz);
+		memset(st->v + st->lidx * st->ncol, -1, RESIZE_STEP * row_sz);
 	}
 	return;
 }
@@ -112,7 +146,7 @@ qcb(gand_res_t res, void *clo)
 		st->lidx++;
 		check_resize(st);
 		/* set the date */
-		st->d[st->lidx] = st->ldat = res->date;
+		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
 	}
 
 	if (st->v &&
@@ -131,8 +165,8 @@ void
 mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 	gand_ctx_t gctx;
-	const char *srv;
-	const char *sym;
+	char *srv;
+	char *sym;
 	/* state for retrieval */
 	struct __recv_st_s rst = {0};
 
@@ -141,16 +175,19 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		mexErrMsgTxt("service string not defined\n");
 	} else if (nrhs == 1 ||
 		   (sym = mxArrayToString(prhs[1])) == NULL) {
+		mxFree(srv);
 		mexErrMsgTxt("symbol not given\n");
 	} else if (nlhs == 0) {
+		mxFree(srv);
+		mxFree(sym);
 		return;
 	} else if (nrhs > 2) {
-		rst.vf = calloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
+		rst.vf = mxCalloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
 	for (size_t i = 0; i < nrhs - 2; i++) {
-		const char *vf = mxArrayToString(prhs[i + 2]);
-		rst.vf[i] = strdup(vf);
+		char *vf = mxArrayToString(prhs[i + 2]);
+		rst.vf[i] = vf;
 	}
 
 	/* set up the closure */
@@ -158,13 +195,13 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		rst.ncol = nrhs - 2 ?: 1;
 	}
 	if (nlhs > 2) {
-		rst.res_vf = calloc(rst.nvf, sizeof(*rst.res_vf));
+		rst.res_vf = mxCalloc(rst.nvf, sizeof(*rst.res_vf));
 	}
 	/* start with a negative index */
 	rst.lidx = -1;
 
 	/* open the gandalf handle */
-	gctx = gand_open(srv, /*timeout*/2000);
+	gctx = gand_open(srv, /*timeout*/2500);
 	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
 	/* and fuck off again */
 	gand_close(gctx);
@@ -202,14 +239,16 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			mxSetCell(ca, i, s);
 			free(rst.res_vf[i]);
 		}
-		free(rst.res_vf);
+		mxFree(rst.res_vf);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
-			free(rst.vf[i]);
+			mxFree(rst.vf[i]);
 		}
-		free(rst.vf);
+		mxFree(rst.vf);
 	}
+	mxFree(srv);
+	mxFree(sym);
 	return;
 }
 

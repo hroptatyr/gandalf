@@ -258,6 +258,7 @@ gand_close(gand_ctx_t ug)
 	struct __ctx_s *g = ug;
 	/* stop waiting for events */
 	ep_fini(g, g->gs);
+	shut_sock(g->gs);
 	shut_sock(g->eps);
 	munmap(g->buf, g->bsz);
 	free(g);
@@ -330,15 +331,16 @@ find:
 		}
 		/* memmove what we've got */
 		memmove(g->buf, g->buf + g->idx, g->nrd - g->idx);
-		g->idx = g->nrd - g->idx;
+		g->nrd -= g->idx;
+		g->idx = 0;
 
-	} else if (g->nrd > 0 && g->nrd < g->bsz) {
+	} else if (g->idx > 0) {
 		/* message has been finished prematurely, we assume thats it
 		 * ATTENTION this might go wrong if the total message size
 		 * is divisible by the buffer size, in which case we wait
 		 * for another SRV_TIMEOUT millis, a well */
-		*buf = NULL;
-		return -1;
+		g->idx = g->nrd = 0;
+		g->timeo = 10;
 	}
 
 	do {
@@ -354,24 +356,25 @@ find:
 		if (LIKELY(ev & EPOLLIN)) {
 			ssize_t nrd;
 
-			if ((nrd = read(fd, g->buf, g->bsz - g->idx)) > 0) {
-				g->nrd = nrd;
+			if ((nrd = read(
+				     fd,
+				     g->buf + g->nrd, g->bsz - g->nrd)) > 0) {
+				g->nrd += nrd;
 				goto find;
 			} else if (nrd == 0) {
 				/* ah, eo-msg */
 				*buf = NULL;
 				return -1;
 			}
-
 		} else if (ev & EPOLLOUT) {
-			/* uh oh */
+			/* do nothing */
 			;
 		} else {
-			break;
+			return -1;
 		}
 	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	/* rinse */
-	return 0;
+	return -1;
 }
 
 int
