@@ -897,8 +897,6 @@ gand_init_inot(const char *file, struct mmfb_s *symbuf)
 static ud_conn_t
 gand_init_uds_sock(const char **sock_path, ud_ctx_t ctx, void *settings)
 {
-	volatile int res = -1;
-
 	udcfg_tbl_lookup_s(sock_path, ctx, settings, "sock");
 	return make_unix_conn(*sock_path, handle_data, handle_close, NULL);
 }
