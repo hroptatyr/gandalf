@@ -223,7 +223,7 @@ free_info_name(const char *UNUSED(sym))
 static int
 mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 {
-	size_t fsz;
+	size_t fsz = 0;
 
 	if (fst == NULL || S_ISLNK(fst->st_mode)) {
 		struct stat st[1];
