@@ -91,7 +91,7 @@ struct valflav_s {
 };
 
 enum select_e {
-	SEL_ALL = -1,
+	SEL_ALL = -1U,
 	SEL_NOTHING = 0,
 	SEL_SYM = 1,
 	SEL_RID = 2,
