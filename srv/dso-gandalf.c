@@ -111,7 +111,7 @@ static struct mmfb_s grsymu = {
 
 /* match state */
 struct ms_s {
-	int cnt;
+	unsigned int cnt;
 	/* the date that made a match */
 	idate_t m_date;
 	idate_t last;
