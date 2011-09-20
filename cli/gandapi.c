@@ -380,7 +380,7 @@ find:
 int
 gand_get_series(
 	gand_ctx_t ug,
-	const char *sym, const char *const valflav[], size_t nvalflav,
+	const char *sym, char *const valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
 	static const char dflt[] = "fix/stl/close/unknown";
