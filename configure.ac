@@ -36,6 +36,8 @@ fi
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CC_C99
+SXE_CHECK_CFLAGS
+
 AC_PROG_YACC
 AM_PROG_LEX
 LT_INIT
