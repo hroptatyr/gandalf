@@ -167,13 +167,15 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	/* state for retrieval */
 	struct __recv_st_s rst = {0};
 
-	if (nrhs == 0 ||
+	if (nrhs <= 0 ||
 	    (srv = mxArrayToString(prhs[0])) == NULL) {
 		mexErrMsgTxt("service string not defined\n");
+		return;
 	} else if (nrhs == 1 ||
 		   (sym = mxArrayToString(prhs[1])) == NULL) {
 		mxFree(srv);
 		mexErrMsgTxt("symbol not given\n");
+		return;
 	} else if (nlhs == 0) {
 		mxFree(srv);
 		mxFree(sym);
