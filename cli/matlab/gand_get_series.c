@@ -50,9 +50,6 @@
 #define LIKELY(x)	(x)
 #define UNLIKELY(x)	(x)
 
-/* grrrr */
-extern void mexFunction(int, mxArray*[], int, const mxArray*[]);
-
 typedef uint32_t daysi_t;
 
 struct __recv_st_s {
@@ -185,7 +182,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		rst.vf = mxCalloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
-	for (size_t i = 0; i < nrhs - 2; i++) {
+	for (int i = 0; i < nrhs - 2; i++) {
 		char *vf = mxArrayToString(prhs[i + 2]);
 		rst.vf[i] = vf;
 	}
