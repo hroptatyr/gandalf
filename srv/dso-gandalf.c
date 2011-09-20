@@ -514,7 +514,7 @@ bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 static void
 __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 {
-	struct mmfb_s mf = {.m = {0}, .fd = -1};
+	struct mmfb_s mf = {.m = {NULL}, .fd = -1};
 	struct ms_s state = {0};
 	const char *f;
 
@@ -522,7 +522,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
-	} else if (mmap_whole_file(&mf, f, 0) < 0) {
+	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
 		goto out;
 	}
 
@@ -641,7 +641,7 @@ __upcase(char *str)
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
-	struct mmmb_s mb = {0};
+	struct mmmb_s mb = {NULL};
 
 	GAND_DEBUG("nrolf_objs %zu\n", msg->nrolf_objs);
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
@@ -706,8 +706,8 @@ __eol(const char *ptr, size_t bsz)
 static size_t
 get_nfo(char **buf, gand_msg_t msg)
 {
-	struct mmmb_s mb = {0};
-	struct mmfb_s mf = {.m = {0}, .fd = -1};
+	struct mmmb_s mb = {NULL};
+	struct mmfb_s mf = {.m = {NULL}, .fd = -1};
 	const char *f;
 
 	/* general checks and get us the lateglu name */
@@ -715,7 +715,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_info_name()) == NULL) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f, 0) < 0) {
+	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
 		goto out;
 	}
 
