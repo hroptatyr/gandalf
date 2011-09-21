@@ -37,6 +37,7 @@
 
 %{
 #define YY_EXTRA_TYPE	void*
+#define YY_FATAL_ERROR(msg)
 %}
 
 %option reentrant
