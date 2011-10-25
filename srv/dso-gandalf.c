@@ -220,25 +220,35 @@ free_info_name(const char *UNUSED(sym))
 }
 
 
-static int
+static ssize_t
 mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 {
 	size_t fsz = 0;
+	struct stat st[1];
 
 	if (fst == NULL || S_ISLNK(fst->st_mode)) {
-		struct stat st[1];
+	restat:
 		if (UNLIKELY(stat(f, st) < 0)) {
 			return -1;
 		} else if (UNLIKELY((fsz = st->st_size) == 0)) {
 			return -1;
 		}
+	} else if (UNLIKELY((fsz = st->st_size) <= 16)) {
+		GAND_ERR_LOG("file size %zu suspicious, restatting\n", fsz);
+		goto restat;
 	}
+
 	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
 		return -1;
 	}
 
 	/* mmap the file */
 	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
+	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
+		mf->m.buf = NULL;
+		mf->m.all = mf->m.bsz = 0;
+		return -1;
+	}
 	return mf->m.all = mf->m.bsz = fsz;
 }
 
