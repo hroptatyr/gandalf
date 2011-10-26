@@ -29,7 +29,7 @@ AC_COPYRIGHT(
 ###     autoreconf
 ])
 
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign dist-xz])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 ## initialise our cool message nest levels
