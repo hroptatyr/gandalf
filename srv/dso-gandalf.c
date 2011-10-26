@@ -747,6 +747,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		for (const char *cand = (rest = mf.m.bsz, mf.m.buf), *cend;
 		     (cand = memmem(cand, rest, p, q)) != NULL;
 		     cand++, rest = mf.m.bsz - (cand - mf.m.buf)) {
+			char *tmp1, *tmp2;
 			if (ro->rolf_id > 0) {
 				/* rolf ids are only at the
 				 * beginning of a line */
@@ -755,8 +756,9 @@ get_nfo(char **buf, gand_msg_t msg)
 					continue;
 				}
 			} else if (!(cand[-1] == '\t' &&
-				     rawmemchr(cand, '@') <
-				     rawmemchr(cand, '\t'))) {
+				     (tmp1 = rawmemchr(cand, '@'),
+				      tmp2 = rawmemchr(cand, '\t'),
+				      tmp1 < tmp2))) {
 				continue;
 			}
 
