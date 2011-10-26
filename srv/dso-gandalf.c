@@ -221,7 +221,7 @@ free_info_name(const char *UNUSED(sym))
 
 
 static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *UNUSED(fs))
+mmap_whole_file(struct mmfb_s *mf, const char *f)
 {
 	size_t fsz = 0;
 	struct stat st = {0};
@@ -527,7 +527,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
-	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
@@ -720,7 +720,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_info_name()) == NULL) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
@@ -874,7 +874,7 @@ handle_inot(
 	munmap_all(data);
 	/* reinit */
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
-	if (mmap_whole_file(data, f, st) < 0) {
+	if (mmap_whole_file(data, f) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
 	} else {
 		GAND_INFO_LOG("new sym table built\n");
