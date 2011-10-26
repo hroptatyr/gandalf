@@ -220,42 +220,10 @@ free_info_name(const char *UNUSED(sym))
 }
 
 
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
-{
-	size_t fsz = 0;
-	struct stat st[1];
-
-	if (fst == NULL || S_ISLNK(fst->st_mode)) {
-	restat:
-		if (UNLIKELY(stat(f, st) < 0)) {
-			return -1;
-		} else if (UNLIKELY((fsz = st->st_size) == 0)) {
-			return -1;
-		}
-	} else if (UNLIKELY((fsz = st->st_size) <= 16)) {
-		GAND_ERR_LOG("file size %zu suspicious, restatting\n", fsz);
-		goto restat;
-	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		mf->m.buf = NULL;
-		mf->m.all = mf->m.bsz = 0;
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
-}
-
 static void
 munmap_all(struct mmfb_s *mf)
 {
-	if (mf->m.buf != NULL && mf->m.all > 0UL) {
+	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
 		munmap(mf->m.buf, mf->m.all);
 	}
 	if (mf->fd >= 0) {
@@ -266,6 +234,32 @@ munmap_all(struct mmfb_s *mf)
 	mf->m.bsz = mf->m.all = 0UL;
 	mf->fd = -1;
 	return;
+}
+
+static ssize_t
+mmap_whole_file(struct mmfb_s *mf, const char *f)
+{
+	size_t fsz = 0;
+	struct stat st = {0};
+
+	if (UNLIKELY(stat(f, &st) < 0)) {
+		return -1;
+	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
+		return -1;
+	}
+
+	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
+		return -1;
+	}
+
+	/* mmap the file */
+	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
+	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
+		munmap_all(mf);
+		return -1;
+	}
+	GAND_DEBUG("mapped %zu bytes\n", fsz);
+	return mf->m.all = mf->m.bsz = fsz;
 }
 
 static mdir_t
@@ -532,7 +526,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
-	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
@@ -725,7 +719,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		return 0UL;
 	} else if ((f = make_info_name()) == NULL) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f, NULL) < 0) {
+	} else if (mmap_whole_file(&mf, f) < 0) {
 		goto out;
 	}
 
@@ -747,6 +741,7 @@ get_nfo(char **buf, gand_msg_t msg)
 		for (const char *cand = (rest = mf.m.bsz, mf.m.buf), *cend;
 		     (cand = memmem(cand, rest, p, q)) != NULL;
 		     cand++, rest = mf.m.bsz - (cand - mf.m.buf)) {
+			char *tmp1, *tmp2;
 			if (ro->rolf_id > 0) {
 				/* rolf ids are only at the
 				 * beginning of a line */
@@ -755,8 +750,9 @@ get_nfo(char **buf, gand_msg_t msg)
 					continue;
 				}
 			} else if (!(cand[-1] == '\t' &&
-				     rawmemchr(cand, '@') <
-				     rawmemchr(cand, '\t'))) {
+				     (tmp1 = rawmemchr(cand, '@'),
+				      tmp2 = rawmemchr(cand, '\t'),
+				      tmp1 < tmp2))) {
 				continue;
 			}
 
@@ -872,20 +868,14 @@ handle_close(ud_conn_t c, void *data)
 
 static int
 handle_inot(
-	ud_conn_t UNUSED(c), const char *f, const struct stat *st, void *data)
+	ud_conn_t UNUSED(c), const char *f,
+	const struct stat *UNUSED(st), void *data)
 {
-	/* check if someone trunc'd us the file */
-	if (UNLIKELY(st == NULL)) {
-		/* good */
-	} else if (UNLIKELY(st->st_size == 0)) {
-		return -1;
-	}
-
 	/* off with the old guy */
 	munmap_all(data);
 	/* reinit */
 	GAND_INFO_LOG("building sym table \"%s\" ...", f);
-	if (mmap_whole_file(data, f, st) < 0) {
+	if (mmap_whole_file(data, f) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
 	} else {
 		GAND_INFO_LOG("new sym table built\n");

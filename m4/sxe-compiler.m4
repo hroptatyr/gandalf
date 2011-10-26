@@ -202,7 +202,7 @@ AC_DEFUN([SXE_OPTIFLAGS], [dnl
 
 AC_DEFUN([SXE_FEATFLAGS], [dnl
 	## if libtool then
-	dnl XFLAG="-XCClinker"
+	XFLAG="-XCClinker"
 	## default flags for needed features
 	SXE_CHECK_COMPILER_FLAGS([-static-intel], [
 		ldflags="${ldflags} ${XFLAG} -static-intel"])
