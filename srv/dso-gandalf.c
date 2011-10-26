@@ -867,15 +867,9 @@ handle_close(ud_conn_t c, void *data)
 
 static int
 handle_inot(
-	ud_conn_t UNUSED(c), const char *f, const struct stat *st, void *data)
+	ud_conn_t UNUSED(c), const char *f,
+	const struct stat *UNUSED(st), void *data)
 {
-	/* check if someone trunc'd us the file */
-	if (UNLIKELY(st == NULL)) {
-		/* good */
-	} else if (UNLIKELY(st->st_size == 0)) {
-		return -1;
-	}
-
 	/* off with the old guy */
 	munmap_all(data);
 	/* reinit */
