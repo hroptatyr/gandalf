@@ -221,21 +221,15 @@ free_info_name(const char *UNUSED(sym))
 
 
 static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
+mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *UNUSED(fs))
 {
 	size_t fsz = 0;
-	struct stat st[1];
+	struct stat st = {0};
 
-	if (fst == NULL || S_ISLNK(fst->st_mode)) {
-	restat:
-		if (UNLIKELY(stat(f, st) < 0)) {
-			return -1;
-		} else if (UNLIKELY((fsz = st->st_size) == 0)) {
-			return -1;
-		}
-	} else if (UNLIKELY((fsz = st->st_size) <= 16)) {
-		GAND_ERR_LOG("file size %zu suspicious, restatting\n", fsz);
-		goto restat;
+	if (UNLIKELY(stat(f, &st) < 0)) {
+		return -1;
+	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
+		return -1;
 	}
 
 	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
@@ -249,6 +243,7 @@ mmap_whole_file(struct mmfb_s *mf, const char *f, const struct stat *fst)
 		mf->m.all = mf->m.bsz = 0;
 		return -1;
 	}
+	GAND_DEBUG("mapped %zu bytes\n", fsz);
 	return mf->m.all = mf->m.bsz = fsz;
 }
 
