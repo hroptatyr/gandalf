@@ -220,6 +220,22 @@ free_info_name(const char *UNUSED(sym))
 }
 
 
+static void
+munmap_all(struct mmfb_s *mf)
+{
+	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
+		munmap(mf->m.buf, mf->m.all);
+	}
+	if (mf->fd >= 0) {
+		close(mf->fd);
+	}
+	/* reset values */
+	mf->m.buf = NULL;
+	mf->m.bsz = mf->m.all = 0UL;
+	mf->fd = -1;
+	return;
+}
+
 static ssize_t
 mmap_whole_file(struct mmfb_s *mf, const char *f)
 {
@@ -239,28 +255,11 @@ mmap_whole_file(struct mmfb_s *mf, const char *f)
 	/* mmap the file */
 	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
 	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		mf->m.buf = NULL;
-		mf->m.all = mf->m.bsz = 0;
+		munmap_all(mf);
 		return -1;
 	}
 	GAND_DEBUG("mapped %zu bytes\n", fsz);
 	return mf->m.all = mf->m.bsz = fsz;
-}
-
-static void
-munmap_all(struct mmfb_s *mf)
-{
-	if (mf->m.buf != NULL && mf->m.all > 0UL) {
-		munmap(mf->m.buf, mf->m.all);
-	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
-	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
-	return;
 }
 
 static mdir_t
