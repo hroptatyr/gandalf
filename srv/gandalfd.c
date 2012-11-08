@@ -270,7 +270,6 @@ main(int argc, char *argv[])
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
 	bool daemonisep = false;
-	bool prefer6p = false;
 	cfg_t cfg;
 
 	/* whither to log */
@@ -289,7 +288,6 @@ main(int argc, char *argv[])
 		;
 	} else {
 		daemonisep |= cfg_glob_lookup_b(cfg, "daemonise");
-		prefer6p |= cfg_glob_lookup_b(cfg, "prefer_ipv6");
 	}
 
 	/* run as daemon, do me properly */
