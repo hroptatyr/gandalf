@@ -166,6 +166,30 @@ gand_free_config(cfg_t ctx)
 #endif	/* USE_LUA */
 
 
+/* callbacks */
+static void
+sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("C-c caught, unrolling everything\n");
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
+}
+
+static void
+sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("SIGPIPE caught, doing nothing\n");
+	return;
+}
+
+static void
+sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("SIGHUP caught, doing nothing\n");
+	return;
+}
+
+
 /* server helpers */
 static int
 daemonise(void)
@@ -242,8 +266,6 @@ main(int argc, char *argv[])
 	static ev_signal ALGN16(sighup_watcher)[1];
 	static ev_signal ALGN16(sigterm_watcher)[1];
 	static ev_signal ALGN16(sigpipe_watcher)[1];
-	static ev_signal ALGN16(sigusr2_watcher)[1];
-	static ev_async ALGN16(wakeup_watcher)[1];
 	/* args */
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
@@ -297,7 +319,6 @@ main(int argc, char *argv[])
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
 
-#if 0
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
@@ -305,15 +326,11 @@ main(int argc, char *argv[])
 	ev_signal_init(sigpipe_watcher, sigpipe_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 	/* initialise a SIGTERM handler */
-	ev_signal_init(sigterm_watcher, sighup_cb, SIGTERM);
+	ev_signal_init(sigterm_watcher, sigint_cb, SIGTERM);
 	ev_signal_start(EV_A_ sigterm_watcher);
 	/* initialise a SIGHUP handler */
 	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
 	ev_signal_start(EV_A_ sighup_watcher);
-	/* initialise a SIGUSR2 handler */
-	ev_signal_init(sigusr2_watcher, sigusr2_cb, SIGUSR2);
-	ev_signal_start(EV_A_ sigusr2_watcher);
-#endif
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
