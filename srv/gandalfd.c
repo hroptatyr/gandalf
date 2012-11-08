@@ -152,7 +152,6 @@ gand_read_config(const char *user_cf)
 		return cfg;
 	}
 	GAND_DBGCONT("failed\n");
-	lua_config_deinit(cfg);
 	return NULL;
 }
 
