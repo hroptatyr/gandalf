@@ -49,6 +49,7 @@ AC_CHECK_HEADERS([fcntl.h])
 
 ## event loop
 SXE_CHECK_LIBEV
+AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ## check for libxml to process fixml
 PKG_CHECK_MODULES([LIBXML2], [libxml-2.0 >= 2.7])
