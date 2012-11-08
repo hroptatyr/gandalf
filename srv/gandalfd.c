@@ -158,7 +158,9 @@ gand_read_config(const char *user_cf)
 static void
 gand_free_config(cfg_t ctx)
 {
-	lua_config_deinit(ctx);
+	if (ctx != NULL) {
+		lua_config_deinit(ctx);
+	}
 	return;
 }
 #endif	/* USE_LUA */
@@ -262,11 +264,11 @@ main(int argc, char *argv[])
 
 	/* try and read the context file */
 	if ((cfg = gand_read_config(argi->config_arg)) == NULL) {
-		exit(1);
+		;
+	} else {
+		daemonisep |= cfg_glob_lookup_b(cfg, "daemonise");
+		prefer6p |= cfg_glob_lookup_b(cfg, "prefer_ipv6");
 	}
-
-	daemonisep |= cfg_glob_lookup_b(cfg, "daemonise");
-	prefer6p |= cfg_glob_lookup_b(cfg, "prefer_ipv6");
 
 	/* run as daemon, do me properly */
 	if (daemonisep) {
@@ -281,7 +283,7 @@ main(int argc, char *argv[])
 		const char *pidf;
 
 		if ((argi->pidfile_given && (pidf = argi->pidfile_arg)) ||
-		    (cfg_glob_lookup_s(&pidf, cfg, "pidfile") > 0)) {
+		    (cfg && cfg_glob_lookup_s(&pidf, cfg, "pidfile") > 0)) {
 			/* command line has precedence */
 			write_pidfile(pidf);
 		}
