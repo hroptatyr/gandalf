@@ -35,42 +35,26 @@ dnl This file is part of SXEmacs.
 
 AC_DEFUN([SXE_CHECK_LIBEV], [
 	## defines sxe_cv_feat_libev
+	PKG_CHECK_MODULES([libev], [libev >= 4.0], [have_libev="yes"],
+		[have_libev="no"; libev_LIBS="-lev"])
+	SXE_DUMP_LIBS
+	CPPFLAGS="$CPPFLAGS $libev_CFLAGS"
 	SXE_CHECK_HEADERS([ev.h])
-	## we dont need a lib, so fuck this
-	dnl SXE_CHECK_LIB_FUNCS([ev], [ev_loop])
+	SXE_RESTORE_LIBS
 
 	if test "$ac_cv_header_ev_h" = "yes"; then
 		AC_DEFINE([HAVE_LIBEV], [1], [Whether libev is fully functional])
 		sxe_cv_feat_libev="yes"
 		have_libev="yes"
-		LIBEV_CPPFLAGS=
-		LIBEV_LDFLAGS=
-		LIBEV_LIBS=""
 	else
 		sxe_cv_feat_libev="no"
 		have_libev="no"
-		LIBEV_CPPFLAGS=
-		LIBEV_LDFLAGS=
-		LIBEV_LIBS=
+		libev_CFLAGS=
+		libev_LIBS=
 	fi
 
-	AC_SUBST([LIBEV_CPPFLAGS])
-	AC_SUBST([LIBEV_LDFLAGS])
-	AC_SUBST([LIBEV_LIBS])
+	AC_SUBST([libev_CFLAGS])
+	AC_SUBST([libev_LIBS])
 ])dnl SXE_CHECK_LIBEV
-
-AC_DEFUN([SXE_CHECK_EVENTS], [dnl
-	SXE_MSG_CHECKING([for event drivers])
-
-	SXE_CHECK_LIBEV
-	SXE_CHECK_SUFFICIENCY([libev], [libev])
-
-	## assume we havent got any of prerequisites
-	have_events="no"
-
-	have_events="yes"
-
-	SXE_MSG_RESULT([$have_events])
-])dnl SXE_CHECK_EVENTS
 
 dnl sxe-events.m4 ends here
