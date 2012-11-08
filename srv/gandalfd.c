@@ -199,7 +199,7 @@ daemonise(void)
 
 	switch (pid = fork()) {
 	case -1:
-		return false;
+		return -1;
 	case 0:
 		break;
 	default:
@@ -208,7 +208,7 @@ daemonise(void)
 	}
 
 	if (setsid() == -1) {
-		return false;
+		return -1;
 	}
 	for (int i = getdtablesize(); i>=0; --i) {
 		/* close all descriptors */
@@ -293,8 +293,9 @@ main(int argc, char *argv[])
 	}
 
 	/* run as daemon, do me properly */
-	if (daemonisep) {
-		daemonise();
+	if (daemonisep && daemonise() < 0) {
+		perror("daemonisation failed");
+		exit(1);
 	}
 
 	/* start them log files */
