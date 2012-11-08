@@ -164,6 +164,62 @@ gand_free_config(cfg_t ctx)
 #endif	/* USE_LUA */
 
 
+/* server helpers */
+static int
+daemonise(void)
+{
+	int fd;
+	pid_t pid;
+
+	switch (pid = fork()) {
+	case -1:
+		return false;
+	case 0:
+		break;
+	default:
+		GAND_NOTI_LOG("Successfully bore a squaller: %d\n", pid);
+		exit(0);
+	}
+
+	if (setsid() == -1) {
+		return false;
+	}
+	for (int i = getdtablesize(); i>=0; --i) {
+		/* close all descriptors */
+		close(i);
+	}
+	if (LIKELY((fd = open("/dev/null", O_RDWR, 0)) >= 0)) {
+		(void)dup2(fd, STDIN_FILENO);
+		(void)dup2(fd, STDOUT_FILENO);
+		(void)dup2(fd, STDERR_FILENO);
+		if (fd > STDERR_FILENO) {
+			(void)close(fd);
+		}
+	}
+	gand_logout = fopen("/dev/null", "w");
+	return 0;
+}
+
+static void
+write_pidfile(const char *pidfile)
+{
+	char str[32];
+	pid_t pid;
+	size_t len;
+	int fd;
+
+	if ((pid = getpid()) &&
+	    (len = snprintf(str, sizeof(str) - 1, "%d\n", pid)) &&
+	    (fd = open(pidfile, O_RDWR | O_CREAT | O_TRUNC, 0644)) >= 0) {
+		write(fd, str, len);
+		close(fd);
+	} else {
+		GAND_ERR_LOG("Could not write pid file %s\n", pidfile);
+	}
+	return;
+}
+
+
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
 # pragma warning (disable:181)
