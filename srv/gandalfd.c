@@ -59,7 +59,7 @@
 #include "nifty.h"
 
 /* we assume unserding with logger feature */
-FILE *logout;
+void *gand_logout;
 
 #define GAND_MOD		"[mod/gand]"
 #define GAND_INFO_LOG(args...)				\
@@ -195,7 +195,7 @@ main(int argc, char *argv[])
 	cfg_t cfg;
 
 	/* whither to log */
-	logout = stderr;
+	gand_logout = stderr;
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
@@ -266,8 +266,8 @@ main(int argc, char *argv[])
 	ev_default_destroy();
 
 	/* close our log output */	
-	fflush(logout);
-	fclose(logout);
+	fflush(gand_logout);
+	fclose(gand_logout);
 	gand_closelog();
 	/* unloop was called, so exit */
 	return 0;
