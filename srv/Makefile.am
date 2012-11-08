@@ -26,8 +26,31 @@ dso_gandalf_la_CPPFLAGS += -I$(top_srcdir)/lib
 dso_gandalf_la_CPPFLAGS += $(LIBXML2_CFLAGS)
 dso_gandalf_la_SOURCES += dso-gandalf.c
 endif BUILD_UD_DSO
+
+sbin_PROGRAMS = gandalfd
+gandalfd_SOURCES = gandalfd.c
+gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_LDFLAGS = $(AM_LDFLAGS)
+gandalfd_LDADD =
+gandalfd_SOURCES += gandalfd-clo.ggo
+gandalfd_SOURCES += configger.h
+gandalfd_SOURCES += logger.h
+gandalfd_CPPFLAGS += $(libev_CFLAGS)
+gandalfd_LDFLAGS += $(libev_LIBS)
+if HAVE_LUA
+gandalfd_SOURCES += lua-config.c lua-config.h
+gandalfd_CPPFLAGS += -DUSE_LUA $(LUA_CFLAGS)
+gandalfd_LDFLAGS += $(LUA_LIBS)
+endif  HAVE_LUA
+gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
+gandalfd_LDADD += $(top_builddir)/lib/.libs/libgandalf.a
+BUILT_SOURCES += gandalfd-clo.c gandalfd-clo.h
 endif ## BUILD_SERVER
 
+
+## our rule for gengetopt
+%.c %.h: %.ggo
+	$(AM_V_GEN) gengetopt -l -i $< -F $*
 
 # 
 # Help the developers get nice post-processed source files
