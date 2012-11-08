@@ -71,7 +71,17 @@ fi
 popdef([use_libxml2])
 
 ## check for unserding
-PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [:], [enable_server="no"])
+PKG_CHECK_MODULES([unserding], [unserding >= 0.2.1], [
+	have_ud="yes"
+], [
+	have_ud="no"
+	if test "${enable_server}" = "yes"; then
+		AC_MSG_WARN([server build requested but unserding missing.
+  There will be no DSO suitable for loading with unserding.])
+	fi
+])
+AM_CONDITIONAL([BUILD_UD_DSO],
+	[test "${enable_server}" = "yes" -a "${have_ud}" = "yes"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
