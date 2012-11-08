@@ -262,6 +262,7 @@ main(int argc, char *argv[])
 
 	/* try and read the context file */
 	if ((cfg = gand_read_config(argi->config_arg)) == NULL) {
+		exit(1);
 	}
 
 	daemonisep |= cfg_glob_lookup_b(cfg, "daemonise");
