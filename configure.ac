@@ -51,6 +51,16 @@ AC_CHECK_HEADERS([fcntl.h])
 SXE_CHECK_LIBEV
 AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
+## check for lua, critical
+PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
+	have_lua="no"
+	if test "${enable_server}" = "yes"; then
+		AC_MSG_WARN([server build request but lua missing.])
+		enable_server="no"
+	fi
+])
+AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
+
 ## check for libxml to process fixml
 PKG_CHECK_MODULES([LIBXML2], [libxml-2.0 >= 2.7])
 pushdef([use_libxml2], [test -n "${LIBXML2_LIBS}"])
