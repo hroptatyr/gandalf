@@ -12,6 +12,8 @@ CLEANFILES =
 if BUILD_SERVER
 pkgconfigdir = ${libdir}/pkgconfig
 pkgconfig_DATA = gandalf.pc
+
+if BUILD_UD_DSO
 moddir = $(libdir)/unserding
 mod_LTLIBRARIES = dso-gandalf.la
 dso_gandalf_la_SOURCES =
@@ -23,6 +25,7 @@ dso_gandalf_la_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 dso_gandalf_la_CPPFLAGS += -I$(top_srcdir)/lib
 dso_gandalf_la_CPPFLAGS += $(LIBXML2_CFLAGS)
 dso_gandalf_la_SOURCES += dso-gandalf.c
+endif BUILD_UD_DSO
 endif ## BUILD_SERVER
 
 
