@@ -687,22 +687,6 @@ rid_iter(struct get_rid_iter_s *st)
 }
 
 static size_t
-__upcase(char *str)
-{
-	size_t len;
-
-	for (len = 0; *str; len++, str++) {
-		switch (*str) {
-		case 'a' ... 'z':
-			*str -= 0x20;
-		default:
-			break;
-		}
-	}
-	return len;
-}
-
-static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
 	struct mmmb_s mb = {NULL};
@@ -720,9 +704,7 @@ get_ser(char **buf, gand_msg_t msg)
 		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
 			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
-			char *sym = robj->rolf_sym;
-			size_t len = __upcase(sym);
-			st = init_rid_iter(&i2s_b, sym, len);
+			GAND_DEBUG("can't do igncase yet\n");
 		} else {
 			const char *sym = robj->rolf_sym;
 			size_t len = strlen(sym);
