@@ -29,12 +29,14 @@ endif BUILD_UD_DSO
 
 sbin_PROGRAMS = gandalfd
 gandalfd_SOURCES = gandalfd.c
+EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDADD =
 gandalfd_SOURCES += gandalfd-clo.ggo
 gandalfd_SOURCES += configger.h
 gandalfd_SOURCES += logger.h
+EXTRA_gandalfd_SOURCES += gq.c gq.h
 gandalfd_CPPFLAGS += $(libev_CFLAGS)
 gandalfd_LDFLAGS += $(libev_LIBS)
 if HAVE_LUA
