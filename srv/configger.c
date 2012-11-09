@@ -42,6 +42,10 @@
 
 #if defined USE_LUA
 /* lua bindings */
+#include <lua.h>
+#include <lauxlib.h>
+#include "lua-config.h"
+
 static cfg_t state_singleton = NULL;
 static cfgset_t cfgsets[16];
 static size_t ncfgsets = 0UL;
@@ -53,11 +57,16 @@ cfg_get_sets(cfgset_t *p, cfg_t UNUSED(L))
 	return ncfgsets;
 }
 
-static int
-lc_load_module(cfg_t L)
+static inline void*
+lc_ref(void *L)
 {
-	const char *p;
+	int r = luaL_ref(L, LUA_REGISTRYINDEX);
+	return (void*)(long int)r;
+}
 
+static int
+lc_load_module(lua_State *L)
+{
 	if (!lua_istable(L, 1)) {
 		fprintf(stderr, "argument is not a table\n");
 		return -1;

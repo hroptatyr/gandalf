@@ -362,7 +362,9 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 static const char cfg_glob_prefix[] = GLOB_CFG_PRE;
 
 #if defined USE_LUA
+/* that should be pretty much the only mention of lua in here */
 static const char cfg_file_name[] = "gandalf.lua";
+#endif	/* USE_LUA */
 
 static void
 gand_expand_user_cfg_file_name(char *tgt)
@@ -400,23 +402,23 @@ gand_read_config(const char *user_cf)
 	cfg_t cfg;
 
         GAND_DEBUG("reading configuration from config file ...");
-	lua_config_init(&cfg);
 
 	/* we prefer the user's config file, then fall back to the
 	 * global config file if that's not available */
-	if (user_cf && read_lua_config(cfg, user_cf)) {
+	if (user_cf != NULL && (cfg = configger_init(user_cf)) != NULL) {
 		GAND_DBGCONT("done\n");
 		return cfg;
 	}
 
 	gand_expand_user_cfg_file_name(cfgf);
-	if (read_lua_config(cfg, cfgf)) {
+	if (cfgf != NULL && (cfg = configger_init(cfgf)) != NULL) {
 		GAND_DBGCONT("done\n");
 		return cfg;
 	}
+
 	/* otherwise there must have been an error */
 	gand_expand_glob_cfg_file_name(cfgf);
-	if (read_lua_config(cfg, cfgf)) {
+	if (cfgf != NULL && (cfg = configger_init(cfgf)) != NULL) {
 		GAND_DBGCONT("done\n");
 		return cfg;
 	}
@@ -428,11 +430,10 @@ static void
 gand_free_config(cfg_t ctx)
 {
 	if (ctx != NULL) {
-		lua_config_deinit(ctx);
+		configger_fini(ctx);
 	}
 	return;
 }
-#endif	/* USE_LUA */
 
 
 /* server helpers */

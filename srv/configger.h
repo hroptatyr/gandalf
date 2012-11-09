@@ -38,6 +38,13 @@
 #if !defined INCLUDED_configger_h_
 #define INCLUDED_configger_h_
 
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stddef.h>
+#include <stdbool.h>
+#include "nifty.h"
+
 /**
  * Generic handle to refer to the configuration somehow. */
 typedef void *cfg_t;
