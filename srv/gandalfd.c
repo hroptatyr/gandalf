@@ -118,6 +118,40 @@ struct ev_io_i_s {
 };
 
 
+/* rolf glue */
+static char *trolfdir;
+static size_t ntrolfdir;
+
+static size_t
+gand_get_trolfdir(char **tgt, cfg_t ctx)
+{
+	static char __trolfdir[] = "/var/scratch/freundt/trolf";
+	size_t rsz;
+	const char *res = NULL;
+	cfgset_t cs;
+
+	/* start out with an empty target */
+	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
+		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs + i, "trolfdir"))) {
+			struct stat st = {0};
+
+			if (stat(res, &st) == 0) {
+				/* set up the IO watcher and timer */
+				goto out;
+			}
+		}
+	}
+	/* quite fruitless today */
+	res = __trolfdir;
+	rsz = sizeof(__trolfdir) -1;
+
+out:
+	/* make sure *tgt is freeable */
+	*tgt = strndup(res, rsz);
+	return rsz;
+}
+
+
 /* connection handling */
 #if !defined MAX_DCCP_CONNECTION_BACK_LOG
 # define MAX_DCCP_CONNECTION_BACK_LOG	(5)
@@ -557,6 +591,9 @@ main(int argc, char *argv[])
 			write_pidfile(pidf);
 		}
 	}
+
+	/* get the trolf dir */
+	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
 
 	/* free cmdline parser goodness */
 	cmdline_parser_free(argi);
