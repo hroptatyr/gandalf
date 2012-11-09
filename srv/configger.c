@@ -51,7 +51,7 @@ static cfgset_t cfgsets[16];
 static size_t ncfgsets = 0UL;
 
 size_t
-cfg_get_sets(cfgset_t *p, cfg_t UNUSED(L))
+cfg_get_sets(cfgset_t **p, cfg_t UNUSED(L))
 {
 	*p = cfgsets;
 	return ncfgsets;

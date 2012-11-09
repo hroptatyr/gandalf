@@ -62,7 +62,7 @@ extern void configger_fini(cfg_t);
 
 /**
  * Return a pointer to the cfgset array and its size. */
-extern size_t cfg_get_sets(cfgset_t *tgt, cfg_t);
+extern size_t cfg_get_sets(cfgset_t **tgt, cfg_t);
 
 
 #if defined USE_LUA
