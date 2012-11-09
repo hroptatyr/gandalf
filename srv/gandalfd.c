@@ -47,6 +47,11 @@
 #include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <sys/utsname.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -56,6 +61,8 @@
 #include "gandalf.h"
 #include "logger.h"
 #include "configger.h"
+#include "ud-sock.h"
+#include "gq.h"
 #include "nifty.h"
 
 /* we assume unserding with logger feature */
@@ -82,6 +89,268 @@ void *gand_logout;
 		GAND_SYSLOG(LOG_NOTICE, GAND_MOD " NOTICE " args);	\
 		GAND_DEBUG("NOTICE " args);				\
 	} while (0)
+
+/* sockaddr union */
+typedef union ud_sockaddr_u *ud_sockaddr_t;
+
+union ud_sockaddr_u {
+	struct sockaddr_storage sas;
+	struct sockaddr sa;
+	struct sockaddr_in6 sa6;
+};
+
+/* the connection queue */
+typedef struct ev_io_q_s *ev_io_q_t;
+typedef struct ev_io_i_s *ev_io_i_t;
+
+/* ev io object queue */
+struct ev_io_q_s {
+	struct gq_s q[1];
+};
+
+struct ev_io_i_s {
+	struct gq_item_s i;
+	ev_io w[1];
+	uint16_t idx;
+	/* reply buffer, pointer and size */
+	char *rpl;
+	size_t rsz;
+};
+
+
+/* connection handling */
+#if !defined MAX_DCCP_CONNECTION_BACK_LOG
+# define MAX_DCCP_CONNECTION_BACK_LOG	(5)
+#endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
+
+static int
+make_tcp(void)
+{
+	int s;
+
+	if ((s = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		return s;
+	}
+	/* reuse addr in case we quickly need to turn the server off and on */
+	setsock_reuseaddr(s);
+	/* turn lingering on */
+	setsock_linger(s, 1);
+	return s;
+}
+
+static int
+sock_listener(int s, ud_sockaddr_t sa)
+{
+	if (s < 0) {
+		return s;
+	}
+
+	if (bind(s, &sa->sa, sizeof(*sa)) < 0) {
+		return -1;
+	}
+
+	return listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
+}
+
+/* looks like dccp://host:port/secdef?idx=00000 */
+static char brag_uri[INET6_ADDRSTRLEN + 64] = "dccp://";
+/* offset into brag_uris idx= field */
+static size_t UNUSED(brag_uri_offset) = 0;
+
+static int
+make_brag_uri(ud_sockaddr_t sa, socklen_t UNUSED(sa_len))
+{
+	struct utsname uts[1];
+	char dnsdom[64];
+	const size_t uri_host_offs = sizeof("dccp://");
+	char *curs = brag_uri + uri_host_offs - 1;
+	size_t rest = sizeof(brag_uri) - uri_host_offs;
+	int len;
+
+	if (uname(uts) < 0) {
+		return -1;
+	} else if (getdomainname(dnsdom, sizeof(dnsdom)) < 0) {
+		return -1;
+	}
+
+	len = snprintf(
+		curs, rest, "%s.%s:%hu/",
+		uts->nodename, dnsdom, ntohs(sa->sa6.sin6_port));
+
+	if (len > 0) {
+		brag_uri_offset = uri_host_offs + len - 1;
+	}
+	return 0;
+}
+
+
+/* the actual beef, number of requests we can monitor */
+#include "gq.c"
+
+static struct ev_io_q_s ioq = {0};
+
+static ev_io_i_t
+make_io(void)
+{
+	ev_io_i_t res;
+
+	if (ioq.q->free->i1st == NULL) {
+		size_t nitems = ioq.q->nitems / sizeof(*res);
+
+		assert(ioq.q->free->ilst == NULL);
+		GAND_DEBUG("IOQ RESIZE -> %zu\n", nitems + 16);
+		init_gq(ioq.q, sizeof(*res), nitems + 16);
+	}
+	/* get us a new client and populate the object */
+	res = (void*)gq_pop_head(ioq.q->free);
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+static void
+free_io(ev_io_i_t io)
+{
+	gq_push_tail(ioq.q->free, (gq_item_t)io);
+	return;
+}
+
+/* fdfs */
+static void
+ev_io_shut(EV_P_ ev_io *w)
+{
+	int fd = w->fd;
+
+	ev_io_stop(EV_A_ w);
+	shutdown(fd, SHUT_RDWR);
+	close(fd);
+	w->fd = -1;
+	return;
+}
+
+static void
+ev_qio_shut(EV_P_ ev_io *w)
+{
+/* attention, W *must* come from the ev io queue */
+	ev_io_i_t qio = w->data;
+
+	ev_io_shut(EV_A_ w);
+	free_io(qio);
+	return;
+}
+
+
+/* callbacks */
+static void
+paste_clen(char *restrict buf, size_t bsz, size_t len)
+{
+/* print ascii repr of LEN at BUF. */
+	buf[0] = ' ';
+	buf[1] = ' ';
+	buf[2] = ' ';
+	buf[3] = ' ';
+
+	if (len > bsz) {
+		len = 0;
+	}
+
+	buf[4] = (len % 10U) + '0';
+	if ((len /= 10U)) {
+		buf[3] = (len % 10U) + '0';
+		if ((len /= 10U)) {
+			buf[2] = (len % 10U) + '0';
+			if ((len /= 10U)) {
+				buf[1] = (len % 10U) + '0';
+				if ((len /= 10U)) {
+					buf[0] = (len % 10U) + '0';
+				}
+			}
+		}
+	}
+	return;
+}
+
+static void
+dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
+{
+	/* the final \n will be subst'd later on */
+#define HDR		"\
+HTTP/1.1 200 OK\r\n\
+Server: um-quosnp\r\n\
+Content-Length: "
+#define CLEN_SPEC	"% 5zu"
+#define BUF_INIT	HDR CLEN_SPEC "\r\n\r\n"
+	/* hdr is a format string and hdr_len is as wide as the result printed
+	 * later on */
+	static char buf[65536] = BUF_INIT;
+	char *rsp = buf + sizeof(BUF_INIT) - 1;
+	const size_t rsp_len = sizeof(buf) - (sizeof(BUF_INIT) - 1);
+	ssize_t nrd;
+	size_t cont_len = 0UL;
+
+	if ((nrd = read(w->fd, rsp, rsp_len)) < 0) {
+		goto clo;
+	} else if ((size_t)nrd < rsp_len) {
+		rsp[nrd] = '\0';
+	} else {
+		/* uh oh, mega request, wtf? */
+		buf[sizeof(buf) - 1] = '\0';
+	}
+
+	;
+
+	/* prepare the header */
+	paste_clen(buf + sizeof(HDR) - 1, sizeof(buf), cont_len);
+
+	/* and append the actual contents */
+	send(w->fd, buf, sizeof(BUF_INIT) - 1 + cont_len, 0);
+
+clo:
+	ev_qio_shut(EV_A_ w);
+	return;
+}
+
+static void
+dccp_cb(EV_P_ ev_io *w, int UNUSED(re))
+{
+	union ud_sockaddr_u sa;
+	socklen_t sasz = sizeof(sa);
+	ev_io_i_t qio;
+	int s;
+
+	GAND_DEBUG("interesting activity on %d\n", w->fd);
+
+	if ((s = accept(w->fd, &sa.sa, &sasz)) < 0) {
+		return;
+	}
+
+	qio = make_io();
+	ev_io_init(qio->w, dccp_data_cb, s, EV_READ);
+	qio->w->data = qio;
+	ev_io_start(EV_A_ qio->w);
+	return;
+}
+
+static void
+sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("C-c caught, unrolling everything\n");
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
+}
+
+static void
+sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("SIGPIPE caught, doing nothing\n");
+	return;
+}
+
+static void
+sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
+{
+	GAND_NOTI_LOG("SIGHUP caught, doing nothing\n");
+	return;
+}
 
 
 #define GLOB_CFG_PRE	"/etc/unserding"
@@ -166,30 +435,6 @@ gand_free_config(cfg_t ctx)
 #endif	/* USE_LUA */
 
 
-/* callbacks */
-static void
-sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
-{
-	GAND_NOTI_LOG("C-c caught, unrolling everything\n");
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
-	return;
-}
-
-static void
-sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
-{
-	GAND_NOTI_LOG("SIGPIPE caught, doing nothing\n");
-	return;
-}
-
-static void
-sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
-{
-	GAND_NOTI_LOG("SIGHUP caught, doing nothing\n");
-	return;
-}
-
-
 /* server helpers */
 static int
 daemonise(void)
@@ -266,6 +511,8 @@ main(int argc, char *argv[])
 	static ev_signal ALGN16(sighup_watcher)[1];
 	static ev_signal ALGN16(sigterm_watcher)[1];
 	static ev_signal ALGN16(sigpipe_watcher)[1];
+	ev_io lstn[2];
+	size_t nlstn = 0;
 	/* args */
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
@@ -331,10 +578,50 @@ main(int argc, char *argv[])
 	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
 	ev_signal_start(EV_A_ sighup_watcher);
 
+	/* get us this socket thing */
+	{
+		union ud_sockaddr_u sa = {
+			.sa6 = {
+				.sin6_family = AF_INET6,
+				.sin6_addr = in6addr_any,
+				.sin6_port = 0,
+			},
+		};
+		socklen_t sa_len = sizeof(sa);
+		int s;
+
+		if ((s = make_tcp()) < 0) {
+			/* just to indicate we have no socket */
+			lstn[0].fd = -1;
+		} else if (sock_listener(s, &sa) < 0) {
+			/* bugger */
+			close(s);
+			lstn[0].fd = -1;
+		} else {
+			/* yay */
+			ev_io_init(lstn + 0, dccp_cb, s, EV_READ);
+			ev_io_start(EV_A_ lstn);
+
+			getsockname(s, &sa.sa, &sa_len);
+			nlstn++;
+
+			/* brag about this url */
+			make_brag_uri(&sa, sa_len);
+			GAND_INFO_LOG("%s\n", brag_uri);
+		}
+	}
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	GAND_NOTI_LOG("shutting down unserdingd\n");
+
+	/* close the listener */
+	for (size_t i = 0; i < nlstn; i++) {
+		int s = lstn[i].fd;
+		ev_io_stop(EV_A_ lstn + i);
+		close(s);
+	}
 
 	/* destroy the default evloop */
 	ev_default_destroy();
