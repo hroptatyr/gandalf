@@ -649,6 +649,8 @@ main(int argc, char *argv[])
 		}
 	}
 
+	GAND_NOTI_LOG("gandalfd ready\n");
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
