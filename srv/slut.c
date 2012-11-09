@@ -95,16 +95,26 @@ DEFUN rid_t
 slut_sym2rid(slut_t s, const char *sym)
 {
 	struct trie_data_s data[1];
-	rid_t res;
 
 	/* make an alpha char array first */
 	if (slut_tg_get(s->stbl, sym, data) < 0) {
 		/* create a new entry */
-		res = /*(uint16_t)__crea(s, sym)*/0;
-	} else {
-		res = data->rid;
+		return 0;
 	}
-	return res;
+	return data->rid;
+}
+
+DEFUN struct trie_data_s
+slut_sym2data(slut_t s, const char *sym)
+{
+	struct trie_data_s data[1];
+
+	/* make an alpha char array first */
+	if (slut_tg_get(s->stbl, sym, data) < 0) {
+		/* create a new entry */
+		return trie_data_error();
+	}
+	return *data;
 }
 
 /* slut.c ends here */
