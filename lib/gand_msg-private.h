@@ -35,9 +35,6 @@ unsize_mall(void **ptr, size_t cnt, size_t UNUSED(blksz), size_t UNUSED(inc))
 	return;
 }
 
-#define PROT_MEM		(PROT_READ | PROT_WRITE)
-#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
-
 static inline void
 resize_mmap(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {
