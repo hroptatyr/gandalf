@@ -91,4 +91,15 @@
 /* fixme, any chance we can get that one from the server? */
 extern void *gand_logout;
 
+/* just a service for mmap based allocators */
+#if !defined MAP_ANON && defined MAP_ANONYMOUS
+# define MAP_ANON	MAP_ANONYMOUS
+#endif	/* MAP_ANON && !MAP_ANONYMOUS */
+#if !defined MAP_MEM
+# define MAP_MEM	(MAP_PRIVATE | MAP_ANON)
+#endif	/* MAP_MEM */
+#if !defined PROT_MEM
+# define PROT_MEM	(PROT_READ | PROT_WRITE)
+#endif	/* PROT_MEM */
+
 #endif	/* INCLUDED_nifty_h_ */
