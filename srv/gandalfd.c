@@ -660,18 +660,25 @@ rid_iter(struct get_rid_iter_s *st)
 		rest = symbuf->m.bsz;
 	}
 	while ((cand = memmem(cand, rest, sym, ssz))) {
-		if (cand == symbuf->m.buf || cand[-1] == '\n') {
-			/* we've got a prefix match */
-			uint32_t rid;
-			char *next = NULL;
+		const char *next = cand;
 
-			rest = symbuf->m.bsz - (cand - symbuf->m.buf);
-			cand = memchr(cand, '\t', rest);
-			rid = strtoul(cand + 1, &next, 10);
-			st->bufpos = next ?: cand + 1;
+		if (cand <= symbuf->m.buf) {
+			/* great */
+			break;
+		} else if (*--cand == '\t') {
+			/* otherwise it's a prefix match */
+			unsigned int rid = 0;
+
+			for (unsigned int mul = 1; *--cand != '\n'; mul *= 10) {
+				rid += (*cand - '0') * mul;
+			}
+			st->bufpos = next + 1;
 			return rid;
+		} else {
+			/* just bullshit */
+			;
 		}
-		if ((rest = symbuf->m.bsz - (++cand - symbuf->m.buf)) <= 0) {
+		if ((rest = symbuf->m.bsz - (next + 1 - symbuf->m.buf)) <= 0) {
 			break;
 		}
 	}
