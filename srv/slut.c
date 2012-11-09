@@ -81,16 +81,6 @@ free_slut(slut_t s)
 	return;
 }
 
-static struct trie_data_s
-__crea(slut_t s, const char *sym)
-{
-	struct trie_data_s res = {0};
-
-	/* store in the s2i table (trie) */
-	slut_tg_put(s->stbl, sym, res);
-	return res;
-}
-
 DEFUN rid_t
 slut_sym2rid(slut_t s, const char *sym)
 {
@@ -105,7 +95,7 @@ slut_sym2rid(slut_t s, const char *sym)
 }
 
 DEFUN struct trie_data_s
-slut_sym2data(slut_t s, const char *sym)
+slut_get(slut_t s, const char *sym)
 {
 	struct trie_data_s data[1];
 
@@ -115,6 +105,13 @@ slut_sym2data(slut_t s, const char *sym)
 		return trie_data_error();
 	}
 	return *data;
+}
+
+DEFUN int
+slut_put(slut_t s, const char *sym, struct trie_data_s data)
+{
+	slut_tg_put(s->stbl, sym, data);
+	return 0;
 }
 
 /* slut.c ends here */

@@ -77,7 +77,13 @@ DECLF void free_slut(slut_t s);
 /* accessors */
 DECLF rid_t slut_sym2rid(slut_t s, const char *sym);
 
-DECLF struct trie_data_s slut_sym2data(slut_t s, const char *sym);
+/**
+ * For symbol SYM retrieve data associated in the slut S. */
+DECLF struct trie_data_s slut_get(slut_t s, const char *sym);
+
+/**
+ * Store DATA under key SYM in slut S. */
+DECLF int slut_put(slut_t s, const char *sym, struct trie_data_s data);
 
 /**
  * Return the number of symbols currently in the slut S. */
