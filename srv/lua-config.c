@@ -166,30 +166,6 @@ lc_globcfg_lookup_i(void *L, const char *name)
 }
 
 
-static int
-lc_load_module(lua_State *L)
-{
-	const char *p;
-	void *cfgset;
-
-	if (!lua_istable(L, 1)) {
-		fprintf(stderr, "argument is not a table\n");
-		return 0;
-	}
-	cfgset = lc_ref(L);
-
-	lc_cfgtbl_lookup_s(&p, L, cfgset, "file");
-	;
-	return 0;
-}
-
-static void
-register_funs(lua_State *L)
-{
-	lua_register(L, "load_module", lc_load_module);
-	return;
-}
-
 bool
 read_lua_config(void *L, const char *file)
 {
@@ -198,22 +174,6 @@ read_lua_config(void *L, const char *file)
 	/* eval the input file */
 	res = luaL_dofile(L, file);
 	return res == 0;
-}
-
-void
-lua_config_init(void **state)
-{
-	*state = luaL_newstate();
-	/* add our bindings */
-	register_funs(*state);
-	return;
-}
-
-void
-lua_config_deinit(void **state)
-{
-	lua_close(*state);
-	return;
 }
 
 #if defined STANDALONE

@@ -1,4 +1,4 @@
-/*** configger.h -- config stuff
+/*** configger.c -- config stuff, abstract from lua
  *
  * Copyright (C) 2009-2012 Sebastian Freundt
  *
@@ -35,75 +35,67 @@
  *
  ***/
 
-#if !defined INCLUDED_configger_h_
-#define INCLUDED_configger_h_
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include "configger.h"
 
-/**
- * Generic handle to refer to the configuration somehow. */
-typedef void *cfg_t;
-
-/**
- * Opaque data type for settings tables whither configuration goes. */
-typedef void *cfgset_t;
-
-/**
- * Read config from file FN and return a configuration context. */
-extern cfg_t configger_init(const char *fn);
-/**
- * Free all resources associated with a configuration context. */
-extern void configger_fini(cfg_t);
-
-/**
- * Return a pointer to the cfgset array and its size. */
-extern size_t cfg_get_sets(cfgset_t *tgt, cfg_t);
-
-
 #if defined USE_LUA
-# include "lua-config.h"
+/* lua bindings */
+static cfg_t state_singleton = NULL;
+static cfgset_t cfgsets[16];
+static size_t ncfgsets = 0UL;
 
-/* config mumbojumbo, just redirs to the lua cruft */
-static inline cfgset_t
-cfg_tbl_lookup(cfg_t ctx, cfgset_t s, const char *name)
+size_t
+cfg_get_sets(cfgset_t *p, cfg_t UNUSED(L))
 {
-	return lc_cfgtbl_lookup(ctx, s, name);
+	*p = cfgsets;
+	return ncfgsets;
 }
 
-static inline void
-cfg_tbl_free(cfg_t ctx, cfgset_t s)
+static int
+lc_load_module(cfg_t L)
 {
-	lc_cfgtbl_free(ctx, s);
+	const char *p;
+
+	if (!lua_istable(L, 1)) {
+		fprintf(stderr, "argument is not a table\n");
+		return -1;
+	}
+	if (ncfgsets < countof(cfgsets)) {
+		cfgsets[ncfgsets++] = lc_ref(L);
+	}
+	return 0;
+}
+
+static void
+register_funs(cfg_t L)
+{
+	lua_register(L, "load_module", lc_load_module);
 	return;
 }
 
-static inline size_t
-cfg_tbl_lookup_s(const char **t, cfg_t c, cfgset_t s, const char *n)
+cfg_t
+configger_init(const char *file)
 {
-	return lc_cfgtbl_lookup_s(t, c, s, n);
+	if (LIKELY(state_singleton == NULL &&
+		   (state_singleton = luaL_newstate()) != NULL)) {
+		register_funs(state_singleton);
+	}
+
+	if (read_lua_config(state_singleton, file)) {
+		return state_singleton;
+	}
+	return NULL;
 }
 
-static inline int
-cfg_tbl_lookup_i(cfg_t c, cfgset_t s, const char *n)
+void
+configger_fini(cfg_t c)
 {
-	return lc_cfgtbl_lookup_i(c, s, n);
-}
-
-static inline size_t
-cfg_glob_lookup_s(const char **t, cfg_t c, const char *n)
-{
-	return lc_globcfg_lookup_s(t, c, n);
-}
-
-static inline bool
-cfg_glob_lookup_b(cfg_t ctx, const char *name)
-{
-	return lc_globcfg_lookup_b(ctx, name);
-}
-
-static inline int
-cfg_glob_lookup_i(cfg_t ctx, const char *name)
-{
-	return lc_globcfg_lookup_i(ctx, name);
+	lua_close(c);
+	state_singleton = NULL;
+	return;
 }
 #endif	/* USE_LUA */
 
-#endif	/* INCLUDED_configger_h_ */
+/* configger.c ends here */
