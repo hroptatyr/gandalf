@@ -28,7 +28,7 @@ dso_gandalf_la_SOURCES += dso-gandalf.c
 endif BUILD_UD_DSO
 
 sbin_PROGRAMS = gandalfd
-gandalfd_SOURCES = gandalfd.c
+gandalfd_SOURCES =
 EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
@@ -36,6 +36,12 @@ gandalfd_LDADD =
 gandalfd_SOURCES += gandalfd-clo.ggo
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_SOURCES += logger.h
+gandalfd_SOURCES += trie.c trie.h triedefs.h
+gandalfd_CPPFLAGS += -DSTATIC_TRIE_GUTS
+EXTRA_gandalfd_SOURCES += darray.c darray.h
+EXTRA_gandalfd_SOURCES += tail.c tail.h
+gandalfd_SOURCES += slut.c slut.h slut-trie-glue.h
+gandalfd_SOURCES += gandalfd.c
 EXTRA_gandalfd_SOURCES += gq.c gq.h
 gandalfd_CPPFLAGS += $(libev_CFLAGS)
 gandalfd_LDFLAGS += $(libev_LIBS)
