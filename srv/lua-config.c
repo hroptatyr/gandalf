@@ -173,7 +173,7 @@ lc_load_module(lua_State *L)
 	void *cfgset;
 
 	if (!lua_istable(L, 1)) {
-		fprintf(stderr, "need a table you fuckwit\n");
+		fprintf(stderr, "argument is not a table\n");
 		return 0;
 	}
 	cfgset = lc_ref(L);
