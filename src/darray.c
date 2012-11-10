@@ -602,6 +602,35 @@ da_relocate_base(darray_t d, trie_idx_t s, trie_idx_t new_base)
 	return;
 }
 
+static trie_idx_t
+next_2pow(trie_idx_t idx)
+{
+	if (idx < 16) {
+		return 16;
+	} else if (idx < 64) {
+		return 64;
+	} else if (idx < 256) {
+		return 256;
+	} else if (idx < 1024) {
+		return 1024;
+	} else if (idx < 4096) {
+		return 4096;
+	} else if (idx < 65536) {
+		return 65536;
+	} else if (idx < 262144) {
+		return 262144;
+	} else if (idx < 1048576) {
+		return 1048576;
+	} else if (idx < 4194304) {
+		return 4194304;
+	} else {
+		trie_idx_t x2p = 4194304 * 2;
+
+		for (x2p = 4194304 * 2; x2p < idx; x2p *= 2);
+		return x2p;
+	}
+}
+
 static int
 da_extend_pool(darray_t d, trie_idx_t to_index)
 {
@@ -616,6 +645,9 @@ da_extend_pool(darray_t d, trie_idx_t to_index)
 	if (to_index < d->num_cells) {
 		return 0;
 	}
+	/* round up to the next 2-power */
+	to_index = next_2pow(to_index);
+
 	d->cells = realloc(d->cells, (to_index + 1) * sizeof(*d->cells));
 	new_begin = d->num_cells;
 	d->num_cells = to_index + 1;
