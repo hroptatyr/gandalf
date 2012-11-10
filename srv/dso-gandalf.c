@@ -374,8 +374,6 @@ match_msg_p(struct ms_s *state, const char *ln, size_t lsz, gand_msg_t msg)
 	return MDIR_MATCH;
 }
 
-#define PROT_MEM		(PROT_READ | PROT_WRITE)
-#define MAP_MEM			(MAP_PRIVATE | MAP_ANONYMOUS)
 #define BUF_INC			(4096)
 
 static void
