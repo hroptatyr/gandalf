@@ -45,7 +45,6 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <stdbool.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -63,6 +62,8 @@
 #include "configger.h"
 #include "ud-sock.h"
 #include "gq.h"
+#include "fileutils.h"
+#include "slut.h"
 #include "nifty.h"
 
 /* we assume unserding with logger feature */
@@ -117,21 +118,6 @@ struct ev_io_i_s {
 	size_t rsz;
 };
 
-/* mmap buffers, memory and file based */
-struct mmmb_s {
-	char *buf;
-	/* real size */
-	size_t bsz;
-	/* alloc size */
-	size_t all;
-};
-
-struct mmfb_s {
-	struct mmmb_s m;
-	/* file desc */
-	int fd;
-};
-
 /* match state */
 struct ms_s {
 	unsigned int cnt;
@@ -152,14 +138,7 @@ typedef enum {
 static char *trolfdir;
 static size_t ntrolfdir;
 
-static struct mmfb_s i2s_b = {
-	.m = {
-		.buf = NULL,
-		.bsz = 0UL,
-		.all = 0UL,
-	},
-	.fd = -1,
-};
+static struct slut_s i2s_s[1];
 
 static size_t
 gand_get_trolfdir(char **tgt, cfg_t ctx)
@@ -274,47 +253,6 @@ make_trolf_name(const char *post, size_t plen)
 	}
 	memcpy(f + idx, post, plen);
 	return f;
-}
-
-static void
-munmap_all(struct mmfb_s *mf)
-{
-	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
-		munmap(mf->m.buf, mf->m.all);
-	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
-	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
-	return;
-}
-
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f)
-{
-	size_t fsz = 0;
-	struct stat st = {0};
-
-	if (UNLIKELY(stat(f, &st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
-		return -1;
-	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		munmap_all(mf);
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
 }
 
 static mdir_t
@@ -606,86 +544,6 @@ out:
 	return;
 }
 
-
-struct get_rid_iter_s {
-	const struct mmfb_s *symbuf;
-	const char *bufpos;
-	const char *sym;
-	size_t ssz;
-};
-
-static inline struct get_rid_iter_s
-init_rid_iter(const struct mmfb_s *symbuf, const char *sym, size_t len)
-{
-	struct get_rid_iter_s res = {
-		.symbuf = symbuf,
-		.bufpos = NULL,
-		.sym = sym,
-		.ssz = len,
-	};
-	return res;
-}
-
-static inline void
-fini_rid_iter(struct get_rid_iter_s *s)
-{
-	s->symbuf = NULL;
-	s->bufpos = NULL;
-	s->sym = NULL;
-	s->ssz = 0;
-	return;
-}
-
-static inline bool
-rid_iter_next_p(struct get_rid_iter_s *s)
-{
-	return s->symbuf != NULL && s->ssz != 0;
-}
-
-static uint32_t
-rid_iter(struct get_rid_iter_s *st)
-{
-	const struct mmfb_s *symbuf = st->symbuf;
-	const char *sym = st->sym;
-	size_t ssz = st->ssz;
-	const char *cand;
-	ssize_t rest;
-
-	/* set up */
-	if (UNLIKELY(st->bufpos != NULL)) {
-		cand = st->bufpos;
-		rest = symbuf->m.bsz - (st->bufpos - symbuf->m.buf);
-	} else {
-		cand = symbuf->m.buf;
-		rest = symbuf->m.bsz;
-	}
-	while ((cand = memmem(cand, rest, sym, ssz))) {
-		const char *next = cand;
-
-		if (cand <= symbuf->m.buf) {
-			/* great */
-			break;
-		} else if (*--cand == '\t') {
-			/* otherwise it's a prefix match */
-			unsigned int rid = 0;
-
-			for (unsigned int mul = 1; *--cand != '\n'; mul *= 10) {
-				rid += (*cand - '0') * mul;
-			}
-			st->bufpos = next + 1;
-			return rid;
-		} else {
-			/* just bullshit */
-			;
-		}
-		if ((rest = symbuf->m.bsz - (next + 1 - symbuf->m.buf)) <= 0) {
-			break;
-		}
-	}
-	fini_rid_iter(st);
-	return 0U;
-}
-
 static size_t
 get_ser(char **buf, gand_msg_t msg)
 {
@@ -693,31 +551,24 @@ get_ser(char **buf, gand_msg_t msg)
 
 	GAND_DEBUG("nrolf_objs %zu\n", msg->nrolf_objs);
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
-		uint32_t rid;
+		rid_t rid;
 		struct rolf_obj_s *robj = msg->rolf_objs + i;
-		struct get_rid_iter_s st;
 
 		if (LIKELY(robj->rolf_id > 0)) {
 			rid = robj->rolf_id;
-			fini_rid_iter(&st);
-			goto proc;
 		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
 			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
 			GAND_DEBUG("can't do igncase yet\n");
+			continue;
 		} else {
 			const char *sym = robj->rolf_sym;
-			size_t len = strlen(sym);
-			st = init_rid_iter(&i2s_b, sym, len);
+			rid = slut_sym2rid(i2s_s, sym);
 		}
-		do {
-			rid = rid_iter(&st);
-		proc:
-			GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
-			if (LIKELY(rid != 0)) {
-				__get_ser(&mb, msg, rid);
-			}
-		} while (rid_iter_next_p(&st));
+		GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
+		if (LIKELY(rid != 0)) {
+			__get_ser(&mb, msg, rid);
+		}
 	}
 
 	/* prepare output */
@@ -884,18 +735,17 @@ handle_data(char **res, char *msg, size_t msglen)
 static int
 handle_inot(const char *f)
 {
-	/* off with the old guy */
-	munmap_all(&i2s_b);
-
 	/* reinit */
 	if (UNLIKELY(f == NULL)) {
 		/* ah, we just wanted munmapping */
 		GAND_INFO_LOG("sym table munmapped\n");
-	} else if (mmap_whole_file(&i2s_b, f) < 0) {
+		return 0;
+	} else if (slut_load(i2s_s, f) < 0) {
 		GAND_ERR_LOG("sym table building failed\n");
-	} else {
-		GAND_INFO_LOG("new sym table built\n");
+		return 0;
 	}
+	/* not much that can go wrong now aye? */
+	GAND_INFO_LOG("new sym table built\n");
 	/* never lose interest in these files */
 	return 0;
 }
@@ -1399,7 +1249,7 @@ main(int argc, char *argv[])
 
 	/* inotify the symbol file */
 	{
-		static const char i2s[] = "rolf_idx2sym";
+		static const char i2s[] = "rolft_info";
 		const char *tmp;
 
 		tmp = make_trolf_name(i2s, sizeof(i2s) - 1);
