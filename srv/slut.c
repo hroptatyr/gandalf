@@ -45,26 +45,12 @@
 /* symbol table stuff */
 #include "slut-trie-glue.h"
 #include "slut.h"
+#include "fileutils.h"
 
 
 DEFUN void
-init_slut(void)
-{
-	return;
-}
-
-DEFUN void
-fini_slut(void)
-{
-	return;
-}
-
-DEFUN void
 make_slut(slut_t s)
 {
-	/* singleton */
-	init_slut();
-
 	/* init the s2i trie */
 	s->stbl = make_slut_tg();
 	return;
@@ -111,6 +97,52 @@ DEFUN int
 slut_put(slut_t s, const char *sym, struct trie_data_s data)
 {
 	slut_tg_put(s->stbl, sym, data);
+	return 0;
+}
+
+DEFUN int
+slut_load(slut_t s, const char *fn)
+{
+	struct mmfb_s fb;
+
+	/* free the old slut */
+	free_slut(s);
+
+	if (mmap_whole_file(&fb, fn) < 0) {
+		return -1;
+	}
+
+	/* init the new slut */
+	make_slut(s);
+
+	/* go through all lines of fb.m.buf */
+	for (const char *ln = fb.m.buf,
+		     *ep = ln + fb.m.bsz,
+		     *eoln;
+	     ln < ep; ln = (eoln ?: ep) + 1) {
+		struct slut_data_s sd;
+		char *p;
+
+		/* look for the end of the line */
+		eoln = memchr(ln, '\n', ep - ln);
+
+		/* fill in the slut data object */
+		sd.beg = ln - fb.m.buf;
+		sd.end = eoln - fb.m.buf;
+		if ((sd.rid = strtoul(ln, &p, 10)) &&
+		    p != NULL && *p == '\t') {
+			/* yaay, send him off, though snarf the symbol first */
+			char sym[64], *q = sym;
+
+			while (*++p != '\t');
+			while ((*q++ = *++p) != '\t');
+			*--q = '\0';
+
+			slut_put(s, sym, sd);
+		}
+	}
+
+	munmap_all(&fb);
 	return 0;
 }
 

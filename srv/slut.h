@@ -64,10 +64,6 @@ struct slut_s {
 	uint32_t nsyms;
 };
 
-/* (de)initialiser */
-DECLF void init_slut(void);
-DECLF void fini_slut(void);
-
 /* ctor and dtor */
 DECLF void make_slut(slut_t s);
 DECLF void free_slut(slut_t s);
@@ -82,6 +78,10 @@ DECLF struct slut_data_s slut_get(slut_t s, const char *sym);
 /**
  * Store DATA under key SYM in slut S. */
 DECLF int slut_put(slut_t s, const char *sym, struct slut_data_s data);
+
+/**
+ * Load a complete file FN into S. */
+DECLF int slut_load(slut_t s, const char *fn);
 
 /**
  * Return the number of symbols currently in the slut S. */
