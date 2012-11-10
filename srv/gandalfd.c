@@ -45,7 +45,6 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <stdbool.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -63,6 +62,7 @@
 #include "configger.h"
 #include "ud-sock.h"
 #include "gq.h"
+#include "fileutils.h"
 #include "nifty.h"
 
 /* we assume unserding with logger feature */
@@ -115,21 +115,6 @@ struct ev_io_i_s {
 	/* reply buffer, pointer and size */
 	char *rpl;
 	size_t rsz;
-};
-
-/* mmap buffers, memory and file based */
-struct mmmb_s {
-	char *buf;
-	/* real size */
-	size_t bsz;
-	/* alloc size */
-	size_t all;
-};
-
-struct mmfb_s {
-	struct mmmb_s m;
-	/* file desc */
-	int fd;
 };
 
 /* match state */
@@ -274,47 +259,6 @@ make_trolf_name(const char *post, size_t plen)
 	}
 	memcpy(f + idx, post, plen);
 	return f;
-}
-
-static void
-munmap_all(struct mmfb_s *mf)
-{
-	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
-		munmap(mf->m.buf, mf->m.all);
-	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
-	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
-	return;
-}
-
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f)
-{
-	size_t fsz = 0;
-	struct stat st = {0};
-
-	if (UNLIKELY(stat(f, &st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
-		return -1;
-	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		munmap_all(mf);
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
 }
 
 static mdir_t

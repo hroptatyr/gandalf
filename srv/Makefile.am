@@ -42,6 +42,7 @@ EXTRA_gandalfd_SOURCES += darray.c darray.h
 EXTRA_gandalfd_SOURCES += tail.c tail.h
 gandalfd_SOURCES += slut.c slut.h
 gandalfd_SOURCES += slut-trie-glue.h slut-trie-glue-types.h
+gandalfd_SOURCES += fileutils.h
 gandalfd_SOURCES += gandalfd.c
 EXTRA_gandalfd_SOURCES += gq.c gq.h
 gandalfd_CPPFLAGS += $(libev_CFLAGS)
