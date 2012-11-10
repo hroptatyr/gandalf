@@ -1249,7 +1249,7 @@ main(int argc, char *argv[])
 
 	/* inotify the symbol file */
 	{
-		static const char i2s[] = "rolf_idx2sym";
+		static const char i2s[] = "rolft_info";
 		const char *tmp;
 
 		tmp = make_trolf_name(i2s, sizeof(i2s) - 1);
