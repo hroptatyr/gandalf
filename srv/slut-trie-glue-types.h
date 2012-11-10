@@ -1,10 +1,10 @@
-/*** slut.c -- symbol look-up table
+/*** slut-trie-glue.h -- glue ute and various trie implementations
  *
- * Copyright (C) 2009-2012 Sebastian Freundt
+ * Copyright (C) 2010-2012 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of uterus/gandalf.
+ * This file is part of uterus.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,85 +33,32 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ***/
+ **/
+#if !defined INCLUDED_slut_trie_glue_types_h_
+#define INCLUDED_slut_trie_glue_types_h_
 
-#if defined HAVE_CONFIG_H
-# include "config.h"
-#endif	/* HAVE_CONFIG_H */
-#include <stdint.h>
-#include <sys/mman.h>
-#include <string.h>
-#include "nifty.h"
-/* symbol table stuff */
-#include "slut-trie-glue.h"
-#include "slut.h"
+typedef uint32_t rid_t;
 
-
-DEFUN void
-init_slut(void)
+/* anonymous glue type, could be a trie */
+typedef void *__slut_t;
+/* anonymous glue type, could be just an array */
+typedef void *__ilut_t;
+
+/**
+ * @brief Type of value associated to trie entries */
+typedef struct slut_data_s *slut_data_t;
+
+struct slut_data_s {
+	off_t beg;
+	off_t end;
+	rid_t rid;
+};
+
+static inline __attribute__((const, pure)) struct slut_data_s
+slut_data_initialiser(void)
 {
-	return;
+	static const struct slut_data_s res = {0};
+	return res;
 }
 
-DEFUN void
-fini_slut(void)
-{
-	return;
-}
-
-DEFUN void
-make_slut(slut_t s)
-{
-	/* singleton */
-	init_slut();
-
-	/* init the s2i trie */
-	s->stbl = make_slut_tg();
-	return;
-}
-
-DEFUN void
-free_slut(slut_t s)
-{
-	/* s2i */
-	if (s->stbl != NULL) {
-		free_slut_tg(s->stbl);
-		s->stbl = NULL;
-	}
-	return;
-}
-
-DEFUN rid_t
-slut_sym2rid(slut_t s, const char *sym)
-{
-	struct trie_data_s data[1];
-
-	/* make an alpha char array first */
-	if (slut_tg_get(s->stbl, sym, data) < 0) {
-		/* create a new entry */
-		return 0;
-	}
-	return data->rid;
-}
-
-DEFUN struct trie_data_s
-slut_get(slut_t s, const char *sym)
-{
-	struct trie_data_s data[1];
-
-	/* make an alpha char array first */
-	if (slut_tg_get(s->stbl, sym, data) < 0) {
-		/* return an empty entry */
-		return slut_data_initialiser();
-	}
-	return *data;
-}
-
-DEFUN int
-slut_put(slut_t s, const char *sym, struct trie_data_s data)
-{
-	slut_tg_put(s->stbl, sym, data);
-	return 0;
-}
-
-/* slut.c ends here */
+#endif	/* INCLUDED_slut_trie_glue_types_h_ */

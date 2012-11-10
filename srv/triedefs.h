@@ -28,19 +28,10 @@
 #define __TRIEDEFS_H
 
 #include <stdint.h>
+#include "slut-trie-glue-types.h"
 
-/**
- * @brief Type of value associated to trie entries
- */
-typedef struct trie_data_s *trie_data_t;
-
-typedef uint32_t rid_t;
-
-struct trie_data_s {
-	off_t beg;
-	off_t end;
-	rid_t rid;
-};
+#define trie_data_t	slut_data_t
+#define trie_data_s	slut_data_s
 
 /**
  * @file triedefs.h
@@ -69,13 +60,6 @@ typedef int32_t trie_idx_t;
 /**
  * @brief Trie error data
  */
-#define TRIE_DATA_ERROR		(trie_data_error())
-
-static inline __attribute__((const, pure)) struct trie_data_s
-trie_data_error(void)
-{
-	static const struct trie_data_s res = {0};
-	return res;
-}
+#define TRIE_DATA_ERROR		(slut_data_initialiser())
 
 #endif  /* __TRIEDEFS_H */

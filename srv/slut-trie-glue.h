@@ -1,4 +1,4 @@
-/*** uteslut-trie-glue.h -- glue ute and various trie implementations
+/*** slut-trie-glue.h -- glue ute and various trie implementations
  *
  * Copyright (C) 2010-2012 Sebastian Freundt
  *
@@ -39,14 +39,15 @@
  * This header is for internal use only.
  ***/
 
-#if !defined INCLUDED_uteslut_trie_glue_h_
-#define INCLUDED_uteslut_trie_glue_h_
+#if !defined INCLUDED_slut_trie_glue_h_
+#define INCLUDED_slut_trie_glue_h_
 
 #include <stdint.h>
+
+#include "slut-trie-glue-types.h"
 #include "trie.h"
 
 /* assumes we have a void* alias __slut_t */
-
 static inline __slut_t
 make_slut_tg(void)
 {
@@ -89,4 +90,4 @@ slut_tg_walk(__slut_t t, slut_tg_walk_f cb, void *closure)
 	return;
 }
 
-#endif	/* INCLUDED_trie_glue_h_ */
+#endif	/* INCLUDED_slut_trie_glue_h_ */

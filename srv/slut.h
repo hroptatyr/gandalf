@@ -39,7 +39,8 @@
 # define INCLUDED_slut_h_
 
 #include <stddef.h>
-#include "triedefs.h"
+#include <stdint.h>
+#include "slut-trie-glue.h"
 
 #undef DECLF
 #undef DEFUN
@@ -51,12 +52,9 @@
 # define DECLF	extern
 #endif	/* STATIC_GUTS */
 
-typedef struct slut_s *slut_t;
+typedef uint32_t rid_t;
 
-/* anonymous glue type, could be a trie */
-typedef void *__slut_t;
-/* anonymous glue type, could be just an array */
-typedef void *__ilut_t;
+typedef struct slut_s *slut_t;
 
 struct slut_s {
 	/* sym2rid */
@@ -79,11 +77,11 @@ DECLF rid_t slut_sym2rid(slut_t s, const char *sym);
 
 /**
  * For symbol SYM retrieve data associated in the slut S. */
-DECLF struct trie_data_s slut_get(slut_t s, const char *sym);
+DECLF struct slut_data_s slut_get(slut_t s, const char *sym);
 
 /**
  * Store DATA under key SYM in slut S. */
-DECLF int slut_put(slut_t s, const char *sym, struct trie_data_s data);
+DECLF int slut_put(slut_t s, const char *sym, struct slut_data_s data);
 
 /**
  * Return the number of symbols currently in the slut S. */
