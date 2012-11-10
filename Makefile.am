@@ -3,7 +3,7 @@ LC_ALL = C
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = lib cli srv
+SUBDIRS = lib cli src
 
 EXTRA_DIST = .version git-version-gen
 
