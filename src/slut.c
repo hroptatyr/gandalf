@@ -41,11 +41,14 @@
 #include <stdint.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <ctype.h>
 #include "nifty.h"
 /* symbol table stuff */
 #include "slut-trie-glue.h"
 #include "slut.h"
 #include "fileutils.h"
+
+#define IGNCASE_CHAR	('\t')
 
 static size_t
 next_2pow(size_t idx)
@@ -128,6 +131,29 @@ slut_sym2rid(slut_t s, const char *sym)
 	return (rid_t)*data;
 }
 
+DEFUN rid_t
+slut_isym2rid(slut_t s, const char *sym)
+{
+	static char isym[64];
+	trie_data_t data[1];
+
+	/* indicator for ignore case branch */
+	isym[0] = IGNCASE_CHAR;
+	{
+		char *p = isym + 1;
+		for (const char *q = sym, *ep = isym + sizeof(isym);
+		     p < ep && (*p++ = tolower(*q++)););
+		*p = '\0';
+	}
+
+	/* ordinary lookup now */
+	if (slut_tg_get(s->stbl, isym, data) < 0) {
+		/* create a new entry */
+		return 0UL;
+	}
+	return (rid_t)*data;
+}
+
 DEFUN struct slut_data_s
 slut_rid2data(slut_t s, rid_t rid)
 {
@@ -181,13 +207,20 @@ slut_load(slut_t s, const char *fn)
 		if ((rid = strtoul(ln, &p, 10)) &&
 		    p != NULL && *p == '\t') {
 			/* yaay, send him off, though snarf the symbol first */
-			char sym[64], *q = sym;
+			char sym[64], *q = sym + 1;
 
 			while (*++p != '\t');
 			while ((*q++ = *++p) != '\t');
 			*--q = '\0';
 
-			slut_put(s, sym, rid, sd);
+			slut_put(s, sym + 1, rid, sd);
+
+			/* put the lower case version too */
+			sym[0] = IGNCASE_CHAR;
+			for (p = sym + 1; p < q; p++) {
+				*p = tolower(*p);
+			}
+			slut_tg_put(s->stbl, sym, rid);
 		}
 	}
 
