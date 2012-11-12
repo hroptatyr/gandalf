@@ -153,6 +153,10 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 	const char *res = NULL;
 	cfgset_t *cs;
 
+	if (UNLIKELY(ctx == NULL)) {
+		goto dflt;
+	}
+
 	/* start out with an empty target */
 	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
 		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "trolfdir"))) {
@@ -175,6 +179,7 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 	}
 
 	/* quite fruitless today */
+dflt:
 	res = __trolfdir;
 	rsz = sizeof(__trolfdir) -1;
 
@@ -193,6 +198,10 @@ gand_get_nfo_file(cfg_t ctx)
 	size_t rsz;
 	const char *res = NULL;
 	size_t idx;
+
+	if (UNLIKELY(ctx == NULL)) {
+		goto dflt;
+	}
 
 	/* start out with an empty target */
 	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
@@ -215,6 +224,7 @@ gand_get_nfo_file(cfg_t ctx)
 	}
 
 	/* otherwise we'll construct it from the trolfdir */
+dflt:
 	if (UNLIKELY(trolfdir == NULL)) {
 		return NULL;
 	}
@@ -239,6 +249,10 @@ gand_get_port(cfg_t ctx)
 	cfgset_t *cs;
 	int res;
 
+	if (UNLIKELY(ctx == NULL)) {
+		goto dflt;
+	}
+
 	/* start out with an empty target */
 	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
 		if ((res = cfg_tbl_lookup_i(ctx, cs[i], "port"))) {
@@ -253,6 +267,7 @@ out:
 	if (res > 0 && res < 65536) {
 		return (uint16_t)res;
 	}
+dflt:
 	return 0U;
 }
 
@@ -1204,7 +1219,7 @@ main(int argc, char *argv[])
 	/* args */
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
-	bool daemonisep = false;
+	int daemonisep = 0;
 	uint16_t port;
 	cfg_t cfg;
 
