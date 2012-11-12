@@ -100,7 +100,7 @@ make_slut(slut_t s)
 	/* init the rtbl (resolves rid -> data) */
 	s->rtbl = NULL;
 	/* make sure we can take 4096 rids */
-	check_rtblz(s, 4096U);
+	check_rtblz(s, 1U);
 	return;
 }
 
@@ -147,6 +147,10 @@ slut_put(slut_t s, const char *sym, rid_t rid, struct slut_data_s data)
 
 	check_rtblz(s, rid);
 	s->rtbl[rid - 1] = data;
+
+	if (UNLIKELY(rid > s->nsyms)) {
+		s->nsyms = rid;
+	}
 	return 0;
 }
 
