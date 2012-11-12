@@ -9,7 +9,7 @@ before_script:
   - sudo apt-get install -qq help2man
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
-  - sudo apt-get install -qq lua
+  - sudo apt-get install -qq lua5.1 liblua5.1-0-dev
   - sudo apt-get install -qq libev
   - autoreconf -vfi
 
