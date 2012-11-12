@@ -55,6 +55,7 @@
 #include "gandalf.h"
 #include "nifty.h"
 #include "gand_msg-parser.h"
+#include "gand_msg-private.h"
 
 #define GCSZ_DEBUG(args...)
 
