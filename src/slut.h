@@ -54,15 +54,33 @@
 
 typedef uint32_t rid_t;
 
+/**
+ * Our own data associated with each rid. */
+typedef struct slut_data_s *slut_data_t;
+
 typedef struct slut_s *slut_t;
+
+struct slut_data_s {
+	off_t beg;
+	off_t end;
+};
 
 struct slut_s {
 	/* sym2rid */
 	__slut_t stbl;
+	/* rid2data */
+	struct slut_data_s *rtbl;
 	/* administrative stuff */
 	uint32_t alloc_sz;
 	uint32_t nsyms;
 };
+
+static inline __attribute__((const, pure)) struct slut_data_s
+slut_data_initialiser(void)
+{
+	static const struct slut_data_s res = {0};
+	return res;
+}
 
 /* ctor and dtor */
 DECLF void make_slut(slut_t s);
@@ -72,12 +90,12 @@ DECLF void free_slut(slut_t s);
 DECLF rid_t slut_sym2rid(slut_t s, const char *sym);
 
 /**
- * For symbol SYM retrieve data associated in the slut S. */
-DECLF struct slut_data_s slut_get(slut_t s, const char *sym);
+ * For rolf id RID retrieve data associated in the slut S. */
+DECLF struct slut_data_s slut_rid2data(slut_t s, rid_t rid);
 
 /**
- * Store DATA under key SYM in slut S. */
-DECLF int slut_put(slut_t s, const char *sym, struct slut_data_s data);
+ * Store data D under key SYM and rid RID in slut S. */
+DECLF int slut_put(slut_t s, const char *sym, rid_t rid, struct slut_data_s d);
 
 /**
  * Load a complete file FN into S. */
