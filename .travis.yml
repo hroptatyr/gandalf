@@ -11,7 +11,7 @@ before_script:
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
   - sudo apt-get install -qq lua5.1 liblua5.1-0-dev
-  - sudo apt-get install -qq libev
+  - sudo apt-get install -qq libev-dev
   - sudo apt-get install -qq bison
   - sudo apt-get install -qq flex
   - autoreconf -vfi
