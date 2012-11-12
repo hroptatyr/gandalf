@@ -153,7 +153,7 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 
 	/* start out with an empty target */
 	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs + i, "trolfdir"))) {
+		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "trolfdir"))) {
 			struct stat st = {0};
 
 			if (stat(res, &st) == 0) {
