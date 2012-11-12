@@ -1,5 +1,5 @@
 args "--unamed-opts"
-usage "[OPTION]... [...]"
+usage " [OPTION]... [...]"
 description "gandalf service"
 
 section "Server options"
