@@ -578,14 +578,13 @@ get_ser(char **buf, gand_msg_t msg)
 }
 
 static void
-__get_nfo(
-	struct mmmb_s *mb, struct mmfb_s *mf,
-	gand_msg_t msg, struct slut_data_s rdata)
+__get_nfo(struct mmmb_s *mb, struct mmfb_s *mf, gand_msg_t msg, rid_t rid)
 {
+	struct slut_data_s rdata = slut_rid2data(i2s_s, rid);
 	const char *cand = mf->m.buf + rdata.beg;
 	const char *cend = mf->m.buf + rdata.end;
 
-	GAND_INFO_LOG("get_nfo(%u)\n", rdata.rid);
+	GAND_INFO_LOG("get_nfo(%u)\n", rid);
 	if (msg->sel == SEL_ALL || msg->sel == SEL_NOTHING) {
 		bang_whole_line(mb, cand, cend - cand);
 	} else {
@@ -611,12 +610,12 @@ get_nfo(char **buf, gand_msg_t msg)
 	}
 
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
-		struct slut_data_s rdata;
 		struct rolf_obj_s *robj = msg->rolf_objs + i;
+		rid_t rid;
 
 		if (LIKELY(robj->rolf_id > 0)) {
 			/* bugger, how to get rdata from rid? */
-			rdata = slut_data_initialiser();
+			rid = robj->rolf_id;
 		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
 			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
@@ -624,11 +623,11 @@ get_nfo(char **buf, gand_msg_t msg)
 			continue;
 		} else {
 			const char *sym = robj->rolf_sym;
-			rdata = slut_get(i2s_s, sym);
+			rid = slut_sym2rid(i2s_s, sym);
 		}
-		GAND_DEBUG("rolf_obj %zu id %u\n", i, rdata.rid);
-		if (LIKELY(rdata.rid != 0)) {
-			__get_nfo(&mb, &mf, msg, rdata);
+		GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
+		if (LIKELY(rid != 0)) {
+			__get_nfo(&mb, &mf, msg, rid);
 		}
 	}
 
