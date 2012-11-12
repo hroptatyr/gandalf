@@ -52,10 +52,14 @@ SXE_CHECK_LIBEV
 AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ## check for lua, critical
-PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
+PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
 	## just for debian
-	PKG_CHECK_MODULES([LUA], [lua5.1], [have_lua="yes"], [
+	PKG_CHECK_MODULES([lua5.1], [lua5.1], [
+		have_lua="yes"
+		lua_LIBS="${lua5.1_LIBS}"
+		lua_CFLAGS="${lua5.1_CFLAGS}"
+		], [
 		have_lua="no"
 		if test "${enable_server}" = "yes"; then
 			AC_MSG_WARN([server build request but lua missing.])
