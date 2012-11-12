@@ -38,6 +38,9 @@
 %{
 #define YY_EXTRA_TYPE	void*
 #define YY_FATAL_ERROR(msg)
+
+extern int yyget_column(yyscan_t);
+extern void yyset_column(int, yyscan_t);
 %}
 
 %option reentrant
@@ -55,6 +58,7 @@
 #include "gandalf.h"
 #include "nifty.h"
 #include "gand_msg-parser.h"
+#include "gand_msg-private.h"
 
 #define GCSZ_DEBUG(args...)
 

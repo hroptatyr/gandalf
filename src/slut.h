@@ -89,6 +89,9 @@ DECLF void free_slut(slut_t s);
 /* accessors */
 DECLF rid_t slut_sym2rid(slut_t s, const char *sym);
 
+/* like slut_sym2rid() but ignore case of SYM. */
+DECLF rid_t slut_isym2rid(slut_t s, const char *sym);
+
 /**
  * For rolf id RID retrieve data associated in the slut S. */
 DECLF struct slut_data_s slut_rid2data(slut_t s, rid_t rid);

@@ -596,8 +596,8 @@ get_ser(char **buf, gand_msg_t msg)
 		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
 			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
-			GAND_DEBUG("can't do igncase yet\n");
-			continue;
+			const char *sym = robj->rolf_sym;
+			rid = slut_isym2rid(i2s_s, sym);
 		} else {
 			const char *sym = robj->rolf_sym;
 			rid = slut_sym2rid(i2s_s, sym);
@@ -699,8 +699,8 @@ get_nfo(char **buf, gand_msg_t msg)
 		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
 			continue;
 		} else if (UNLIKELY(msg->igncase == 1)) {
-			GAND_DEBUG("can't do igncase yet\n");
-			continue;
+			const char *sym = robj->rolf_sym;
+			rid = slut_isym2rid(i2s_s, sym);
 		} else {
 			const char *sym = robj->rolf_sym;
 			rid = slut_sym2rid(i2s_s, sym);
