@@ -164,6 +164,16 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 			}
 		}
 	}
+
+	/* otherwise try the root domain */
+	if ((rsz = cfg_glob_lookup_s(&res, ctx, "trolfdir"))) {
+		struct stat st = {0};
+
+		if (stat(res, &st) == 0) {
+			goto out;
+		}
+	}
+
 	/* quite fruitless today */
 	res = __trolfdir;
 	rsz = sizeof(__trolfdir) -1;
