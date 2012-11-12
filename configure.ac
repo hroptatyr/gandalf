@@ -55,10 +55,10 @@ AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
 	## just for debian
-	PKG_CHECK_MODULES([lua5.1], [lua5.1], [
+	PKG_CHECK_MODULES([lua5_1], [lua5.1], [
 		have_lua="yes"
-		lua_LIBS="${lua5.1_LIBS}"
-		lua_CFLAGS="${lua5.1_CFLAGS}"
+		lua_LIBS="${lua5_1_LIBS}"
+		lua_CFLAGS="${lua5_1_CFLAGS}"
 		], [
 		have_lua="no"
 		if test "${enable_server}" = "yes"; then
