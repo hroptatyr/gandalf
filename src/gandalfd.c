@@ -51,6 +51,7 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
+#include <sys/time.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -132,6 +133,8 @@ typedef enum {
 	MDIR_NOMATCH = 0,
 	MDIR_MATCH,
 } mdir_t;
+
+#define MAX_MAP_TIME	(30U)
 
 
 /* rolf glue */
@@ -509,7 +512,7 @@ bang_whole_line(struct mmmb_s *mb, const char *lin, size_t lsz)
 static void
 __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 {
-	struct mmfb_s mf = {.m = {NULL}, .fd = -1};
+	struct mmfb_s mf_ser = {.m = {NULL}, .fd = -1};
 	struct ms_s state = {0};
 	const char *f;
 
@@ -517,13 +520,13 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	/* get us the lateglu name */
 	if ((f = make_lateglu_name(rid)) == NULL) {
 		return;
-	} else if (mmap_whole_file(&mf, f) < 0) {
+	} else if (mmap_whole_file(&mf_ser, f) < 0) {
 		goto out;
 	}
 
-	for (size_t idx = 0; idx < mf.m.bsz; ) {
-		const char *lin = mf.m.buf + idx;
-		char *eol = memchr(lin, '\n', mf.m.bsz - idx);
+	for (size_t idx = 0; idx < mf_ser.m.bsz; ) {
+		const char *lin = mf_ser.m.buf + idx;
+		char *eol = memchr(lin, '\n', mf_ser.m.bsz - idx);
 		size_t lsz = eol - lin;
 		int mdir;
 
@@ -538,7 +541,7 @@ __get_ser(struct mmmb_s *mb, gand_msg_t msg, uint32_t rid)
 	}
 
 	/* free the resources */
-	munmap_all(&mf);
+	munmap_all(&mf_ser);
 out:
 	free_lateglu_name(f);
 	return;
@@ -577,6 +580,56 @@ get_ser(char **buf, gand_msg_t msg)
 	return mb.bsz;
 }
 
+static struct mmfb_s mf_nfo = {
+	.m = {
+		.buf = NULL,
+		.bsz = 0UL,
+	},
+	.fd = -1
+};
+static time_t mf_nfo_stamp;
+
+static int
+mmap_nfo(void)
+{
+	static const char *f;
+	static struct timeval tv;
+
+	if (LIKELY(mf_nfo.m.buf != NULL)) {
+		/* still mapped, that's good */
+		;
+	} else if ((f = make_info_name()) == NULL) {
+		return -1;
+	} else if (mmap_whole_file(&mf_nfo, f) < 0) {
+		return -1;
+	} else {
+		free_info_name(f);
+	}
+	/* keep track of last map time */
+	(void)gettimeofday(&tv, NULL);
+	mf_nfo_stamp = tv.tv_sec;
+	return 0;
+}
+
+static int
+munmap_nfo(int forcep)
+{
+	static struct timeval tv = {0};
+
+	if (mf_nfo.m.buf == NULL) {
+		/* do fuckall */
+		return 0;
+	} else if (((void)gettimeofday(&tv, NULL),
+		    tv.tv_sec < mf_nfo_stamp + MAX_MAP_TIME) && !forcep) {
+		/* don't munmap as the mapping is too recent */
+		return 0;
+	}
+	/* otherwise it's definitely munmap time */
+	GAND_NOTI_LOG("munmap'ping info file\n");
+	munmap_all(&mf_nfo);
+	return 0;
+}
+
 static void
 __get_nfo(struct mmmb_s *mb, struct mmfb_s *mf, gand_msg_t msg, rid_t rid)
 {
@@ -597,16 +650,12 @@ static size_t
 get_nfo(char **buf, gand_msg_t msg)
 {
 	struct mmmb_s mb = {NULL};
-	struct mmfb_s mf = {.m = {NULL}, .fd = -1};
-	const char *f;
 
 	/* general checks and get us the lateglu name */
 	if (UNLIKELY(msg->nrolf_objs == 0)) {
 		return 0UL;
-	} else if ((f = make_info_name()) == NULL) {
+	} else if (mmap_nfo() < 0) {
 		return 0UL;
-	} else if (mmap_whole_file(&mf, f) < 0) {
-		goto out;
 	}
 
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
@@ -627,17 +676,13 @@ get_nfo(char **buf, gand_msg_t msg)
 		}
 		GAND_DEBUG("rolf_obj %zu id %u\n", i, rid);
 		if (LIKELY(rid != 0)) {
-			__get_nfo(&mb, &mf, msg, rid);
+			__get_nfo(&mb, &mf_nfo, msg, rid);
 		}
 	}
 
 	/* prepare output */
 	mmmb_freeze(&mb);
 	*buf = mb.buf;
-	/* free the resources */
-	munmap_all(&mf);
-out:
-	free_info_name(f);
 	return mb.bsz;
 }
 
@@ -928,6 +973,14 @@ dccp_cb(EV_P_ ev_io *w, int UNUSED(re))
 }
 
 static void
+prep_cb(EV_P_ ev_prepare *UNUSED(w), int UNUSED(revents))
+{
+	/* check the map stamp */
+	munmap_nfo(0);
+	return;
+}
+
+static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	GAND_NOTI_LOG("C-c caught, unrolling everything\n");
@@ -1114,6 +1167,8 @@ main(int argc, char *argv[])
 	size_t nlstn = 0;
 	/* i2s translation */
 	ev_stat ALGN16(st_i2s)[1];
+	/* prep timer */
+	ev_prepare prp[1];
 	/* args */
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
@@ -1168,6 +1223,10 @@ main(int argc, char *argv[])
 
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
+
+	/* pre and post poll hooks */
+	ev_prepare_init(prp, prep_cb);
+	ev_prepare_start(EV_A_ prp);
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
@@ -1236,10 +1295,16 @@ main(int argc, char *argv[])
 
 	GAND_NOTI_LOG("shutting down unserdingd\n");
 
+	/* munmap the info file (if mapped) */
+	munmap_nfo(/*force*/1);
+
 	/* stop inotifying */
 	handle_inot(NULL);
 	ev_stat_stop(EV_A_ st_i2s);
 	free_slut(i2s_s);
+
+	/* stop them post poll hooks */
+	ev_prepare_stop(EV_A_ prp);
 
 	/* close the listener */
 	for (size_t i = 0; i < nlstn; i++) {
