@@ -141,6 +141,8 @@ typedef enum {
 static char *trolfdir;
 static size_t ntrolfdir;
 
+static char *nfo_fname = NULL;
+
 static struct slut_s i2s_s[1];
 
 static size_t
@@ -153,7 +155,7 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 
 	/* start out with an empty target */
 	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs + i, "trolfdir"))) {
+		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "trolfdir"))) {
 			struct stat st = {0};
 
 			if (stat(res, &st) == 0) {
@@ -162,6 +164,16 @@ gand_get_trolfdir(char **tgt, cfg_t ctx)
 			}
 		}
 	}
+
+	/* otherwise try the root domain */
+	if ((rsz = cfg_glob_lookup_s(&res, ctx, "trolfdir"))) {
+		struct stat st = {0};
+
+		if (stat(res, &st) == 0) {
+			goto out;
+		}
+	}
+
 	/* quite fruitless today */
 	res = __trolfdir;
 	rsz = sizeof(__trolfdir) -1;
@@ -170,6 +182,78 @@ out:
 	/* make sure *tgt is freeable */
 	*tgt = strndup(res, rsz);
 	return rsz;
+}
+
+static char*
+gand_get_nfo_file(cfg_t ctx)
+{
+	static const char rinf[] = "rolft_info";
+	static char f[PATH_MAX];
+	cfgset_t *cs;
+	size_t rsz;
+	const char *res = NULL;
+	size_t idx;
+
+	/* start out with an empty target */
+	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
+		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "nfo_file"))) {
+			struct stat st = {0};
+
+			if (stat(res, &st) == 0) {
+				goto out;
+			}
+		}
+	}
+
+	/* otherwise try the root domain */
+	if ((rsz = cfg_glob_lookup_s(&res, ctx, "nfo_file"))) {
+		struct stat st = {0};
+
+		if (stat(res, &st) == 0) {
+			goto out;
+		}
+	}
+
+	/* otherwise we'll construct it from the trolfdir */
+	if (UNLIKELY(trolfdir == NULL)) {
+		return NULL;
+	}
+
+	/* construct the path */
+	memcpy(f, trolfdir, (idx = ntrolfdir));
+	if (f[idx - 1] != '/') {
+		f[idx++] = '/';
+	}
+	memcpy(f + idx, rinf, sizeof(rinf) - 1);
+	res = f;
+	rsz = idx + sizeof(rinf) - 1;
+
+out:
+	/* make sure the return value is freeable */
+	return strndup(res, rsz);
+}
+
+static uint16_t
+gand_get_port(cfg_t ctx)
+{
+	cfgset_t *cs;
+	int res;
+
+	/* start out with an empty target */
+	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
+		if ((res = cfg_tbl_lookup_i(ctx, cs[i], "port"))) {
+			goto out;
+		}
+	}
+
+	/* otherwise try the root domain */
+	res = cfg_glob_lookup_i(ctx, "port");
+
+out:
+	if (res > 0 && res < 65536) {
+		return (uint16_t)res;
+	}
+	return 0U;
 }
 
 static size_t
@@ -206,56 +290,6 @@ free_lateglu_name(const char *UNUSED(name))
 {
 	/* just for later when we're reentrant */
 	return;
-}
-
-static const char*
-make_info_name(void)
-{
-	static const char rinf[] = "rolft_info";
-	static char f[PATH_MAX];
-	static bool inip = false;
-	size_t idx;
-
-	if (LIKELY(inip)) {
-	singleton:
-		return f;
-	} else if (UNLIKELY(trolfdir == NULL)) {
-		return NULL;
-	}
-
-	/* construct the path */
-	memcpy(f, trolfdir, (idx = ntrolfdir));
-	if (f[idx - 1] != '/') {
-		f[idx++] = '/';
-	}
-	memcpy(f + idx, rinf, sizeof(rinf) - 1);
-	inip = true;
-	goto singleton;
-}
-
-static void
-free_info_name(const char *UNUSED(sym))
-{
-	return;
-}
-
-static const char*
-make_trolf_name(const char *post, size_t plen)
-{
-	static char f[PATH_MAX];
-	size_t idx;
-
-	if (UNLIKELY(trolfdir == NULL)) {
-		return NULL;
-	}
-
-	/* construct the path */
-	memcpy(f, trolfdir, (idx = ntrolfdir));
-	if (f[idx - 1] != '/') {
-		f[idx++] = '/';
-	}
-	memcpy(f + idx, post, plen);
-	return f;
 }
 
 static mdir_t
@@ -592,18 +626,15 @@ static time_t mf_nfo_stamp;
 static int
 mmap_nfo(void)
 {
-	static const char *f;
 	static struct timeval tv;
 
 	if (LIKELY(mf_nfo.m.buf != NULL)) {
 		/* still mapped, that's good */
 		;
-	} else if ((f = make_info_name()) == NULL) {
+	} else if (nfo_fname == NULL) {
 		return -1;
-	} else if (mmap_whole_file(&mf_nfo, f) < 0) {
+	} else if (mmap_whole_file(&mf_nfo, nfo_fname) < 0) {
 		return -1;
-	} else {
-		free_info_name(f);
 	}
 	/* keep track of last map time */
 	(void)gettimeofday(&tv, NULL);
@@ -758,7 +789,7 @@ handle_inot(const char *f)
 		return 0;
 	}
 	/* not much that can go wrong now aye? */
-	GAND_INFO_LOG("new sym table built\n");
+	GAND_INFO_LOG("new sym table built (from %s)\n", f);
 	munmap_nfo(1);
 	/* never lose interest in these files */
 	return 0;
@@ -1174,6 +1205,7 @@ main(int argc, char *argv[])
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
 	bool daemonisep = false;
+	uint16_t port;
 	cfg_t cfg;
 
 	/* whither to log */
@@ -1216,6 +1248,8 @@ main(int argc, char *argv[])
 
 	/* get the trolf dir */
 	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
+	nfo_fname = gand_get_nfo_file(cfg);
+	port = gand_get_port(cfg);
 
 	/* free cmdline parser goodness */
 	cmdline_parser_free(argi);
@@ -1248,7 +1282,7 @@ main(int argc, char *argv[])
 			.sa6 = {
 				.sin6_family = AF_INET6,
 				.sin6_addr = in6addr_any,
-				.sin6_port = 0,
+				.sin6_port = htons(port),
 			},
 		};
 		socklen_t sa_len = sizeof(sa);
@@ -1276,17 +1310,13 @@ main(int argc, char *argv[])
 	}
 
 	/* inotify the symbol file */
-	{
-		static const char i2s[] = "rolft_info";
-		const char *tmp;
-
-		tmp = make_trolf_name(i2s, sizeof(i2s) - 1);
-		ev_stat_init(st_i2s, inot_cb, tmp, 0.);
+	if (nfo_fname != NULL) {
+		ev_stat_init(st_i2s, inot_cb, nfo_fname, 0.);
 		ev_stat_start(EV_A_ st_i2s);
 
 		/* and just to make sure we kick things off */
 		make_slut(i2s_s);
-		handle_inot(tmp);
+		handle_inot(nfo_fname);
 	}
 
 	GAND_NOTI_LOG("gandalfd ready\n");
@@ -1316,6 +1346,14 @@ main(int argc, char *argv[])
 
 	/* destroy the default evloop */
 	ev_default_destroy();
+
+	/* free trolfdir and nfo_fname */
+	if (LIKELY(trolfdir != NULL)) {
+		free(trolfdir);
+	}
+	if (LIKELY(nfo_fname != NULL)) {
+		free(nfo_fname);
+	}
 
 	/* close our log output */	
 	fflush(gand_logout);
