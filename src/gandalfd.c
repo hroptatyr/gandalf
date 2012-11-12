@@ -759,6 +759,7 @@ handle_inot(const char *f)
 	}
 	/* not much that can go wrong now aye? */
 	GAND_INFO_LOG("new sym table built\n");
+	munmap_nfo(1);
 	/* never lose interest in these files */
 	return 0;
 }
