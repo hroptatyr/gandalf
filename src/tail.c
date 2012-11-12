@@ -44,7 +44,7 @@ static void tail_free_block(tail_t t, trie_idx_t block);
 
 typedef struct tail_block_s {
 	trie_idx_t next_free;
-	struct trie_data_s data;
+	trie_data_t data;
 	char *suffix;
 } *tail_block_t;
 
@@ -275,7 +275,7 @@ tail_free_block(tail_t t, trie_idx_t block)
  *
  * Get data associated to suffix entry @a index in tail data.
  */
-DEFUN struct trie_data_s
+DEFUN trie_data_t
 tail_get_data(const_tail_t t, trie_idx_t idx)
 {
 	idx -= TAIL_START_BLOCKNO;
@@ -294,7 +294,7 @@ tail_get_data(const_tail_t t, trie_idx_t idx)
  * Set data associated to suffix entry @a index in tail data.
  */
 DEFUN int
-tail_set_data(tail_t t, trie_idx_t idx, struct trie_data_s data)
+tail_set_data(tail_t t, trie_idx_t idx, trie_data_t data)
 {
 	idx -= TAIL_START_BLOCKNO;
 	if (idx < t->num_tails) {

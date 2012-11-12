@@ -47,12 +47,60 @@
 #include "slut.h"
 #include "fileutils.h"
 
+static size_t
+next_2pow(size_t idx)
+{
+	if (idx == 0UL) {
+		return 0UL;
+	} else if (idx < 4096UL) {
+		return 4096UL;
+	} else if (idx < 65536UL) {
+		return 65536UL;
+	} else if (idx < 262144UL) {
+		return 262144UL;
+	} else if (idx < 1048576UL) {
+		return 1048576UL;
+	} else if (idx < 4194304UL) {
+		return 4194304UL;
+	} else {
+		size_t x2p = 4194304UL * 2;
+
+		for (x2p = 4194304UL * 2; x2p < idx; x2p *= 2);
+		return x2p;
+	}
+}
+
+static void
+check_rtblz(slut_t s, size_t at_least)
+{
+	size_t o_least = slut_nsyms(s);
+
+	o_least = next_2pow(o_least);
+	at_least = next_2pow(at_least);
+
+	if (UNLIKELY(s->rtbl == NULL)) {
+		size_t newz = at_least * sizeof(*s->rtbl);
+		s->rtbl = mmap(NULL, newz, PROT_MEM, MAP_MEM, -1, 0);
+	} else if (o_least < at_least) {
+		size_t oldz = o_least * sizeof(*s->rtbl);
+		size_t newz = at_least * sizeof(*s->rtbl);
+		s->rtbl = mremap(s->rtbl, oldz, newz, MREMAP_MAYMOVE);
+	}
+	return;
+}
+
 
 DEFUN void
 make_slut(slut_t s)
 {
+	/* nope, nothing yet */
+	s->nsyms = 0UL;
 	/* init the s2i trie */
 	s->stbl = make_slut_tg();
+	/* init the rtbl (resolves rid -> data) */
+	s->rtbl = NULL;
+	/* make sure we can take 4096 rids */
+	check_rtblz(s, 1U);
 	return;
 }
 
@@ -70,33 +118,39 @@ free_slut(slut_t s)
 DEFUN rid_t
 slut_sym2rid(slut_t s, const char *sym)
 {
-	struct trie_data_s data[1];
+	trie_data_t data[1];
 
 	/* make an alpha char array first */
 	if (slut_tg_get(s->stbl, sym, data) < 0) {
 		/* create a new entry */
-		return 0;
+		return 0UL;
 	}
-	return data->rid;
+	return (rid_t)*data;
 }
 
-DEFUN struct trie_data_s
-slut_get(slut_t s, const char *sym)
+DEFUN struct slut_data_s
+slut_rid2data(slut_t s, rid_t rid)
 {
-	struct trie_data_s data[1];
-
-	/* make an alpha char array first */
-	if (slut_tg_get(s->stbl, sym, data) < 0) {
-		/* return an empty entry */
-		return slut_data_initialiser();
+	if (LIKELY(rid <= slut_nsyms(s))) {
+		return s->rtbl[rid - 1];
 	}
-	return *data;
+	return slut_data_initialiser();
 }
 
 DEFUN int
-slut_put(slut_t s, const char *sym, struct trie_data_s data)
+slut_put(slut_t s, const char *sym, rid_t rid, struct slut_data_s data)
 {
-	slut_tg_put(s->stbl, sym, data);
+	if (UNLIKELY(rid == 0)) {
+		return -1;
+	}
+	slut_tg_put(s->stbl, sym, rid);
+
+	check_rtblz(s, rid);
+	s->rtbl[rid - 1] = data;
+
+	if (UNLIKELY(rid > s->nsyms)) {
+		s->nsyms = rid;
+	}
 	return 0;
 }
 
@@ -105,15 +159,9 @@ slut_load(slut_t s, const char *fn)
 {
 	struct mmfb_s fb;
 
-	/* free the old slut */
-	free_slut(s);
-
 	if (mmap_whole_file(&fb, fn) < 0) {
 		return -1;
 	}
-
-	/* init the new slut */
-	make_slut(s);
 
 	/* go through all lines of fb.m.buf */
 	for (const char *ln = fb.m.buf,
@@ -121,6 +169,7 @@ slut_load(slut_t s, const char *fn)
 		     *eoln;
 	     ln < ep; ln = (eoln ?: ep) + 1) {
 		struct slut_data_s sd;
+		rid_t rid;
 		char *p;
 
 		/* look for the end of the line */
@@ -129,7 +178,7 @@ slut_load(slut_t s, const char *fn)
 		/* fill in the slut data object */
 		sd.beg = ln - fb.m.buf;
 		sd.end = eoln - fb.m.buf;
-		if ((sd.rid = strtoul(ln, &p, 10)) &&
+		if ((rid = strtoul(ln, &p, 10)) &&
 		    p != NULL && *p == '\t') {
 			/* yaay, send him off, though snarf the symbol first */
 			char sym[64], *q = sym;
@@ -138,7 +187,7 @@ slut_load(slut_t s, const char *fn)
 			while ((*q++ = *++p) != '\t');
 			*--q = '\0';
 
-			slut_put(s, sym, sd);
+			slut_put(s, sym, rid, sd);
 		}
 	}
 

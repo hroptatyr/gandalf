@@ -55,7 +55,7 @@ typedef const struct trie_s *const_trie_t;
  *
  * @return 0 to continue enumeration, -1 to stop
  */
-typedef int(*trie_walk_f)(const char *key, struct trie_data_s val, void *clo);
+typedef int(*trie_walk_f)(const char *key, trie_data_t val, void *clo);
 
 /**
  * @brief Trie walking state
@@ -79,9 +79,9 @@ extern int trie_fwrite(trie_t trie, FILE *file);
 extern bool trie_dirty_p(const_trie_t trie);
 
 /* accessors */
-extern int trie_retrieve(const_trie_t t, const char *key, trie_data_t o_data);
-extern int trie_store(trie_t t, const char *key, struct trie_data_s);
-extern int trie_store_if_absent(trie_t t, const char *key, struct trie_data_s);
+extern int trie_retrieve(const_trie_t t, const char *key, trie_data_t *o_data);
+extern int trie_store(trie_t t, const char *key, trie_data_t);
+extern int trie_store_if_absent(trie_t t, const char *key, trie_data_t);
 extern int trie_delete(trie_t t, const char *key);
 extern int trie_walk(const_trie_t t, trie_walk_f walkf, void *closure);
 
@@ -128,7 +128,7 @@ trie_state_leaf_p(const_trie_state_t s)
 	return trie_state_single_p(s) && trie_state_terminal_p(s);
 }
 
-extern struct trie_data_s trie_state_get_data(const_trie_state_t s);
+extern trie_data_t trie_state_get_data(const_trie_state_t s);
 
 #ifdef __cplusplus
 }

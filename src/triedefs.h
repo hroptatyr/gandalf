@@ -28,10 +28,9 @@
 #define __TRIEDEFS_H
 
 #include <stdint.h>
-#include "slut-trie-glue-types.h"
+#include <stddef.h>
 
-#define trie_data_t	slut_data_t
-#define trie_data_s	slut_data_s
+typedef intptr_t trie_data_t;
 
 /**
  * @file triedefs.h
@@ -60,6 +59,6 @@ typedef int32_t trie_idx_t;
 /**
  * @brief Trie error data
  */
-#define TRIE_DATA_ERROR		(slut_data_initialiser())
+#define TRIE_DATA_ERROR		(0UL)
 
 #endif  /* __TRIEDEFS_H */
