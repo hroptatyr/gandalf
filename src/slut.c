@@ -105,15 +105,9 @@ slut_load(slut_t s, const char *fn)
 {
 	struct mmfb_s fb;
 
-	/* free the old slut */
-	free_slut(s);
-
 	if (mmap_whole_file(&fb, fn) < 0) {
 		return -1;
 	}
-
-	/* init the new slut */
-	make_slut(s);
 
 	/* go through all lines of fb.m.buf */
 	for (const char *ln = fb.m.buf,

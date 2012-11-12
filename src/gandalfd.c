@@ -1257,6 +1257,7 @@ main(int argc, char *argv[])
 		ev_stat_start(EV_A_ st_i2s);
 
 		/* and just to make sure we kick things off */
+		make_slut(i2s_s);
 		handle_inot(tmp);
 	}
 
@@ -1270,6 +1271,7 @@ main(int argc, char *argv[])
 	/* stop inotifying */
 	handle_inot(NULL);
 	ev_stat_stop(EV_A_ st_i2s);
+	free_slut(i2s_s);
 
 	/* close the listener */
 	for (size_t i = 0; i < nlstn; i++) {
