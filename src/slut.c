@@ -140,6 +140,9 @@ slut_rid2data(slut_t s, rid_t rid)
 DEFUN int
 slut_put(slut_t s, const char *sym, rid_t rid, struct slut_data_s data)
 {
+	if (UNLIKELY(rid == 0)) {
+		return -1;
+	}
 	slut_tg_put(s->stbl, sym, rid);
 
 	check_rtblz(s, rid);
