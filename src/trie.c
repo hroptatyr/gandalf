@@ -137,17 +137,17 @@ make_trie_state(
 	const_trie_t trie, trie_idx_t idx, short int sufxidx, short int sufxp);
 
 static int
-trie_store_maybe(trie_t t, const char *k, struct trie_data_s d, int overwritep);
+trie_store_maybe(trie_t t, const char *k, trie_data_t d, int overwritep);
 
 static int
 trie_branch_in_branch(
 	trie_t trie, trie_idx_t sep_node,
-	const char *suffix, struct trie_data_s data);
+	const char *suffix, trie_data_t data);
 
 static int
 trie_branch_in_tail(
 	trie_t trie, trie_idx_t sep_node,
-	const char *suffix, struct trie_data_s data);
+	const char *suffix, trie_data_t data);
 
 /*-----------------------*
  *   GENERAL FUNCTIONS   *
@@ -271,7 +271,7 @@ trie_dirty_p(const_trie_t trie)
  * to the data associated to @a key.
  */
 int
-trie_retrieve(const_trie_t trie, const char *key, trie_data_t o_data)
+trie_retrieve(const_trie_t trie, const char *key, trie_data_t *o_data)
 {
 	trie_idx_t s;
 	short int suffix_idx;
@@ -322,7 +322,7 @@ trie_retrieve(const_trie_t trie, const char *key, trie_data_t o_data)
  * be overwritten.
  */
 int
-trie_store(trie_t trie, const char *key, struct trie_data_s data)
+trie_store(trie_t trie, const char *key, trie_data_t data)
 {
 	return trie_store_maybe(trie, key, data, true);
 }
@@ -346,13 +346,13 @@ trie_store(trie_t trie, const char *key, struct trie_data_s data)
  * Available since: 0.2.4
  */
 int
-trie_store_if_absent(trie_t trie, const char *key, struct trie_data_s data)
+trie_store_if_absent(trie_t trie, const char *key, trie_data_t data)
 {
 	return trie_store_maybe(trie, key, data, false);
 }
 
 static int
-trie_store_maybe(trie_t trie, const char *k, struct trie_data_s d, int overwrp)
+trie_store_maybe(trie_t trie, const char *key, trie_data_t data, int overwrp)
 {
 	trie_idx_t s, t;
 	short int suffix_idx;
@@ -360,13 +360,13 @@ trie_store_maybe(trie_t trie, const char *k, struct trie_data_s d, int overwrp)
 
 	/* walk through branches */
 	s = da_get_root(trie->da);
-	for (p = k; !trie_da_separate_p(trie->da, s); p++) {
+	for (p = key; !trie_da_separate_p(trie->da, s); p++) {
 		if (da_walk(trie->da, &s, alpha_map_char_to_trie(*p)) < 0) {
 			char *key_str;
 			int res;
 
 			key_str = alpha_map_char_to_trie_str(p);
-			res = trie_branch_in_branch(trie, s, key_str, d);
+			res = trie_branch_in_branch(trie, s, key_str, data);
 			free(key_str);
 
 			return res;
@@ -388,7 +388,7 @@ trie_store_maybe(trie_t trie, const char *k, struct trie_data_s d, int overwrp)
 			int res;
 
 			tail_str = alpha_map_char_to_trie_str(sep);
-			res = trie_branch_in_tail(trie, s, tail_str, d);
+			res = trie_branch_in_tail(trie, s, tail_str, data);
 			free(tail_str);
 			return res;
 		}
@@ -401,7 +401,7 @@ trie_store_maybe(trie_t trie, const char *k, struct trie_data_s d, int overwrp)
 	if (!overwrp) {
 		return -1;
 	}
-	tail_set_data(trie->tail, t, d);
+	tail_set_data(trie->tail, t, data);
 	trie->dirtyp = 1;
 	return 0;
 }
@@ -409,7 +409,7 @@ trie_store_maybe(trie_t trie, const char *k, struct trie_data_s d, int overwrp)
 static int
 trie_branch_in_branch(
 	trie_t trie, trie_idx_t sep_node,
-	const char *suffix, struct trie_data_s data)
+	const char *suffix, trie_data_t data)
 {
 	trie_idx_t new_da, new_tail;
 
@@ -431,7 +431,7 @@ trie_branch_in_branch(
 static int
 trie_branch_in_tail(
 	trie_t trie, trie_idx_t sep_node,
-	const char *suffix, struct trie_data_s data)
+	const char *suffix, trie_data_t data)
 {
 	trie_idx_t old_tail, old_da, s;
 	const char *old_suffix, *p;
@@ -535,7 +535,7 @@ trie_da_enum_func(const char *key, trie_idx_t sep_node, void *user_data)
 	const char *suffix;
 	char *full_key, *p;
 	int ret;
-	struct trie_data_s data;
+	trie_data_t data;
 	size_t keyl, suffixl;
 
 	walk_data = user_data;
@@ -770,7 +770,7 @@ trie_state_single_p(const_trie_state_t s)
  * Get value from a leaf state of trie. Getting value from a non-leaf state
  * will result in TRIE_DATA_ERROR.
  */
-struct trie_data_s
+trie_data_t
 trie_state_get_data(const_trie_state_t s)
 {
 	return s->suffixp

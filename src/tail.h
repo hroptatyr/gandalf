@@ -58,9 +58,9 @@ DECLF int tail_set_suffix(tail_t t, trie_idx_t index, const char *suffix);
 
 DECLF trie_idx_t tail_add_suffix(tail_t t, const char *suffix);
 
-DECLF struct trie_data_s tail_get_data(const_tail_t t, trie_idx_t index);
+DECLF trie_data_t tail_get_data(const_tail_t t, trie_idx_t index);
 
-DECLF int tail_set_data(tail_t t, trie_idx_t index, struct trie_data_s data);
+DECLF int tail_set_data(tail_t t, trie_idx_t index, trie_data_t data);
 DECLF void tail_delete(tail_t t, trie_idx_t index);
 
 DECLF int

@@ -44,8 +44,12 @@
 
 #include <stdint.h>
 
-#include "slut-trie-glue-types.h"
 #include "trie.h"
+
+/* anonymous glue type, could be a trie */
+typedef void *__slut_t;
+/* anonymous glue type, could be just an array */
+typedef void *__ilut_t;
 
 /* assumes we have a void* alias __slut_t */
 static inline __slut_t
@@ -69,14 +73,14 @@ clone_slut_tg(__slut_t t)
 
 /* should be uint32_t put(__slut_t, const char*) */
 static inline void
-slut_tg_put(__slut_t t, const char *sym, struct trie_data_s data)
+slut_tg_put(__slut_t t, const char *sym, trie_data_t data)
 {
 	trie_store(t, sym, data);
 	return;
 }
 
 static inline int
-slut_tg_get(__slut_t t, const char *sym, trie_data_t data)
+slut_tg_get(__slut_t t, const char *sym, trie_data_t *data)
 {
 	return trie_retrieve(t, sym, data);
 }
