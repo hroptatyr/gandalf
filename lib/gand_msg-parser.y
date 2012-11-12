@@ -80,8 +80,7 @@ cmd_get_dat:
 cmd_get_dat_mand opt_lists;
 
 cmd_get_nfo:
-TOK_GET_NFO rolf_obj_list |
-TOK_GET_NFO rolf_obj_list select_list;
+cmd_get_nfo_mand opt_lists;
 
 opt_lists:
 |
@@ -101,6 +100,9 @@ TOK_GET_SER rolf_obj date_range_list;
 cmd_get_dat_mand:
 TOK_GET_DAT date_range |
 TOK_GET_DAT date_range rolf_obj_list;
+
+cmd_get_nfo_mand:
+TOK_GET_NFO rolf_obj_list;
 
 rolf_obj_list:
 rolf_obj |
