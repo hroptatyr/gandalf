@@ -1219,7 +1219,7 @@ main(int argc, char *argv[])
 	/* args */
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
-	bool daemonisep = false;
+	int daemonisep = 0;
 	uint16_t port;
 	cfg_t cfg;
 
