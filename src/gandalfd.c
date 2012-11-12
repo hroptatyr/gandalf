@@ -577,27 +577,21 @@ get_ser(char **buf, gand_msg_t msg)
 	return mb.bsz;
 }
 
-static const char*
-__bol(const char *ptr, size_t bsz)
+static void
+__get_nfo(
+	struct mmmb_s *mb, struct mmfb_s *mf,
+	gand_msg_t msg, struct slut_data_s rdata)
 {
-	const char *tmp;
-	const char *bop = ptr - bsz;
+	const char *cand = mf->m.buf + rdata.beg;
+	const char *cend = mf->m.buf + rdata.end;
 
-	if (UNLIKELY((tmp = memrchr(bop, '\n', bsz)) == NULL)) {
-		return bop;
+	GAND_INFO_LOG("get_nfo(%u)\n", rdata.rid);
+	if (msg->sel == SEL_ALL || msg->sel == SEL_NOTHING) {
+		bang_whole_line(mb, cand, cend - cand);
+	} else {
+		bang_nfo_line(mb, cand, cend - cand, msg->sel);
 	}
-	return tmp + 1;
-}
-
-static const char*
-__eol(const char *ptr, size_t bsz)
-{
-	const char *tmp = memchr(ptr, '\n', bsz);
-
-	if (UNLIKELY(tmp == NULL)) {
-		return tmp + bsz;
-	}
-	return tmp;
+	return;
 }
 
 static size_t
@@ -617,49 +611,24 @@ get_nfo(char **buf, gand_msg_t msg)
 	}
 
 	for (size_t i = 0; i < msg->nrolf_objs; i++) {
-		char rids[8];
-		struct rolf_obj_s *ro = msg->rolf_objs + i;
-		const char *p;
-		size_t q;
-		size_t rest;
+		struct slut_data_s rdata;
+		struct rolf_obj_s *robj = msg->rolf_objs + i;
 
-		if (LIKELY(ro->rolf_id > 0)) {
-			q = snprintf(rids, sizeof(rids), "%u", ro->rolf_id);
-			p = rids;
+		if (LIKELY(robj->rolf_id > 0)) {
+			/* bugger, how to get rdata from rid? */
+			rdata = slut_data_initialiser();
+		} else if (UNLIKELY(robj->rolf_sym == NULL)) {
+			continue;
+		} else if (UNLIKELY(msg->igncase == 1)) {
+			GAND_DEBUG("can't do igncase yet\n");
+			continue;
 		} else {
-			p = ro->rolf_sym;
-			q = strlen(ro->rolf_sym);
+			const char *sym = robj->rolf_sym;
+			rdata = slut_get(i2s_s, sym);
 		}
-
-		for (const char *cand = (rest = mf.m.bsz, mf.m.buf), *cend;
-		     (cand = memmem(cand, rest, p, q)) != NULL;
-		     cand++, rest = mf.m.bsz - (cand - mf.m.buf)) {
-			char *tmp1, *tmp2;
-			if (ro->rolf_id > 0) {
-				/* rolf ids are only at the
-				 * beginning of a line */
-				if (!((cand == mf.m.buf || cand[-1] == '\n') &&
-				      (cand[q] == '\t'))) {
-					continue;
-				}
-			} else if (!(cand[-1] == '\t' &&
-				     (tmp1 = rawmemchr(cand, '@'),
-				      tmp2 = rawmemchr(cand, '\t'),
-				      tmp1 < tmp2))) {
-				continue;
-			}
-
-			/* search for bol/eol */
-			cand = __bol(cand, cand - mf.m.buf);
-			cend = __eol(cand, mf.m.bsz - (cand - mf.m.buf));
-
-			/* bang the line */
-			if (msg->sel == SEL_ALL || msg->sel == SEL_NOTHING) {
-				bang_whole_line(&mb, cand, cend - cand);
-			} else {
-				bang_nfo_line(&mb, cand, cend - cand, msg->sel);
-			}
-			cand = cend;
+		GAND_DEBUG("rolf_obj %zu id %u\n", i, rdata.rid);
+		if (LIKELY(rdata.rid != 0)) {
+			__get_nfo(&mb, &mf, msg, rdata);
 		}
 	}
 
