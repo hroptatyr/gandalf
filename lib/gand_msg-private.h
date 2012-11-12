@@ -9,6 +9,9 @@
 # define UNUSED(_x)	_x __attribute__((unused))
 #endif	/* !UNUSED */
 
+/* scanner<->parser glue */
+extern int __parse(gand_msg_t msg, const char *s, size_t l);
+
 static inline void
 resize_mall(void **ptr, size_t cnt, size_t blksz, size_t inc)
 {

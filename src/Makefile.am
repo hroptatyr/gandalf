@@ -7,6 +7,7 @@ bin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
 BUILT_SOURCES =
+EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
 
 if BUILD_SERVER
@@ -41,7 +42,7 @@ gandalfd_CPPFLAGS += -DSTATIC_TRIE_GUTS
 EXTRA_gandalfd_SOURCES += darray.c darray.h
 EXTRA_gandalfd_SOURCES += tail.c tail.h
 gandalfd_SOURCES += slut.c slut.h
-gandalfd_SOURCES += slut-trie-glue.h slut-trie-glue-types.h
+gandalfd_SOURCES += slut-trie-glue.h
 gandalfd_SOURCES += fileutils.h
 gandalfd_SOURCES += gandalfd.c
 EXTRA_gandalfd_SOURCES += gq.c gq.h
@@ -49,8 +50,8 @@ gandalfd_CPPFLAGS += $(libev_CFLAGS)
 gandalfd_LDFLAGS += $(libev_LIBS)
 if HAVE_LUA
 gandalfd_SOURCES += lua-config.c lua-config.h
-gandalfd_CPPFLAGS += -DUSE_LUA $(LUA_CFLAGS)
-gandalfd_LDFLAGS += $(LUA_LIBS)
+gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
+gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
 gandalfd_LDADD += $(top_builddir)/lib/.libs/libgandalf.a

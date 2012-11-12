@@ -5,12 +5,15 @@ compiler:
   - clang
 
 before_script:
+  - sudo apt-get update -qq
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq help2man
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
-  - sudo apt-get install -qq lua
-  - sudo apt-get install -qq libev
+  - sudo apt-get install -qq lua5.1 liblua5.1-0-dev
+  - sudo apt-get install -qq libev-dev
+  - sudo apt-get install -qq bison
+  - sudo apt-get install -qq flex
   - autoreconf -vfi
 
 script: ./configure && make clean all check distcheck || (cat test/test-suite.log && /bin/false)
