@@ -233,6 +233,29 @@ out:
 	return strndup(res, rsz);
 }
 
+static uint16_t
+gand_get_port(cfg_t ctx)
+{
+	cfgset_t *cs;
+	int res;
+
+	/* start out with an empty target */
+	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
+		if ((res = cfg_tbl_lookup_i(ctx, cs[i], "port"))) {
+			goto out;
+		}
+	}
+
+	/* otherwise try the root domain */
+	res = cfg_glob_lookup_i(ctx, "port");
+
+out:
+	if (res > 0 && res < 65536) {
+		return (uint16_t)res;
+	}
+	return 0U;
+}
+
 static size_t
 mmmb_freeze(struct mmmb_s *mb)
 {
@@ -1182,6 +1205,7 @@ main(int argc, char *argv[])
 	struct gengetopt_args_info argi[1];
 	/* our take on args */
 	bool daemonisep = false;
+	uint16_t port;
 	cfg_t cfg;
 
 	/* whither to log */
@@ -1225,6 +1249,7 @@ main(int argc, char *argv[])
 	/* get the trolf dir */
 	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
 	nfo_fname = gand_get_nfo_file(cfg);
+	port = gand_get_port(cfg);
 
 	/* free cmdline parser goodness */
 	cmdline_parser_free(argi);
@@ -1257,7 +1282,7 @@ main(int argc, char *argv[])
 			.sa6 = {
 				.sin6_family = AF_INET6,
 				.sin6_addr = in6addr_any,
-				.sin6_port = 0,
+				.sin6_port = htons(port),
 			},
 		};
 		socklen_t sa_len = sizeof(sa);
