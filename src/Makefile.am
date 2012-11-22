@@ -40,7 +40,7 @@ gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
 gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
-gandalfd_LDADD += $(top_builddir)/lib/.libs/libgandalf.a
+gandalfd_LDADD += $(top_builddir)/lib/libgandalf.la
 BUILT_SOURCES += gandalfd-clo.c gandalfd-clo.h
 endif ## BUILD_SERVER
 
