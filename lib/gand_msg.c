@@ -35,4 +35,25 @@ gand_parse_blob_r(gand_ctx_t *ctx, const char *buf, size_t bsz)
 	return res;
 }
 
+gand_msg_t
+gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz)
+{
+	gand_msg_t res = NULL;
+
+	/* for the side effect */
+	*ctx = NULL;
+
+	if (UNLIKELY(bsz == 0)) {
+		return NULL;
+	}
+
+	res = calloc(1, sizeof(*res));
+	if (__parse(res, buf, bsz) < 0) {
+		free(res);
+		return NULL;
+	}
+	/* all clear */
+	return res;
+}
+
 /* gand_msg.c ends here */
