@@ -760,35 +760,81 @@ interpret_msg(char **buf, gand_msg_t msg)
 }
 
 
-/**
- * Take the stuff in MSG of size MSGLEN coming from FD and process it.
- * Return values <0 cause the handler caller to close down the socket. */
 static ssize_t
-handle_data(char **res, char *msg, size_t msglen)
+handle_http(char **res, const char *msg, size_t msglen)
 {
-	static gand_ctx_t p = NULL;
+	static const char r404[] = "\
+HTTP/1.1 404 Not Found\n\
+Server: " PACKAGE_STRING "\n\
+Date: bbb, dd aaa YYYY HH:MM:SS ZZZ\n\
+Content-Type: text/plain; charset=utf-8\n\
+Connection: keep-alive\n\
+Status: 404 Not Found\n\
+Cache-Control: no-cache\n\
+Content-Length: 0\n\
+";
+	static const size_t z404 = sizeof(r404) - 1;
+
+	*res = mmap(NULL, z404, PROT_MEM, MAP_MEM, -1, 0);
+	memcpy(*res, r404, z404);
+	return z404;
+}
+
+static ssize_t
+handle_gand(char **res, char *msg, size_t msglen)
+{
+	static gand_ctx_t c = NULL;
 	gand_msg_t umsg;
 
-	GAND_INFO_LOG("%s", msg);
-
 	/* just to avoid confusion */
-	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
+	if ((umsg = gand_parse_blob_r(&c, msg, msglen)) != NULL) {
 		/* definite success */
 		size_t len;
 
 		/* serialise, put results in BUF*/
 		if ((len = interpret_msg(res, umsg)) && *res != NULL) {
-			p = NULL;
+			c = NULL;
 			return len;
 		}
 
-	} else if (/* umsg == NULL && */p == NULL) {
+	} else if (/* umsg == NULL && */c == NULL) {
 		/* error occurred */
 		GAND_ERR_LOG("context has disappeared, cleaning up\n");
 		return -1;
 	}
 	GAND_INFO_LOG("need more grub\n");
 	return 0;
+}
+
+/**
+ * Take the stuff in MSG of size MSGLEN coming from FD and process it.
+ * Return values <0 cause the handler caller to close down the socket. */
+static ssize_t
+handle_data(char **res, char *msg, size_t msglen)
+{
+	const char *p;
+
+	if (UNLIKELY(msglen == 0)) {
+		/* end of message */
+		return -1;
+
+	} else if ((p = memmem(msg, msglen, "GET ", 4)) != NULL) {
+		/* http request */
+		char *eol;
+
+		if ((eol = strchr(p, '\n')) == NULL) {
+			/* buggered */
+			return -1;
+		}
+
+		*eol = '\0';
+		GAND_INFO_LOG("request: %s\n", p);
+		return handle_http(res, p + 4, eol - p - 4);
+
+	} else {
+		GAND_INFO_LOG("%s", msg);
+		return handle_gand(res, msg, msglen);
+	}
 }
 
 static int
