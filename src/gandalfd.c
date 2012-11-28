@@ -1385,7 +1385,7 @@ main(int argc, char *argv[])
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	GAND_NOTI_LOG("shutting down unserdingd\n");
+	GAND_NOTI_LOG("shutting down gandalfd\n");
 
 	/* munmap the info file (if mapped) */
 	munmap_nfo(/*force*/1);
