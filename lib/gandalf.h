@@ -72,6 +72,12 @@ struct gand_msg_hdr_s {
 	unsigned int flags;
 };
 
+#define GAND_MSG_FLAG_FMT_TEXT	(0)
+#define GAND_MSG_FLAG_FMT_JSON	(1)
+#define GAND_MSG_FLAG_FMT_XML	(2)
+#define GAND_MSG_FLAG_KEEP_CONN	(4)
+#define GAND_MSG_FLAG_WRAP_HTTP	(8)
+
 struct rolf_obj_s {
 	uint32_t rolf_id;
 	char *rolf_sym;

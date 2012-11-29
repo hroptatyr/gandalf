@@ -88,6 +88,18 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		return -1;
 	}
 
+	/* http in means http out */
+	msg->hdr.flags |= GAND_MSG_FLAG_WRAP_HTTP;
+	/* little more checking for the connection stuff */
+	{
+		static const char conn[] = "\nConnection: keep-alive\r\n";
+		static const size_t zonn = sizeof(conn) - 1;
+
+		if (memmem(eol, rsz - (eol - req), conn, zonn) != NULL) {
+			msg->hdr.flags |= GAND_MSG_FLAG_KEEP_CONN;
+		}
+	}
+
 	/* consider the range [req + 4, eol) and look for services */
 	if ((svc = memmem(req, eol - req, svc_ser, svz_ser)) != NULL) {
 		gand_set_msg_type(msg, GAND_MSG_GET_SER);
@@ -97,7 +109,7 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		arg = svc + svz_nfo;
 	} else {
 		/* don't worry about it */
-		return -1;
+		return 0;
 	}
 
 	/* we want ?sym=XYZ or ?rid=NNN */
