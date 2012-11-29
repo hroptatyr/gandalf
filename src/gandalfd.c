@@ -1376,6 +1376,7 @@ main(int argc, char *argv[])
 		ev_stat_start(EV_A_ st_i2s);
 
 		/* and just to make sure we kick things off */
+		GAND_INFO_LOG("building symtable, stand by please ...\n");
 		make_slut(i2s_s);
 		handle_inot(nfo_fname);
 	}
