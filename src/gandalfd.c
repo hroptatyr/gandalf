@@ -944,6 +944,7 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	char *rsp;
 	ssize_t nrsp;
 	gand_msg_t msg;
+	int keep_conn;
 
 	if (UNLIKELY((nreq = read(w->fd, buf, sizeof(buf))) <= 4)) {
 		goto clo;
@@ -969,9 +970,14 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		/* and clean up */
 		munmap(rsp, nrsp);
 	}
+	/* shouldn't this be a getter? */
+	keep_conn = msg->hdr.flags & GAND_MSG_FLAG_KEEP_CONN;
 	/* more clean up */
 	gand_free_msg(msg);
 
+	if (keep_conn) {
+		return;
+	}
 clo:
 	ev_qio_shut(EV_A_ w);
 	return;
