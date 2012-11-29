@@ -754,42 +754,30 @@ interpret_msg(char **buf, gand_msg_t msg)
 		GAND_ERR_LOG("unknown message %u\n", msg->hdr.mt);
 		break;
 	}
-	/* free 'im 'ere */
-	gand_free_msg(msg);
 	return len;
 }
 
-
-/**
- * Take the stuff in MSG of size MSGLEN coming from FD and process it.
- * Return values <0 cause the handler caller to close down the socket. */
+#if 0
 static ssize_t
-handle_data(char **res, char *msg, size_t msglen)
+handle_http(char **res, const char *msg, size_t msglen)
 {
-	static gand_ctx_t p = NULL;
-	gand_msg_t umsg;
+	static const char r404[] = "\
+HTTP/1.1 404 Not Found\n\
+Server: " PACKAGE_STRING "\n\
+Date: bbb, dd aaa YYYY HH:MM:SS ZZZ\n\
+Content-Type: text/plain; charset=utf-8\n\
+Connection: keep-alive\n\
+Status: 404 Not Found\n\
+Cache-Control: no-cache\n\
+Content-Length: 0\n\
+";
+	static const size_t z404 = sizeof(r404) - 1;
 
-	GAND_INFO_LOG("%s", msg);
-
-	/* just to avoid confusion */
-	if ((umsg = gand_parse_blob_r(&p, msg, msglen)) != NULL) {
-		/* definite success */
-		size_t len;
-
-		/* serialise, put results in BUF*/
-		if ((len = interpret_msg(res, umsg)) && *res != NULL) {
-			p = NULL;
-			return len;
-		}
-
-	} else if (/* umsg == NULL && */p == NULL) {
-		/* error occurred */
-		GAND_ERR_LOG("context has disappeared, cleaning up\n");
-		return -1;
-	}
-	GAND_INFO_LOG("need more grub\n");
-	return 0;
+	*res = mmap(NULL, z404, PROT_MEM, MAP_MEM, -1, 0);
+	memcpy(*res, r404, z404);
+	return z404;
 }
+#endif	/* 0 */
 
 static int
 handle_inot(const char *f)
@@ -951,47 +939,38 @@ clo:
 static void
 dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
-	/* the final \n will be subst'd later on */
-#define HDR		"\
-HTTP/1.1 200 OK\r\n\
-Server: um-quosnp\r\n\
-Content-Length: "
-#define CLEN_SPEC	"% 5zu"
-#define BUF_INIT	HDR CLEN_SPEC "\r\n\r\n"
-	/* hdr is a format string and hdr_len is as wide as the result printed
-	 * later on */
-	static char buf[65536] = BUF_INIT;
-	char *req = buf + sizeof(BUF_INIT) - 1;
-	const size_t req_len = sizeof(buf) - (sizeof(BUF_INIT) - 1);
+	static char buf[4096];
 	ssize_t nreq;
 	char *rsp;
 	ssize_t nrsp;
+	gand_msg_t msg;
 
-	if ((nreq = read(w->fd, req, req_len)) < 0) {
+	if (UNLIKELY((nreq = read(w->fd, buf, sizeof(buf))) <= 4)) {
 		goto clo;
-	} else if ((size_t)nreq < req_len) {
-		req[nreq] = '\0';
+	} else if (LIKELY((size_t)nreq < sizeof(buf))) {
+		buf[nreq] = '\0';
 	} else {
 		/* uh oh, mega request, wtf? */
 		buf[sizeof(buf) - 1] = '\0';
 	}
 
-	/* handle data */
-	switch ((nrsp = handle_data(&rsp, req, nreq))) {
-	case -1:
-		/* something went wrong */
+	if (UNLIKELY((msg = gand_parse_blob(NULL, buf, nreq)) == NULL)) {
+		/* bugger right off */
 		goto clo;
-	case 0:
-		/* need more data or no response */
-		return;
-	default:
-		break;
 	}
 
-	/* send off the result */
-	send(w->fd, rsp, nrsp, 0);
-	/* and clean up */
-	munmap(rsp, nrsp);
+	/* just do what they want, care about the format later */
+	if ((nrsp = interpret_msg(&rsp, msg)) > 0) {
+		/* bring the response into shape */
+		;
+
+		/* send off the result */
+		send(w->fd, rsp, nrsp, 0);
+		/* and clean up */
+		munmap(rsp, nrsp);
+	}
+	/* more clean up */
+	gand_free_msg(msg);
 
 clo:
 	ev_qio_shut(EV_A_ w);
@@ -1330,6 +1309,7 @@ main(int argc, char *argv[])
 		ev_stat_start(EV_A_ st_i2s);
 
 		/* and just to make sure we kick things off */
+		GAND_INFO_LOG("building symtable, stand by please ...\n");
 		make_slut(i2s_s);
 		handle_inot(nfo_fname);
 	}
@@ -1339,7 +1319,7 @@ main(int argc, char *argv[])
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	GAND_NOTI_LOG("shutting down unserdingd\n");
+	GAND_NOTI_LOG("shutting down gandalfd\n");
 
 	/* munmap the info file (if mapped) */
 	munmap_nfo(/*force*/1);
