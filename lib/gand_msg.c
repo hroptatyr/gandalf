@@ -164,6 +164,26 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		}
 #undef R
 	}
+
+	/* find &ignore-case or &igncase */
+	{
+		static const char arg_ign[] = "ignore-case";
+		static const char arg_igns[] = "igncase";
+		static const size_t arz_ign = sizeof(arg_ign) - 1U;
+		static const size_t arz_igns = sizeof(arg_igns) - 1U;
+		const char *p;
+
+#define R(p)	(eol - (p))
+		if (((p = memmem(arg, R(arg), arg_ign, arz_ign)) != NULL &&
+		     (p[arz_ign] == '&' || p[arz_ign] == ' ')) ||
+		    ((p = memmem(arg, R(arg), arg_igns, arz_igns)) != NULL &&
+		     (p[arz_igns] == '&' || p[arz_igns] == ' '))) {
+			if (p > req && (p[-1] == '?' || p[-1] == '&')) {
+				msg->igncase = 1;
+			}
+		}
+#undef R
+	}
 	return 0;
 }
 
