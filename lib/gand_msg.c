@@ -11,6 +11,24 @@ static size_t msg_pidx = 0;
 
 
 /* http parser */
+#include "gand_msg-select.c"
+
+static void
+__parse_select(gand_msg_t msg, const char *sel, const size_t ssz)
+{
+	for (const char *p = sel, *q; p < sel + ssz; p = q + 1) {
+		const struct __select_s *tmp;
+
+		if (UNLIKELY((q = memchr(p, ',', ssz - (p - sel))) == NULL)) {
+			q = sel + ssz;
+		}
+		if (LIKELY((tmp = __snarf_select(p, q - p)) != NULL)) {
+			msg->sel |= tmp->val;
+		}
+	}
+	return;
+}
+
 static int
 __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 {
@@ -74,6 +92,23 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 			resize_rolf_objs(msg);
 			msg->rolf_objs[msg->nrolf_objs++].rolf_id =
 				strtoul(p + arz_rid, NULL, 10);
+		}
+#undef R
+	}
+
+	/* parse &select=... */
+	{
+		static const char arg_sel[] = "select=";
+		static const size_t arz_sel = sizeof(arg_sel) - 1U;
+		const char *p = arg;
+		const char *eoa;
+
+#define R(p)	(eol - (p))
+		/* look for sym='s */
+		if ((p = memmem(p, R(p), arg_sel, arz_sel)) != NULL &&
+		    ((eoa = memchr(p, '&', R(p))) != NULL ||
+		     (eoa = memchr(p, ' ', R(p))) != NULL)) {
+			__parse_select(msg, p += arz_sel, eoa - p);
 		}
 #undef R
 	}
