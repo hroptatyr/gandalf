@@ -29,6 +29,41 @@ __parse_select(gand_msg_t msg, const char *sel, const size_t ssz)
 	return;
 }
 
+static void
+__parse_filter_vf(gand_msg_t msg, const char *flt, const size_t fsz)
+{
+	struct valflav_s *vf;
+
+	for (const char *p = flt, *q; p < flt + fsz; p = q + 1) {
+		if (UNLIKELY((q = memchr(p, '/', fsz - (p - flt))) == NULL)) {
+			q = flt + fsz;
+		}
+		if (p == flt) {
+			/* first item in the list */
+			resize_valflavs(msg);
+			vf = msg->valflavs + msg->nvalflavs++;
+			vf->this = strndup(p, q - p);
+		} else {
+			/* ... alternatives, vf should still be valid */
+			resize_alts(vf);
+			vf->alts[vf->nalts++] = strndup(p, q - p);
+		}
+	}
+}
+
+static void
+__parse_filter(gand_msg_t msg, const char *flt, const size_t fsz)
+{
+	for (const char *p = flt, *q; p < flt + fsz; p = q + 1) {
+		if (UNLIKELY((q = memchr(p, ',', fsz - (p - flt))) == NULL)) {
+			q = flt + fsz;
+		}
+		/* bang a new valflav, and indirect to parsing alternatives */
+		__parse_filter_vf(msg, p, q - p);
+	}
+	return;
+}
+
 static int
 __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 {
@@ -109,6 +144,23 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		    ((eoa = memchr(p, '&', R(p))) != NULL ||
 		     (eoa = memchr(p, ' ', R(p))) != NULL)) {
 			__parse_select(msg, p += arz_sel, eoa - p);
+		}
+#undef R
+	}
+
+	/* parse &filter=... */
+	{
+		static const char arg_flt[] = "filter=";
+		static const size_t arz_flt = sizeof(arg_flt) - 1U;
+		const char *p = arg;
+		const char *eoa;
+
+#define R(p)	(eol - (p))
+		/* look for sym='s */
+		if ((p = memmem(p, R(p), arg_flt, arz_flt)) != NULL &&
+		    ((eoa = memchr(p, '&', R(p))) != NULL ||
+		     (eoa = memchr(p, ' ', R(p))) != NULL)) {
+			__parse_filter(msg, p += arz_flt, eoa - p);
 		}
 #undef R
 	}
