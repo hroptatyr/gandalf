@@ -147,11 +147,6 @@ extern gand_msg_t
 gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz);
 
 /**
- * Like `gand_parse_blob()' but re-entrant (and thus slower). */
-extern gand_msg_t
-gand_parse_blob_r(gand_ctx_t *ctx, const char *buf, size_t bsz);
-
-/**
  * Set the message type of MSG to MT. */
 static inline void
 gand_set_msg_type(gand_msg_t msg, gand_msg_type_t mt)
