@@ -76,7 +76,9 @@ gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz)
 	const char *p;
 
 	/* for the side effect */
-	*ctx = NULL;
+	if (ctx != NULL) {
+		*ctx = NULL;
+	}
 
 	if (UNLIKELY(bsz <= 4)) {
 		return NULL;
