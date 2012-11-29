@@ -15,6 +15,7 @@
 #include "gand_msg-private.h"
 
 /* for the select snarfer */
+#define __snarf_select		snarf_select
 #include "gand_msg-select.c"
 
 extern int yylex(void*, void *scanner);
@@ -202,7 +203,7 @@ TOK_SYM {
 	const struct __select_s *sel;
 	const char *v = $<sval>1;
 
-	if ((sel = __snarf_select(v, strlen(v))) != NULL) {
+	if ((sel = snarf_select(v, strlen(v))) != NULL) {
 		msg->sel |= sel->val;
 	}
 };
