@@ -30,10 +30,16 @@ libgandalf_la_SOURCES =
 libgandalf_la_SOURCES += gand_msg.c
 libgandalf_la_SOURCES += gand_msg-scanner.l
 libgandalf_la_SOURCES += gand_msg-parser.y
+libgandalf_la_SOURCES += gand_msg-select.gperf
 BUILT_SOURCES += gand_msg-parser.c gand_msg-parser.h
 BUILT_SOURCES += gand_msg-scanner.c
+BUILT_SOURCES += gand_msg-select.c
 
 ## Help the developers get nice post-processed source files
+
+## gperf rule
+%.c: %.gperf
+	$(AM_V_GEN) $(GPERF) $< --output-file $@
 
 ## Create preprocessor output (debugging purposes only)
 %.i: %.c

@@ -38,9 +38,6 @@
 %{
 #define YY_EXTRA_TYPE	void*
 #define YY_FATAL_ERROR(msg)
-
-extern int yyget_column(yyscan_t);
-extern void yyset_column(int, yyscan_t);
 %}
 
 %option reentrant

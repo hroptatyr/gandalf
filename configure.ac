@@ -47,6 +47,9 @@ LT_INIT
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
 
+AC_PATH_PROG([GPERF], [gperf])
+AC_ARG_VAR([GPERF], [full path to the gperf tool])
+
 ## event loop
 SXE_CHECK_LIBEV
 AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
