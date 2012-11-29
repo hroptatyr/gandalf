@@ -754,12 +754,10 @@ interpret_msg(char **buf, gand_msg_t msg)
 		GAND_ERR_LOG("unknown message %u\n", msg->hdr.mt);
 		break;
 	}
-	/* free 'im 'ere */
-	gand_free_msg(msg);
 	return len;
 }
 
-
+#if 0
 static ssize_t
 handle_http(char **res, const char *msg, size_t msglen)
 {
@@ -779,63 +777,7 @@ Content-Length: 0\n\
 	memcpy(*res, r404, z404);
 	return z404;
 }
-
-static ssize_t
-handle_gand(char **res, char *msg, size_t msglen)
-{
-	static gand_ctx_t c = NULL;
-	gand_msg_t umsg;
-
-	/* just to avoid confusion */
-	if ((umsg = gand_parse_blob_r(&c, msg, msglen)) != NULL) {
-		/* definite success */
-		size_t len;
-
-		/* serialise, put results in BUF*/
-		if ((len = interpret_msg(res, umsg)) && *res != NULL) {
-			c = NULL;
-			return len;
-		}
-
-	} else if (/* umsg == NULL && */c == NULL) {
-		/* error occurred */
-		GAND_ERR_LOG("context has disappeared, cleaning up\n");
-		return -1;
-	}
-	GAND_INFO_LOG("need more grub\n");
-	return 0;
-}
-
-/**
- * Take the stuff in MSG of size MSGLEN coming from FD and process it.
- * Return values <0 cause the handler caller to close down the socket. */
-static ssize_t
-handle_data(char **res, char *msg, size_t msglen)
-{
-	const char *p;
-
-	if (UNLIKELY(msglen == 0)) {
-		/* end of message */
-		return -1;
-
-	} else if ((p = memmem(msg, msglen, "GET ", 4)) != NULL) {
-		/* http request */
-		char *eol;
-
-		if ((eol = strchr(p, '\n')) == NULL) {
-			/* buggered */
-			return -1;
-		}
-
-		*eol = '\0';
-		GAND_INFO_LOG("request: %s\n", p);
-		return handle_http(res, p + 4, eol - p - 4);
-
-	} else {
-		GAND_INFO_LOG("%s", msg);
-		return handle_gand(res, msg, msglen);
-	}
-}
+#endif	/* 0 */
 
 static int
 handle_inot(const char *f)
@@ -997,47 +939,38 @@ clo:
 static void
 dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
-	/* the final \n will be subst'd later on */
-#define HDR		"\
-HTTP/1.1 200 OK\r\n\
-Server: um-quosnp\r\n\
-Content-Length: "
-#define CLEN_SPEC	"% 5zu"
-#define BUF_INIT	HDR CLEN_SPEC "\r\n\r\n"
-	/* hdr is a format string and hdr_len is as wide as the result printed
-	 * later on */
-	static char buf[65536] = BUF_INIT;
-	char *req = buf + sizeof(BUF_INIT) - 1;
-	const size_t req_len = sizeof(buf) - (sizeof(BUF_INIT) - 1);
+	static char buf[4096];
 	ssize_t nreq;
 	char *rsp;
 	ssize_t nrsp;
+	gand_msg_t msg;
 
-	if ((nreq = read(w->fd, req, req_len)) < 0) {
+	if (UNLIKELY((nreq = read(w->fd, buf, sizeof(buf))) <= 4)) {
 		goto clo;
-	} else if ((size_t)nreq < req_len) {
-		req[nreq] = '\0';
+	} else if (LIKELY((size_t)nreq < sizeof(buf))) {
+		buf[nreq] = '\0';
 	} else {
 		/* uh oh, mega request, wtf? */
 		buf[sizeof(buf) - 1] = '\0';
 	}
 
-	/* handle data */
-	switch ((nrsp = handle_data(&rsp, req, nreq))) {
-	case -1:
-		/* something went wrong */
+	if (UNLIKELY((msg = gand_parse_blob(NULL, buf, nreq)) == NULL)) {
+		/* bugger right off */
 		goto clo;
-	case 0:
-		/* need more data or no response */
-		return;
-	default:
-		break;
 	}
 
-	/* send off the result */
-	send(w->fd, rsp, nrsp, 0);
-	/* and clean up */
-	munmap(rsp, nrsp);
+	/* just do what they want, care about the format later */
+	if ((nrsp = interpret_msg(&rsp, msg)) > 0) {
+		/* bring the response into shape */
+		;
+
+		/* send off the result */
+		send(w->fd, rsp, nrsp, 0);
+		/* and clean up */
+		munmap(rsp, nrsp);
+	}
+	/* more clean up */
+	gand_free_msg(msg);
 
 clo:
 	ev_qio_shut(EV_A_ w);
