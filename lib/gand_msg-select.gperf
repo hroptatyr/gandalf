@@ -10,6 +10,7 @@
 %define slot-name sel
 %define hash-function-name ____snarf_select
 %define lookup-function-name __snarf_select
+%compare-strncmp
 %null-strings
 
 struct __select_s {
