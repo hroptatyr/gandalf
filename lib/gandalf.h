@@ -69,6 +69,7 @@ typedef enum {
 struct gand_msg_hdr_s {
 	/* this is generally msg_type * 2 */
 	unsigned int mt;
+	unsigned int flags;
 };
 
 struct rolf_obj_s {
