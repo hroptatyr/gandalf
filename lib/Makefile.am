@@ -35,6 +35,10 @@ BUILT_SOURCES += gand_msg-scanner.c
 
 ## Help the developers get nice post-processed source files
 
+## gperf rule
+%.c: %.gperf
+	$(AM_V_GEN) $(GPERF) $< --output-file $@
+
 ## Create preprocessor output (debugging purposes only)
 %.i: %.c
 	$(COMPILE) -E -o $@ $<
