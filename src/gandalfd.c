@@ -757,27 +757,49 @@ interpret_msg(char **buf, gand_msg_t msg)
 	return len;
 }
 
-#if 0
 static ssize_t
-handle_http(char **res, const char *msg, size_t msglen)
+send_http_wrap(int fd, const char *UNUSED(rsp), size_t rsz, int flags)
 {
-	static const char r404[] = "\
-HTTP/1.1 404 Not Found\n\
+	static char buf[] = "\
+HTTP/1.1 xxx DESCRIPTION\r\n\
+Date: bbb, dd aaa YYYY HH:MM:SS ZZZ\r\n\
 Server: " PACKAGE_STRING "\n\
-Date: bbb, dd aaa YYYY HH:MM:SS ZZZ\n\
-Content-Type: text/plain; charset=utf-8\n\
-Connection: keep-alive\n\
-Status: 404 Not Found\n\
-Cache-Control: no-cache\n\
-Content-Length: 0\n\
-";
-	static const size_t z404 = sizeof(r404) - 1;
+Connection: keep-alive\r\n\
+Cache-Control: no-cache\r\n\
+Content-Type: text/plain; charset=utf-8\r\n\
+Content-Length: 01234567\r\n\
+\r\n";
+	static const char r404[] = "404 Not Found  ";
+	static const char r200[] = "200 OK         ";
+	static const size_t bsz = sizeof(buf) - 1;
+	/* offsets to stuff we overwrite */
+	static const size_t status_off = sizeof("HTTP/1.1");
+	static const size_t date_off = 32U;
+	static const size_t clen_off = sizeof(buf) - 13U;
 
-	*res = mmap(NULL, z404, PROT_MEM, MAP_MEM, -1, 0);
-	memcpy(*res, r404, z404);
-	return z404;
+	if (LIKELY(rsz > 0)) {
+		memcpy(buf + status_off, r200, sizeof(r200) - 1);
+	} else {
+		/* send 404 as is */
+		memcpy(buf + status_off, r404, sizeof(r404) - 1);
+	}
+	/* everything else is the same in both cases (200 and 404) */
+	{
+		struct tm *tm;
+		time_t now;
+
+		time(&now);
+		tm = gmtime(&now);
+		strftime(buf + date_off, 30U, "%b, %d %a %Y %H:%M:%S UTC", tm);
+		buf[date_off + 29] = '\r';
+	}
+	{
+		snprintf(buf + clen_off, 9, "%8zu", rsz);
+		buf[clen_off + 8] = '\r';
+	}
+	/* we will always send buf */
+	return send(fd, buf, bsz, flags);
 }
-#endif	/* 0 */
 
 static int
 handle_inot(const char *f)
@@ -963,7 +985,9 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	/* just do what they want, care about the format later */
 	if ((nrsp = interpret_msg(&rsp, msg)) > 0) {
 		/* bring the response into shape */
-		;
+		if (msg->hdr.flags & GAND_MSG_FLAG_WRAP_HTTP/*<-getter!!*/) {
+			send_http_wrap(w->fd, rsp, nrsp, 0);
+		}
 
 		/* send off the result */
 		send(w->fd, rsp, nrsp, 0);
