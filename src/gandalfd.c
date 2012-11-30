@@ -983,12 +983,12 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	}
 
 	/* just do what they want, care about the format later */
-	if ((nrsp = interpret_msg(&rsp, msg)) > 0) {
-		/* bring the response into shape */
-		if (msg->hdr.flags & GAND_MSG_FLAG_WRAP_HTTP/*<-getter!!*/) {
-			send_http_wrap(w->fd, rsp, nrsp, 0);
-		}
-
+	nrsp = interpret_msg(&rsp, msg);
+	/* bring the response into shape */
+	if (msg->hdr.flags & GAND_MSG_FLAG_WRAP_HTTP/*<-getter!!*/) {
+		send_http_wrap(w->fd, rsp, nrsp, 0);
+	}
+	if (LIKELY(nrsp > 0)) {
 		/* send off the result */
 		send(w->fd, rsp, nrsp, 0);
 		/* and clean up */
