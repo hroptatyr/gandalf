@@ -94,6 +94,7 @@ void *gand_logout;
 
 /* sockaddr union */
 typedef union ud_sockaddr_u *ud_sockaddr_t;
+typedef const union ud_sockaddr_u *ud_const_sockaddr_t;
 
 union ud_sockaddr_u {
 	struct sockaddr_storage sas;
@@ -886,6 +887,33 @@ make_brag_uri(ud_sockaddr_t sa, socklen_t UNUSED(sa_len))
 	return 0;
 }
 
+static inline short unsigned int
+ud_sockaddr_fam(ud_const_sockaddr_t sa)
+{
+	return sa->sa.sa_family;
+}
+
+static inline short unsigned int
+ud_sockaddr_port(ud_const_sockaddr_t sa)
+{
+	return ntohs(sa->sa6.sin6_port);
+}
+
+static inline const void*
+ud_sockaddr_addr(ud_const_sockaddr_t sa)
+{
+	return &sa->sa6.sin6_addr;
+}
+
+static inline void
+ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
+{
+	short unsigned int fam = ud_sockaddr_fam(sa);
+	const void *saa = ud_sockaddr_addr(sa);
+	(void)inet_ntop(fam, saa, buf, len);
+	return;
+}
+
 
 /* the actual beef, number of requests we can monitor */
 #include "gq.c"
@@ -1008,6 +1036,19 @@ clo:
 }
 
 static void
+log_conn(int fd, ud_const_sockaddr_t sa)
+{
+	static char abuf[INET6_ADDRSTRLEN];
+	short unsigned int p;
+
+	ud_sockaddr_ntop(abuf, sizeof(abuf), sa);
+	p = ud_sockaddr_port(sa);
+	GAND_INFO_LOG(":sock %d connect :from [%s]:%d\n", fd, abuf, p);
+	return;
+}
+
+
+static void
 dccp_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 	union ud_sockaddr_u sa;
@@ -1015,11 +1056,10 @@ dccp_cb(EV_P_ ev_io *w, int UNUSED(re))
 	ev_io_i_t qio;
 	int s;
 
-	GAND_DEBUG("interesting activity on %d\n", w->fd);
-
 	if ((s = accept(w->fd, &sa.sa, &sasz)) < 0) {
 		return;
 	}
+	log_conn(s, &sa);
 
 	qio = make_io();
 	ev_io_init(qio->w, dccp_data_cb, s, EV_READ);
