@@ -155,7 +155,8 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		if ((p = memmem(p, R(p), arg_sel, arz_sel)) != NULL &&
 		    ((eoa = memchr(p, '&', R(p))) != NULL ||
 		     (eoa = memchr(p, ' ', R(p))) != NULL)) {
-			__parse_select(msg, p += arz_sel, eoa - p);
+			p += arz_sel;
+			__parse_select(msg, p, eoa - p);
 		}
 #undef R
 	}
@@ -172,7 +173,8 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 		if ((p = memmem(p, R(p), arg_flt, arz_flt)) != NULL &&
 		    ((eoa = memchr(p, '&', R(p))) != NULL ||
 		     (eoa = memchr(p, ' ', R(p))) != NULL)) {
-			__parse_filter(msg, p += arz_flt, eoa - p);
+			p += arz_flt;
+			__parse_filter(msg, p, eoa - p);
 		}
 #undef R
 	}
