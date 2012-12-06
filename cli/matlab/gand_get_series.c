@@ -200,7 +200,10 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	rst.lidx = -1;
 
 	/* open the gandalf handle */
-	gctx = gand_open(srv, /*timeout*/2500);
+	if ((gctx = gand_open(srv, /*timeout*/2500)) == NULL) {
+		goto bugger;
+	}
+	/* and off we go */
 	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
 	/* and fuck off again */
 	gand_close(gctx);
@@ -246,6 +249,7 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		}
 		mxFree(rst.vf);
 	}
+bugger:
 	mxFree(srv);
 	mxFree(sym);
 	return;
