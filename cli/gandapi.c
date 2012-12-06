@@ -205,7 +205,7 @@ gand_open(const char *srv, int timeout)
 	struct sockaddr_storage sa = {0};
 	size_t sa_len = sizeof(sa);
 	int fam;
-	struct __ctx_s *res = calloc(1, sizeof(*res));
+	struct __ctx_s *res;
 	/* to parse the service string */
 	char *p;
 
@@ -226,17 +226,18 @@ gand_open(const char *srv, int timeout)
 			host[p - srv] = '\0';
 		}
 		if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
-			return res;
+			return NULL;
 		}
 	}
 
 	if ((ns = socket(fam, SOCK_STREAM, 0)) < 0) {
-		return res;
+		return NULL;
 	} else if (connect(ns, (void*)&sa, sa_len) < 0) {
-		return res;
+		return NULL;
 	}
 
 	/* init structure */
+	res = calloc(1, sizeof(*res));
 	res->eps = epoll_create1(0);
 	res->gs = ns;
 	res->nev = countof(res->ev);
