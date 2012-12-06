@@ -1,4 +1,5 @@
 args "--unamed-opts=SYMBOL"
+usage "gandqry [OPTIONS]... SYMBOL..."
 package "gandqry"
 description "Query a gandalf server"
 

@@ -35,12 +35,17 @@ main(int argc, char *argv[])
 	/* args */
 	struct gengetopt_args_info argi[1];
 	gand_ctx_t g;
+	int res = 0;
 
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
 
-	g = gand_open(argi->service_arg, argi->timeout_arg);
+	if ((g = gand_open(argi->service_arg, argi->timeout_arg)) == NULL) {
+		perror("gand_open()");
+		res = 1;
+		goto bugger_off;
+	}
 	for (size_t i = 0; i < argi->inputs_num; i++) {
 		npkt = 0;
 		gand_get_series(
@@ -51,8 +56,9 @@ main(int argc, char *argv[])
 	}
 	gand_close(g);
 
+bugger_off:
 	cmdline_parser_free(argi);
-	return 0;
+	return res;
 }
 
 /* gandqry.c ends here */

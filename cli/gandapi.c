@@ -205,7 +205,7 @@ gand_open(const char *srv, int timeout)
 	struct sockaddr_storage sa = {0};
 	size_t sa_len = sizeof(sa);
 	int fam;
-	struct __ctx_s *res = calloc(1, sizeof(*res));
+	struct __ctx_s *res;
 	/* to parse the service string */
 	char *p;
 
@@ -226,17 +226,18 @@ gand_open(const char *srv, int timeout)
 			host[p - srv] = '\0';
 		}
 		if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
-			return res;
+			return NULL;
 		}
 	}
 
 	if ((ns = socket(fam, SOCK_STREAM, 0)) < 0) {
-		return res;
+		return NULL;
 	} else if (connect(ns, (void*)&sa, sa_len) < 0) {
-		return res;
+		return NULL;
 	}
 
 	/* init structure */
+	res = calloc(1, sizeof(*res));
 	res->eps = epoll_create1(0);
 	res->gs = ns;
 	res->nev = countof(res->ev);
@@ -384,6 +385,10 @@ gand_get_series(
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
 	static const char dflt[] = "fix/stl/close/unknown";
+	static const char rhdr[] = " HTTP/1.1\r\n\
+Connection: keep-alive\r\n\
+User-Agent: gandapi\r\n\
+\r\n";
 	struct __ctx_s *g = ug;
 	/* we just use g's buffer to offload our query */
 	size_t gqlen;
@@ -392,7 +397,7 @@ gand_get_series(
 
 	gqlen = snprintf(
 		g->buf, g->bsz,
-		"get_series \"%s\" --select sym,d,vf,v -i --filter ", sym);
+		"GET /series?sym=%s&select=sym,d,vf,v&igncase&filter=", sym);
 
 	if (valflav == NULL || nvalflav == 0) {
 		memcpy(g->buf + gqlen, dflt, countof(dflt));
@@ -406,11 +411,15 @@ gand_get_series(
 				break;
 			}
 			memcpy(g->buf + gqlen, vf, vflen);
-			g->buf[gqlen += vflen] = '+';
+			g->buf[gqlen += vflen] = ',';
 			gqlen++;
 		}
 		--gqlen;
 	}
+
+	/* copy the rest of the header */
+	memcpy(g->buf + gqlen, rhdr, sizeof(rhdr) - 1);
+	gqlen += sizeof(rhdr) - 1;
 
 	/* query is ready now */
 	if (gand_send(g, g->buf, gqlen) < 0) {
