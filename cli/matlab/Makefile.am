@@ -8,6 +8,7 @@ moddir = $(HOME)/.matlab/$(shell basename "$(MATLABROOT)")/toolbox/gandalf
 mod_LTLIBRARIES = gand_get_series.la
 mod_DATA = gand_get_series.m
 gand_get_series_la_LDFLAGS = -module -shrext ".mexa64"
+gand_get_series_la_LDFLAGS += $(XCCLDFLAGS)
 gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS) -DMATLAB_MEX_FILE
 gand_get_series_la_CPPFLAGS += -I$(top_srcdir)/cli
 gand_get_series_la_CPPFLAGS += -I$(MATLABROOT)/extern/include
