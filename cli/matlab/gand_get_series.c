@@ -148,8 +148,10 @@ qcb(gand_res_t res, void *clo)
 
 	if (st->v &&
 	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
+		/* we demand res->strval to be a double atm */
+		double tmp = strtod(res->strval, NULL);
 		/* also fill the second matrix */
-		st->v[st->lidx * st->ncol + this_vf] = res->value;
+		st->v[st->lidx * st->ncol + this_vf] = tmp;
 		if (st->res_vf && st->res_vf[this_vf] == NULL) {
 			st->res_vf[this_vf] = strdup(res->valflav);
 		}
