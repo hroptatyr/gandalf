@@ -452,7 +452,11 @@ User-Agent: gandapi\r\n\
 		res.valflav = rb;
 
 		/* and finally the value */
-		res.value = strtod(p + 1, NULL);
+		if (UNLIKELY((p = strchr((rb = p + 1), '\n')) == NULL)) {
+			continue;
+		}
+		*p = '\0';
+		res.strval = rb;
 
 		/* do the call */
 		qcb(&res, closure);
