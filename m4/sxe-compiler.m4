@@ -1,6 +1,6 @@
 dnl compiler.m4 --- compiler magic
 dnl
-dnl Copyright (C) 2005-2008, 2012 Sebastian Freundt
+dnl Copyright (C) 2005-2012 Sebastian Freundt
 dnl Copyright (c) 2005 Steven G. Johnson
 dnl Copyright (c) 2005 Matteo Frigo
 dnl
@@ -227,13 +227,40 @@ AC_DEFUN([SXE_OPTIFLAGS], [dnl
 ])dnl SXE_OPTIFLAGS
 
 AC_DEFUN([SXE_FEATFLAGS], [dnl
-	## if libtool then
-	dnl XFLAG="-XCClinker"
 	## default flags for needed features
+	AC_REQUIRE([SXE_CHECK_COMPILER_XFLAG])
+	XCCFLAG="${XFLAG}"
+
+	## recent gentoos went ballistic again, they compile PIE gcc's
+	## but there's no way to turn that misconduct off ...
+	## however I've got one report about a working PIE build
+	## we'll just check for -nopie here, if it works, we turn it on
+	## (and hence PIE off) and hope bug 16 remains fixed
+	SXE_CHECK_COMPILER_FLAGS([-nopie],
+		[featflags="$featflags -nopie"])
+
+	## it's utterly helpful to get the sse2 unit up
+	SXE_CHECK_COMPILER_FLAGS([-msse2], [dnl
+		## sse2 is the cure
+		featflags="$featflags -msse2"], [dnl
+		## oh bugger
+		AC_DEFINE([FPMATH_NO_SSE], [1], [no sse2 support for floats])])
+
+	## icc and gcc related
+	## check if some stuff can be staticalised
+	## actually requires SXE_WARNFLAGS so warnings would be disabled
+	## that affect the outcome of the following tests
 	SXE_CHECK_COMPILER_FLAGS([-static-intel], [
-		ldflags="${ldflags} ${XFLAG} -static-intel"])
+		featflags="${featflags} -static-intel"
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-intel"], [:],
+		[${SXE_CFLAGS}])
 	SXE_CHECK_COMPILER_FLAGS([-static-libgcc], [
-		ldflags="${ldflags} ${XFLAG} -static-libgcc"])
+		featflags="${featflags} -static-libgcc"
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-libgcc"], [:],
+		[${SXE_CFLAGS}])
+
+	AC_SUBST([XCCLDFLAGS])
+	AC_SUBST([XCCFLAG])
 ])dnl SXE_FEATFLAGS
 
 
@@ -270,22 +297,36 @@ dnl SXE_CHECK_COMPILER_FLAGS([flag], [do-if-works], [do-if-not-works])
 	fi
 ])dnl SXE_CHECK_COMPILER_FLAGS
 
+AC_DEFUN([SXE_CHECK_COMPILER_XFLAG], [dnl
+	if test "${XFLAG}" = ""; then
+		SXE_CHECK_COMPILER_FLAGS([-XCClinker -foo], [XFLAG="-XCClinker"])
+	fi
+	if test "${XFLAG}" = ""; then
+		SXE_CHECK_COMPILER_FLAGS([-Xlinker -foo], [XFLAG="-Xlinker"])
+	fi
+
+	AC_SUBST([XFLAG])
+])dnl SXE_CHECK_COMPILER_XFLAG
+
 
 AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
 	dnl #### This may need to be overhauled so that all of SXEMACS_CC's flags
 	dnl are handled separately, not just the xe_cflags_warning stuff.
 
 	## Use either command line flag, environment var, or autodetection
+	CFLAGS=""
 	SXE_DEBUGFLAGS
 	SXE_WARNFLAGS
 	SXE_OPTIFLAGS
+	SXE_CFLAGS="$SXE_CFLAGS $debugflags $optiflags $warnflags"
+
 	SXE_FEATFLAGS
-	SXE_CFLAGS="$debugflags $featflags $optiflags $warnflags"
+	SXE_CFLAGS="$SXE_CFLAGS $featflags"
 
 	## unset the werror flag again
 	SXE_LANG_WERROR([off])
 
-	CFLAGS="$SXE_CFLAGS ${ac_cv_env_CFLAGS_value}"
+	CFLAGS="${SXE_CFLAGS} ${ac_cv_env_CFLAGS_value}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
 	AC_MSG_RESULT([${CFLAGS}])
 
@@ -301,11 +342,6 @@ or
   make CFLAGS=<your-own-flags> [target]
 respectively
 		])
-
-	LDFLAGS="${ldflags} ${ac_cv_env_LDFLAGS_value}"
-	AC_MSG_CHECKING([for preferred LDFLAGS])
-	AC_MSG_RESULT([${LDFLAGS}])
-
 ])dnl SXE_CHECK_CFLAGS
 
 AC_DEFUN([SXE_CHECK_CC], [dnl
@@ -313,7 +349,11 @@ dnl SXE_CHECK_CC([STANDARDS])
 dnl standards are flavours supported by the compiler chosen with AC_PROG_CC
 	pushdef([stds], m4_default([$1], [gnu11 c11 gnu99 c99]))
 
-	AC_REQUIRE([AC_PROG_CC])
+	AC_REQUIRE([AC_CANONICAL_HOST])
+	AC_REQUIRE([AC_CANONICAL_BUILD])
+	AC_REQUIRE([AC_PROG_CPP])
+
+	AC_HEADER_STDC
 
 	case "${CC}" in dnl (
 	*"-std="*)
