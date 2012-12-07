@@ -13,7 +13,10 @@ struct gand_res_s {
 	const char *symbol;
 	idate_t date;
 	const char *valflav;
-	double value;
+	union {
+		double value;
+		const char *string;
+	};
 };
 
 /**

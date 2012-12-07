@@ -452,7 +452,15 @@ User-Agent: gandapi\r\n\
 		res.valflav = rb;
 
 		/* and finally the value */
-		res.value = strtod(p + 1, NULL);
+		{
+			char *on;
+			if ((res.value = strtod(p + 1, &on), on == NULL) &&
+			    (p = strchr(p + 1, '\n')) != NULL) {
+				/* set string slot then */
+				res.string = on;
+				*p = '\0';
+			}
+		}
 
 		/* do the call */
 		qcb(&res, closure);
