@@ -452,9 +452,7 @@ User-Agent: gandapi\r\n\
 		res.valflav = rb;
 
 		/* and finally the value */
-		if (UNLIKELY((p = strchr((rb = p + 1), '\n')) == NULL)) {
-			continue;
-		}
+		p = strchrnul((rb = p + 1), '\n');
 		*p = '\0';
 		res.strval = rb;
 
