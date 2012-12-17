@@ -8,7 +8,7 @@ pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
 ifelse([]version[], [], [0.2.0], []version[])[]dnl
 popdef([version])dnl
 ])
-AC_INIT([gandalf], [GIT_VERSION_GEN], [https://trac.ga-group.nl/freundt_devel/])
+AC_INIT([gandalf], [GIT_VERSION_GEN], [https://github.com/hroptatyr/gandalf])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([lib/config.h])
 AC_CONFIG_MACRO_DIR([m4])
