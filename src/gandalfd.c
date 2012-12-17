@@ -987,6 +987,22 @@ clo:
 
 
 static void
+log_req(const char *buf, size_t bsz)
+{
+	const char *q = memchr(buf, '\n', bsz);
+	static char cpy[256];
+
+	if (LIKELY(q > buf && q < buf + sizeof(cpy) - 1)) {
+		memcpy(cpy, buf, q - buf);
+		cpy[q - buf] = '\0';
+		GAND_INFO_LOG(":req [%s]\n", cpy);
+	} else {
+		GAND_INFO_LOG(":req <empty>\n");
+	}
+	return;
+}
+
+static void
 dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 	static char buf[4096];
@@ -1005,6 +1021,7 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		buf[sizeof(buf) - 1] = '\0';
 	}
 
+	log_req(buf, nreq);
 	if (UNLIKELY((msg = gand_parse_blob(NULL, buf, nreq)) == NULL)) {
 		/* bugger right off */
 		goto clo;
