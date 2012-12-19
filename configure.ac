@@ -74,15 +74,6 @@ PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 ])
 AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
-## check for libxml to process fixml
-PKG_CHECK_MODULES([LIBXML2], [libxml-2.0 >= 2.7])
-pushdef([use_libxml2], [test -n "${LIBXML2_LIBS}"])
-AM_CONDITIONAL([USE_LIBXML2], []use_libxml2[])
-if []use_libxml2[]; then
-	AC_DEFINE([HAVE_LIBXML2], [1], [Define if libxml2 support is there])
-fi
-popdef([use_libxml2])
-
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
@@ -142,7 +133,6 @@ echo
 echo "Build server: ${BUILD_SRV}"
 echo "Build cliapps: ${BUILD_CLI}"
 echo "Build library: ${BUILD_LIB}"
-echo "XML: ${USE_LIBXML2_FALSE:+libxml2}"
 echo
 
 dnl configure.ac ends here
