@@ -74,6 +74,12 @@ PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 ])
 AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
+
+## check splicing features
+SXE_CHECK_TCP_SPLICE
+SXE_CHECK_UDP_SPLICE
+
+
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
