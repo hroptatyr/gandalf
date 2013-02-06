@@ -97,6 +97,7 @@ AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
 	[dnl
+		SXE_LANG_WERROR([off])
 		SXE_CHECK_MATLAB([${withval}])
 		if test "${enable_cliapps}" != "no" -a \
 			-n "${sxe_cv_matlabroot}"; then
