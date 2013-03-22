@@ -486,7 +486,7 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	}
 
 	/* finalise the line */
-	mb->buf[mb->bsz - 1] = '\n';
+	mb->buf[mb->bsz++] = '\n';
 	return;
 }
 
@@ -539,7 +539,7 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	}
 
 	/* finalise the line */
-	mb->buf[mb->bsz - 1] = '\n';
+	mb->buf[mb->bsz++] = '\n';
 	return;
 }
 
