@@ -454,11 +454,17 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	mmmbuf_check_resize(mb, lsz);
 
 	/* find all tabs first */
-	tabs[0] = rawmemchr(lin, '\t');
-	tabs[1] = rawmemchr(tabs[0] + 1, '\t');
-	tabs[2] = rawmemchr(tabs[1] + 1, '\t');
-	tabs[3] = rawmemchr(tabs[2] + 1, '\t');
-	tabs[4] = rawmemchr(tabs[3] + 1, '\t');
+	if (UNLIKELY((tabs[0] = rawmemchr(lin, '\t')) == NULL)) {
+		return;
+	} else if (UNLIKELY((tabs[1] = rawmemchr(tabs[0] + 1, '\t')) == NULL)) {
+		return;
+	} else if (UNLIKELY((tabs[2] = rawmemchr(tabs[1] + 1, '\t')) == NULL)) {
+		return;
+	} else if (UNLIKELY((tabs[3] = rawmemchr(tabs[2] + 1, '\t')) == NULL)) {
+		return;
+	} else if (UNLIKELY((tabs[4] = rawmemchr(tabs[3] + 1, '\t')) == NULL)) {
+		return;
+	}
 
 	/* copy only interesting lines */
 	if (sel & SEL_RID) {
