@@ -455,15 +455,15 @@ bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 
 	/* find all tabs first */
 	{
-		const char **tp = tabs;
+		size_t ntab = 0U;
 
-		for (size_t i = 0, nt = 0; i < lsz && nt < countof(tabs); i++) {
-			if (lin[i] == '\t') {
-				*tp++ = lin + i;
+		for (const char *p = lin, *const ep = p + lsz; p < ep; p++) {
+			if (*p == '\t') {
+				tabs[ntab++] = p;
 			}
 		}
 
-		if (UNLIKELY((size_t)(tp - tabs) < countof(tabs))) {
+		if (UNLIKELY(ntab < countof(tabs))) {
 			/* we need 5 tabs and found less, line is buggered */
 			return;
 		}
