@@ -1,6 +1,6 @@
-/*** fileutils.h -- mapping files and stuff
+/*** gand_close.c -- gandalf resource dtor
  *
- * Copyright (C) 2009-2012 Sebastian Freundt
+ * Copyright (C) 2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,74 +34,40 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_fileutils_h_
-#define INCLUDED_fileutils_h_
-
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include "nifty.h"
-
-/* mmap buffers, memory and file based */
-struct mmmb_s {
-	char *buf;
-	/* real size */
-	size_t bsz;
-	/* alloc size */
-	size_t all;
-};
-
-struct mmfb_s {
-	struct mmmb_s m;
-	/* file desc */
-	int fd;
-};
-
-/* no-map buffer */
-struct nmfb_s {
-	size_t fz;
-	int fd;
-};
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+/* matlab stuff */
+#include <mex.h>
+/* our stuff */
+#include "gandapi.h"
+#include "gand_handle.h"
 
 static void
-munmap_all(struct mmfb_s *mf)
+wipe_handle(const mxArray *arr)
 {
-	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
-		munmap(mf->m.buf, mf->m.all);
-	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
-	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
+	gmx_put_handle(arr, NULL);
 	return;
 }
 
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f)
+
+void
+mexFunction(
+	int UNUSED(nlhs), mxArray *UNUSED(plhs[]),
+	int nrhs, const mxArray *prhs[])
 {
-	size_t fsz = 0;
-	struct stat st = {0};
+	gand_ctx_t hdl;
 
-	if (UNLIKELY(stat(f, &st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
-		return -1;
+	if (nrhs != 1) {
+		mexErrMsgTxt("invalid usage, see `help gand_close'");
+		return;
+	} else if ((hdl = gmx_get_handle(prhs[0])) == NULL) {
+		mexErrMsgTxt("gandalf handle seems buggered");
+		return;
 	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		munmap_all(mf);
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
+	gand_close(hdl);
+	wipe_handle(prhs[0]);
+	return;
 }
 
-#endif	/* INCLUDED_fileutils_h_ */
+/* gand_close.c ends here */

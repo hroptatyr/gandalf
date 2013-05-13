@@ -1,7 +1,6 @@
 #include <string.h>
 #include "gandalf.h"
 #include "nifty.h"
-#include "gand_msg-parser.h"
 #include "gand_msg-private.h"
 
 #define MSG_PRE		"gandmsg"
@@ -79,6 +78,8 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 	static const size_t svz_ser = sizeof(svc_ser) - 1U;
 	static const char svc_nfo[] = "/info?";
 	static const size_t svz_nfo = sizeof(svc_nfo) - 1U;
+	static const char svc_raw[] = "/raw?";
+	static const size_t svz_raw = sizeof(svc_raw) - 1U;
 	const char *eol;
 	const char *svc;
 	const char *arg;
@@ -107,6 +108,9 @@ __parse_http(gand_msg_t msg, const char *req, size_t rsz)
 	} else if ((svc = memmem(req, eol - req, svc_nfo, svz_nfo)) != NULL) {
 		gand_set_msg_type(msg, GAND_MSG_GET_NFO);
 		arg = svc + svz_nfo;
+	} else if ((svc = memmem(req, eol - req, svc_raw, svz_raw)) != NULL) {
+		gand_set_msg_type(msg, GAND_MSG_GET_RAW);
+		arg = svc + svz_raw;
 	} else {
 		/* don't worry about it */
 		return 0;
@@ -276,8 +280,9 @@ gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz)
 		/* http request */
 		rc = __parse_http(res, p, bsz - (p - buf));
 	} else {
-		/* could be classic gandalf command syntax */
-		rc = __parse(res, buf, bsz);
+		/* could be classic gandalf command syntax
+		 * unsupported since 0.2.2 */
+		rc = -1;
 	}
 
 	if (UNLIKELY(rc < 0)) {

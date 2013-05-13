@@ -1,6 +1,6 @@
-/*** fileutils.h -- mapping files and stuff
+/*** gand_open.c -- gandalf handle acquisition
  *
- * Copyright (C) 2009-2012 Sebastian Freundt
+ * Copyright (C) 2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,74 +34,45 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_fileutils_h_
-#define INCLUDED_fileutils_h_
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stdint.h>
+/* matlab stuff */
+#include <mex.h>
+/* our stuff */
+#include "gandapi.h"
+#include "gand_handle.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include "nifty.h"
-
-/* mmap buffers, memory and file based */
-struct mmmb_s {
-	char *buf;
-	/* real size */
-	size_t bsz;
-	/* alloc size */
-	size_t all;
-};
-
-struct mmfb_s {
-	struct mmmb_s m;
-	/* file desc */
-	int fd;
-};
-
-/* no-map buffer */
-struct nmfb_s {
-	size_t fz;
-	int fd;
-};
-
-static void
-munmap_all(struct mmfb_s *mf)
+static char*
+snarf_fname(const mxArray *fn)
 {
-	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
-		munmap(mf->m.buf, mf->m.all);
+	return mxArrayToString(fn);
+}
+
+
+void
+mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+	gand_ctx_t hdl;
+	char *fn;
+
+	if (nrhs != 1 || nlhs != 1) {
+		mexErrMsgTxt("invalid usage, see `help gand_open'");
+		return;
+	} else if ((fn = snarf_fname(prhs[0])) == NULL) {
+		mexErrMsgTxt("cannot determine file name to open");
+		return;
+	} else if ((hdl = gand_open(fn, /*:timeout */2500)) == NULL) {
+		mexErrMsgTxt("cannot establish connection to gandalf server");
+		return;
 	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
-	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
+	/* free file name */
+	mxFree(fn);
+	/* otherwise just assign the handle */
+	plhs[0] = make_gmx_handle();
+	gmx_put_handle(plhs[0], hdl);
 	return;
 }
 
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f)
-{
-	size_t fsz = 0;
-	struct stat st = {0};
-
-	if (UNLIKELY(stat(f, &st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
-		return -1;
-	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		munmap_all(mf);
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
-}
-
-#endif	/* INCLUDED_fileutils_h_ */
+/* gand_open.c ends here */

@@ -1,6 +1,6 @@
-/*** fileutils.h -- mapping files and stuff
+/*** gand_handle.h -- gandalf handle wraps
  *
- * Copyright (C) 2009-2012 Sebastian Freundt
+ * Copyright (C) 2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,74 +34,77 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_fileutils_h_
-#define INCLUDED_fileutils_h_
+#if !defined INCLUDED_gand_handle_h_
+#define INCLUDED_gand_handle_h_
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include "nifty.h"
+#include <stdbool.h>
+/* matlab stuff */
+#include <mex.h>
+/* our stuff */
+#include "gandapi.h"
 
-/* mmap buffers, memory and file based */
-struct mmmb_s {
-	char *buf;
-	/* real size */
-	size_t bsz;
-	/* alloc size */
-	size_t all;
-};
+#if !defined LIKELY
+# define LIKELY(_x)	__builtin_expect((_x), 1)
+#endif	/* !LIKELY */
+#if !defined UNLIKELY
+# define UNLIKELY(_x)	__builtin_expect((_x), 0)
+#endif	/* UNLIKELY */
 
-struct mmfb_s {
-	struct mmmb_s m;
-	/* file desc */
-	int fd;
-};
+#if !defined UNUSED
+# define UNUSED(_x)	_x __attribute__((unused))
+#endif	/* !UNUSED */
 
-/* no-map buffer */
-struct nmfb_s {
-	size_t fz;
-	int fd;
-};
+#if !defined ALGN
+# define ALGN(_x, to)	_x __attribute__((aligned(to)))
+#endif	/* !ALGN */
 
-static void
-munmap_all(struct mmfb_s *mf)
+#if !defined countof
+# define countof(x)	(sizeof(x) / sizeof(*x))
+#endif	/* !countof */
+
+static inline mxArray*
+make_gmx_handle(void)
 {
-	if (mf->m.all > 0UL && mf->m.buf != NULL && mf->m.buf != MAP_FAILED) {
-		munmap(mf->m.buf, mf->m.all);
+	mwSize dims[] = {1};
+	return mxCreateNumericArray(countof(dims), dims, mxINDEX_CLASS, mxREAL);
+}
+
+static inline bool
+mxIsIndex(const mxArray *arr)
+{
+	if (mxINDEX_CLASS == mxUINT64_CLASS) {
+		return mxIsUint64(arr);
+	} else if (mxINDEX_CLASS == mxUINT32_CLASS) {
+		return mxIsUint32(arr);
 	}
-	if (mf->fd >= 0) {
-		close(mf->fd);
+	return false;
+}
+
+static inline gand_ctx_t
+gmx_get_handle(const mxArray *arr)
+{
+	intptr_t *ptr;
+
+	if (UNLIKELY(!mxIsIndex(arr))) {
+		return NULL;
+	} else if (UNLIKELY((ptr = mxGetData(arr)) == NULL)) {
+		return NULL;
 	}
-	/* reset values */
-	mf->m.buf = NULL;
-	mf->m.bsz = mf->m.all = 0UL;
-	mf->fd = -1;
+	return (void*)ptr[0];
+}
+
+static inline void
+gmx_put_handle(const mxArray *tgt, gand_ctx_t hdl)
+{
+	intptr_t *ptr;
+
+	if (UNLIKELY(!mxIsIndex(tgt))) {
+		return;
+	} else if (UNLIKELY((ptr = mxGetData(tgt)) == NULL)) {
+		return;
+	}
+	ptr[0] = (intptr_t)hdl;
 	return;
 }
 
-static ssize_t
-mmap_whole_file(struct mmfb_s *mf, const char *f)
-{
-	size_t fsz = 0;
-	struct stat st = {0};
-
-	if (UNLIKELY(stat(f, &st) < 0)) {
-		return -1;
-	} else if (UNLIKELY((fsz = st.st_size) == 0)) {
-		return -1;
-	}
-
-	if (UNLIKELY((mf->fd = open(f, O_RDONLY)) < 0)) {
-		return -1;
-	}
-
-	/* mmap the file */
-	mf->m.buf = mmap(NULL, fsz, PROT_READ, MAP_SHARED, mf->fd, 0);
-	if (UNLIKELY(mf->m.buf == MAP_FAILED)) {
-		munmap_all(mf);
-		return -1;
-	}
-	return mf->m.all = mf->m.bsz = fsz;
-}
-
-#endif	/* INCLUDED_fileutils_h_ */
+#endif	/* INCLUDED_gand_handle_h_ */
