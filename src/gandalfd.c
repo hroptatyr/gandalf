@@ -749,9 +749,6 @@ interpret_msg(char **buf, gand_msg_t msg)
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SER:
-		len = get_ser(buf, msg);
-		break;
-
 	case GAND_MSG_GET_DAT:
 		len = get_ser(buf, msg);
 		break;
