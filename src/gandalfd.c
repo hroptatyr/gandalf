@@ -448,22 +448,25 @@ mmmbuf_check_resize(struct mmmb_s *mb, size_t lsz)
 static void
 bang_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 {
-	const char *tabs[6];
+	const char *tabs[5];
 
 	/* check if we need to resize */
 	mmmbuf_check_resize(mb, lsz);
 
 	/* find all tabs first */
-	if (UNLIKELY((tabs[0] = rawmemchr(lin, '\t')) == NULL)) {
-		return;
-	} else if (UNLIKELY((tabs[1] = rawmemchr(tabs[0] + 1, '\t')) == NULL)) {
-		return;
-	} else if (UNLIKELY((tabs[2] = rawmemchr(tabs[1] + 1, '\t')) == NULL)) {
-		return;
-	} else if (UNLIKELY((tabs[3] = rawmemchr(tabs[2] + 1, '\t')) == NULL)) {
-		return;
-	} else if (UNLIKELY((tabs[4] = rawmemchr(tabs[3] + 1, '\t')) == NULL)) {
-		return;
+	{
+		const char **tp = tabs;
+
+		for (size_t i = 0, nt = 0; i < lsz && nt < countof(tabs); i++) {
+			if (lin[i] == '\t') {
+				*tp++ = lin + i;
+			}
+		}
+
+		if (UNLIKELY((size_t)(tp - tabs) < countof(tabs))) {
+			/* we need 5 tabs and found less, line is buggered */
+			return;
+		}
 	}
 
 	/* copy only interesting lines */
