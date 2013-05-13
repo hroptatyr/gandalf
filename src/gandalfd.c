@@ -52,6 +52,8 @@
 #include <sys/un.h>
 #include <sys/utsname.h>
 #include <sys/time.h>
+/* check for me */
+#include <sys/sendfile.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -639,6 +641,35 @@ get_ser(char **buf, gand_msg_t msg)
 	return mb.bsz;
 }
 
+static struct nmfb_s
+get_raw(gand_msg_t msg)
+{
+	struct nmfb_s res = {-1};
+	const char *sym;
+	const char *fn;
+	rid_t rid;
+	struct stat st = {0};
+
+	GAND_DEBUG("nrolf_objs %zu\n", msg->nrolf_objs);
+	if (UNLIKELY(msg->nrolf_objs != 1U)) {
+		return res;
+	} else if (UNLIKELY((sym = msg->rolf_objs[0].rolf_sym) == NULL)) {
+		return res;
+	} else if (UNLIKELY((rid = slut_sym2rid(i2s_s, sym)) == 0U)) {
+		return res;
+	} else if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
+		return res;
+	} else if (UNLIKELY((res.fd = open(fn, O_RDONLY)) < 0)) {
+		;
+	} else if (UNLIKELY(fstat(res.fd, &st) < 0)) {
+		;
+	}
+
+	res.fz = st.st_size;
+	free_lateglu_name(fn);
+	return res;
+}
+
 static struct mmfb_s mf_nfo = {
 	.m = {
 		.buf = NULL,
@@ -742,26 +773,83 @@ get_nfo(char **buf, gand_msg_t msg)
 	return mb.bsz;
 }
 
-static size_t
-interpret_msg(char **buf, gand_msg_t msg)
+
+struct rsp_s {
+	enum {
+		RSP_UNK,
+		RSP_BUF,
+		RSP_NMP,
+	} type;
+
+	union {
+		/* for RSP_BUF */
+		struct {
+			size_t z;
+			char *buf;
+		};
+
+		/* for a descriptor based result, RSP_NMP */
+		struct nmfb_s nmp;
+	};
+};
+
+static struct rsp_s
+interpret_msg(gand_msg_t msg)
 {
-	size_t len = 0;
+	struct rsp_s res = {RSP_UNK};
 
 	switch (gand_get_msg_type(msg)) {
 	case GAND_MSG_GET_SER:
-	case GAND_MSG_GET_DAT:
-		len = get_ser(buf, msg);
-		break;
+	case GAND_MSG_GET_DAT: {
+		size_t len;
+		char *buf;
 
-	case GAND_MSG_GET_NFO:
-		len = get_nfo(buf, msg);
+		if ((len = get_ser(&buf, msg)) > 0U) {
+			res.type = RSP_BUF;
+			res.z = len;
+			res.buf = buf;
+		}
+		break;
+	}
+
+	case GAND_MSG_GET_NFO: {
+		size_t len;
+		char *buf;
+
+		if ((len = get_nfo(&buf, msg)) > 0U) {
+			res.type = RSP_BUF;
+			res.z = len;
+			res.buf = buf;
+		}
+		break;
+	}
+
+	case GAND_MSG_GET_RAW:
+		if ((res.nmp = get_raw(msg)).fd >= 0) {
+			res.type = RSP_NMP;
+		}
 		break;
 
 	default:
 		GAND_ERR_LOG("unknown message %u\n", msg->hdr.mt);
 		break;
 	}
-	return len;
+	return res;
+}
+
+static inline __attribute__((pure, const)) size_t
+rsp_content_size(struct rsp_s x)
+{
+	switch (x.type) {
+	case RSP_UNK:
+	default:
+		break;
+	case RSP_BUF:
+		return x.z;
+	case RSP_NMP:
+		return x.nmp.fz;
+	}
+	return 0U;
 }
 
 static ssize_t
@@ -1013,8 +1101,7 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 	static char buf[4096];
 	ssize_t nreq;
-	char *rsp;
-	ssize_t nrsp;
+	struct rsp_s rsp;
 	gand_msg_t msg;
 	int keep_conn;
 
@@ -1034,16 +1121,26 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	}
 
 	/* just do what they want, care about the format later */
-	nrsp = interpret_msg(&rsp, msg);
+	rsp = interpret_msg(msg);
 	/* bring the response into shape */
 	if (msg->hdr.flags & GAND_MSG_FLAG_WRAP_HTTP/*<-getter!!*/) {
-		send_http_wrap(w->fd, nrsp, 0);
+		size_t z = rsp_content_size(rsp);
+
+		send_http_wrap(w->fd, z, 0);
 	}
-	if (LIKELY(nrsp > 0)) {
+	switch (rsp.type) {
+	case RSP_UNK:
+		break;
+	case RSP_BUF:
 		/* send off the result */
-		send(w->fd, rsp, nrsp, 0);
+		send(w->fd, rsp.buf, rsp.z, 0);
 		/* and clean up */
-		munmap(rsp, nrsp);
+		munmap(rsp.buf, rsp.z);
+		break;
+	case RSP_NMP:
+		puts("sendf");
+		sendfile(w->fd, rsp.nmp.fd, NULL, rsp.nmp.fz);
+		break;
 	}
 	/* shouldn't this be a getter? */
 	keep_conn = msg->hdr.flags & GAND_MSG_FLAG_KEEP_CONN;

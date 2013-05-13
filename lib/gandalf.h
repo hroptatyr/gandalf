@@ -64,6 +64,7 @@ typedef enum {
 	GAND_MSG_GET_SER,
 	GAND_MSG_GET_DAT,
 	GAND_MSG_GET_NFO,
+	GAND_MSG_GET_RAW,
 } gand_msg_type_t;
 
 struct gand_msg_hdr_s {
