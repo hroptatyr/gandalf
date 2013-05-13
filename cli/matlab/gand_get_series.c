@@ -1,6 +1,6 @@
 /*** gand_get_series.c -- obtain time series from gandalf server
  *
- * Copyright (C) 2011 Sebastian Freundt
+ * Copyright (C) 2011-2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -38,17 +38,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-/* our stuff */
-#include "gandapi.h"
 /* matlab stuff */
 #include "mex.h"
+/* our stuff */
+#include "gandapi.h"
+#include "gand_handle.h"
 
 /* see gand_get_series.m for details */
-
-#define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
-#define LIKELY(x)	(x)
-#define UNLIKELY(x)	(x)
 
 typedef uint32_t daysi_t;
 
@@ -163,24 +160,21 @@ qcb(gand_res_t res, void *clo)
 void
 mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-	gand_ctx_t gctx;
-	char *srv;
+	gand_ctx_t hdl;
 	char *sym;
 	/* state for retrieval */
 	struct __recv_st_s rst = {0};
 
-	if (nrhs <= 0 ||
-	    (srv = mxArrayToString(prhs[0])) == NULL) {
-		mexErrMsgTxt("service string not defined\n");
+	if (nrhs <= 0) {
+		mexErrMsgTxt("invalid usage, see `help gand_get_series'");
 		return;
-	} else if (nrhs == 1 ||
-		   (sym = mxArrayToString(prhs[1])) == NULL) {
-		mxFree(srv);
-		mexErrMsgTxt("symbol not given\n");
+	} else if ((hdl = gmx_get_handle(prhs[0])) == NULL) {
+		mexErrMsgTxt("gandalf handle seems buggered");
+		return;
+	} else if (nrhs == 1 || (sym = mxArrayToString(prhs[1])) == NULL) {
+		mexErrMsgTxt("no symbol given\n");
 		return;
 	} else if (nlhs == 0) {
-		mxFree(srv);
-		mxFree(sym);
 		return;
 	} else if (nrhs > 2) {
 		rst.vf = mxCalloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
@@ -201,14 +195,8 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	/* start with a negative index */
 	rst.lidx = -1;
 
-	/* open the gandalf handle */
-	if ((gctx = gand_open(srv, /*timeout*/2500)) == NULL) {
-		goto bugger;
-	}
 	/* and off we go */
-	gand_get_series(gctx, sym, rst.vf, rst.nvf, qcb, &rst);
-	/* and fuck off again */
-	gand_close(gctx);
+	gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
 
 	/* now reset the matrices to their true dimensions */
 	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
@@ -251,8 +239,6 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		}
 		mxFree(rst.vf);
 	}
-bugger:
-	mxFree(srv);
 	mxFree(sym);
 	return;
 }
