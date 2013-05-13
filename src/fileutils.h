@@ -57,6 +57,12 @@ struct mmfb_s {
 	int fd;
 };
 
+/* no-map buffer */
+struct nmfb_s {
+	size_t fz;
+	int fd;
+};
+
 static void
 munmap_all(struct mmfb_s *mf)
 {
