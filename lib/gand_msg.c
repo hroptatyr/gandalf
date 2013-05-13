@@ -1,7 +1,6 @@
 #include <string.h>
 #include "gandalf.h"
 #include "nifty.h"
-#include "gand_msg-parser.h"
 #include "gand_msg-private.h"
 
 #define MSG_PRE		"gandmsg"
@@ -281,8 +280,9 @@ gand_parse_blob(gand_ctx_t *ctx, const char *buf, size_t bsz)
 		/* http request */
 		rc = __parse_http(res, p, bsz - (p - buf));
 	} else {
-		/* could be classic gandalf command syntax */
-		rc = __parse(res, buf, bsz);
+		/* could be classic gandalf command syntax
+		 * unsupported since 0.2.2 */
+		rc = -1;
 	}
 
 	if (UNLIKELY(rc < 0)) {
