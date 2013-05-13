@@ -1138,7 +1138,6 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		munmap(rsp.buf, rsp.z);
 		break;
 	case RSP_NMP:
-		puts("sendf");
 		sendfile(w->fd, rsp.nmp.fd, NULL, rsp.nmp.fz);
 		break;
 	}
