@@ -765,7 +765,7 @@ interpret_msg(char **buf, gand_msg_t msg)
 }
 
 static ssize_t
-send_http_wrap(int fd, const char *UNUSED(rsp), size_t rsz, int flags)
+send_http_wrap(int fd, size_t rsz, int flags)
 {
 	static char buf[] = "\
 HTTP/1.1 xxx DESCRIPTION\r\n\
@@ -1037,7 +1037,7 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	nrsp = interpret_msg(&rsp, msg);
 	/* bring the response into shape */
 	if (msg->hdr.flags & GAND_MSG_FLAG_WRAP_HTTP/*<-getter!!*/) {
-		send_http_wrap(w->fd, rsp, nrsp, 0);
+		send_http_wrap(w->fd, nrsp, 0);
 	}
 	if (LIKELY(nrsp > 0)) {
 		/* send off the result */
