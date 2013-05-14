@@ -49,6 +49,8 @@ struct __ctx_s {
 	int32_t nev;
 	/* flex array of events, 8b-aligned */
 	struct epoll_event ev[1];
+#define RX	0U
+#define TX	0U
 };
 
 
@@ -276,21 +278,13 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 	int nfds __attribute__((unused)) = 1;
 
 	do {
-		typeof(g->ev->events) ev = g->ev[0].events;
-		int fd = g->ev[0].data.fd;
+#define EV	(g->ev[TX].events)
+		int fd = g->ev[TX].data.fd;
 
 		/* we've only asked for one, so it would be peculiar */
 		assert(nfds == 1);
 
-		if (ev & EPOLLIN) {
-			/* must be garbage, wipe it */
-			ssize_t nrd;
-			size_t tot = 0;
-			while ((nrd = read(fd, g->buf, g->bsz)) > 0) {
-				tot += nrd;
-			}
-
-		} else if (LIKELY(ev & EPOLLOUT)) {
+		if (LIKELY(EV & EPOLLOUT)) {
 			ssize_t nwr;
 			size_t tot = 0;
 
@@ -303,12 +297,17 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 				return 0;
 			}
 
-		} else if (ev == 0) {
+		} else if (EV & EPOLLIN) {
+			/* leave input for the next gand_recv() call */
+			;
+
+		} else if (EV == 0) {
 			/* state unknown, better poll */
 
 		} else {
 			break;
 		}
+#undef EV
 	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	return -1;
 }
@@ -345,16 +344,13 @@ find:
 	}
 
 	do {
-		typeof(g->ev->events) ev;
-		int fd;
+#define EV	(g->ev[RX].events)
+		int fd = g->ev[RX].data.fd;
 
 		/* we've only asked for one, so it would be peculiar */
 		assert(nfds == 1);
 
-		ev = g->ev[0].events;
-		fd = g->ev[0].data.fd;
-
-		if (LIKELY(ev & EPOLLIN)) {
+		if (LIKELY(EV & EPOLLIN)) {
 			ssize_t nrd;
 
 			if ((nrd = read(
@@ -367,12 +363,13 @@ find:
 				*buf = NULL;
 				return -1;
 			}
-		} else if (ev & EPOLLOUT) {
+		} else if (EV & EPOLLOUT) {
 			/* do nothing */
 			;
 		} else {
 			return -1;
 		}
+#undef EV
 	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	/* rinse */
 	return -1;
