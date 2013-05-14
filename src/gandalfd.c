@@ -299,7 +299,10 @@ make_lateglu_name(uint32_t rolf_id)
 	}
 	memcpy(f + idx, glud, sizeof(glud) - 1);
 	idx += sizeof(glud) - 1;
-	snprintf(f + idx, PATH_MAX - idx, "%08u", rolf_id);
+	snprintf(
+		f + idx, PATH_MAX - idx,
+		/* this is the split version */
+		"%04u/%08u", rolf_id / 10000U, rolf_id);
 	return f;
 }
 
@@ -510,15 +513,20 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	mmmbuf_check_resize(mb, lsz);
 
 	/* find all tabs first */
-	tabs[0] = rawmemchr(lin, '\t');
-	tabs[1] = rawmemchr(tabs[0] + 1, '\t');
-	tabs[2] = rawmemchr(tabs[1] + 1, '\t');
-	tabs[3] = rawmemchr(tabs[2] + 1, '\t');
-	tabs[4] = rawmemchr(tabs[3] + 1, '\t');
-	tabs[5] = rawmemchr(tabs[4] + 1, '\t');
-	tabs[6] = rawmemchr(tabs[5] + 1, '\t');
-	tabs[7] = rawmemchr(tabs[6] + 1, '\t');
-	tabs[8] = rawmemchr(tabs[7] + 1, '\t');
+	{
+		size_t ntab = 0U;
+
+		for (const char *p = lin, *const ep = p + lsz; p < ep; p++) {
+			if (*p == '\t') {
+				tabs[ntab++] = p;
+			}
+		}
+
+		if (UNLIKELY(ntab < countof(tabs))) {
+			/* we need 9 tabs and found less, line is buggered */
+			return;
+		}
+	}
 
 	/* copy only interesting lines */
 	if (sel & SEL_RID) {
@@ -1139,6 +1147,8 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		break;
 	case RSP_NMP:
 		sendfile(w->fd, rsp.nmp.fd, NULL, rsp.nmp.fz);
+		/* clean up */
+		close(rsp.nmp.fd);
 		break;
 	}
 	/* shouldn't this be a getter? */
