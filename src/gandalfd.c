@@ -1144,6 +1144,8 @@ dccp_data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		break;
 	case RSP_NMP:
 		sendfile(w->fd, rsp.nmp.fd, NULL, rsp.nmp.fz);
+		/* clean up */
+		close(rsp.nmp.fd);
 		break;
 	}
 	/* shouldn't this be a getter? */
