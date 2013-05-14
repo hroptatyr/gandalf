@@ -250,6 +250,9 @@ gand_open(const char *srv, int timeout)
 	/* set up epoll */
 	setsock_nonblock(res->eps);
 	setsock_nonblock(res->gs);
+
+	/* setup event waiter */
+	ep_prep(res, res->gs, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
 	return res;
 }
 
@@ -271,9 +274,6 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 {
 	__ctx_t g = ug;
 	int nfds __attribute__((unused)) = 1;
-
-	/* setup event waiter */
-	ep_prep(g, g->gs, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
 
 	do {
 		typeof(g->ev->events) ev = g->ev[0].events;
