@@ -299,7 +299,10 @@ make_lateglu_name(uint32_t rolf_id)
 	}
 	memcpy(f + idx, glud, sizeof(glud) - 1);
 	idx += sizeof(glud) - 1;
-	snprintf(f + idx, PATH_MAX - idx, "%08u", rolf_id);
+	snprintf(
+		f + idx, PATH_MAX - idx,
+		/* this is the split version */
+		"%04u/%08u", rolf_id / 10000U, rolf_id);
 	return f;
 }
 
