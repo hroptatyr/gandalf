@@ -510,15 +510,20 @@ bang_nfo_line(struct mmmb_s *mb, const char *lin, size_t lsz, uint32_t sel)
 	mmmbuf_check_resize(mb, lsz);
 
 	/* find all tabs first */
-	tabs[0] = rawmemchr(lin, '\t');
-	tabs[1] = rawmemchr(tabs[0] + 1, '\t');
-	tabs[2] = rawmemchr(tabs[1] + 1, '\t');
-	tabs[3] = rawmemchr(tabs[2] + 1, '\t');
-	tabs[4] = rawmemchr(tabs[3] + 1, '\t');
-	tabs[5] = rawmemchr(tabs[4] + 1, '\t');
-	tabs[6] = rawmemchr(tabs[5] + 1, '\t');
-	tabs[7] = rawmemchr(tabs[6] + 1, '\t');
-	tabs[8] = rawmemchr(tabs[7] + 1, '\t');
+	{
+		size_t ntab = 0U;
+
+		for (const char *p = lin, *const ep = p + lsz; p < ep; p++) {
+			if (*p == '\t') {
+				tabs[ntab++] = p;
+			}
+		}
+
+		if (UNLIKELY(ntab < countof(tabs))) {
+			/* we need 9 tabs and found less, line is buggered */
+			return;
+		}
+	}
 
 	/* copy only interesting lines */
 	if (sel & SEL_RID) {
