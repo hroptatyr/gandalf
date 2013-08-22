@@ -54,6 +54,7 @@ struct __recv_st_s {
 	uint32_t lidx;
 	double *d;
 	double *v;
+	char **raw;
 	char **vf;
 	char **res_vf;
 	uint32_t nvf;
@@ -120,12 +121,18 @@ check_resize(struct __recv_st_s *st)
 	/* yep, resize */
 	st->d = mxRealloc(st->d, (st->lidx + RESIZE_STEP) * sizeof(double));
 	memset(st->d + st->lidx, -1, RESIZE_STEP * sizeof(double));
+
 	if (st->ncol) {
-		size_t row_sz = st->ncol * sizeof(double);
+		union foo {double d; char *s;};
+		size_t row_sz = st->ncol * sizeof(union foo);
 		size_t new_sz = (st->lidx + RESIZE_STEP) * row_sz;
 
 		st->v = mxRealloc(st->v, new_sz);
 		memset(st->v + st->lidx * st->ncol, -1, RESIZE_STEP * row_sz);
+
+		/* also resize the raw array */
+		st->raw = mxRealloc(st->raw, new_sz);
+		memset(st->raw + st->lidx * st->ncol, 0, RESIZE_STEP * row_sz);
 	}
 	return;
 }
@@ -151,6 +158,38 @@ qcb(gand_res_t res, void *clo)
 		st->v[st->lidx * st->ncol + this_vf] = tmp;
 		if (st->res_vf && st->res_vf[this_vf] == NULL) {
 			st->res_vf[this_vf] = strdup(res->valflav);
+		}
+	}
+	return 0;
+}
+
+static int
+qrawcb(gand_res_t res, void *clo)
+{
+	struct __recv_st_s *st = clo;
+	int this_vf;
+
+	if (res->date > st->ldat) {
+		st->lidx++;
+		check_resize(st);
+		/* set the date */
+		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
+	}
+
+	if ((st->v || st->raw) &&
+	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
+		/* we demand res->strval to be a double atm */
+		double tmp = strtod(res->strval, NULL);
+
+		/* also fill the second matrix */
+		st->v[st->lidx * st->ncol + this_vf] = tmp;
+		if (st->res_vf && st->res_vf[this_vf] == NULL) {
+			st->res_vf[this_vf] = strdup(res->valflav);
+		}
+
+		if (st->raw) {
+			st->raw[st->lidx * st->ncol + this_vf] =
+				(char*)mxCreateString(res->strval);
 		}
 	}
 	return 0;
@@ -196,7 +235,11 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	rst.lidx = -1;
 
 	/* and off we go */
-	gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
+	if (nlhs <= 3) {
+		gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
+	} else {
+		gand_get_series(hdl, sym, rst.vf, rst.nvf, qrawcb, &rst);
+	}
 
 	/* now reset the matrices to their true dimensions */
 	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
@@ -222,16 +265,35 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		}
 		mxFree(rst.v);
 	}
-	if (nlhs > 2 && rst.res_vf) {
+	if (nlhs > 2) {
 		/* also bang the fields */
 		mwSize dim = rst.nvf;
 		mxArray *ca = plhs[2] = mxCreateCellArray(1, &dim);
-		for (size_t i = 0; i < rst.nvf; i++) {
-			mxArray *s = mxCreateString(rst.res_vf[i]);
-			mxSetCell(ca, i, s);
-			free(rst.res_vf[i]);
+
+		if (rst.res_vf) {
+			for (size_t i = 0; i < rst.nvf; i++) {
+				mxArray *s = mxCreateString(rst.res_vf[i]);
+				mxSetCell(ca, i, s);
+				free(rst.res_vf[i]);
+			}
+			mxFree(rst.res_vf);
 		}
-		mxFree(rst.res_vf);
+	}
+	if (nlhs > 3) {
+		/* since matlab is col oriented, transpose the matrix */
+		mwSize dim[2] = {rst.lidx, rst.ncol};
+		mxArray *ap = plhs[3] = mxCreateCellArray(2, dim);
+
+		for (size_t c = 0; c < rst.ncol; c++) {
+			for (size_t r = 0; r < rst.lidx; r++) {
+				size_t old_pos = r * rst.ncol + c;
+				size_t new_pos = c * rst.lidx + r;
+				mxArray *val = (void*)rst.raw[old_pos];
+
+				mxSetCell(ap, new_pos, val);
+			}
+		}
+		mxFree(rst.raw);
 	}
 	if (rst.vf) {
 		for (size_t i = 0; i < rst.nvf; i++) {
