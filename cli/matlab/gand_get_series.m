@@ -4,6 +4,7 @@
 %   d = gand_get_series(handle, symbol, valflav, ...);
 %   [d, p] = gand_get_series(handle, symbol, valflav, ...);
 %   [d, p, fields] = gand_get_series(handle, symbol, valflav, ...)
+%   [d, p, fields, raw] = gand_get_series(handle, symbol, valflav, ...)
 %
 % Input Arguments:
 %   handle  - a gandalf connection handle as obtained by gand_open()
