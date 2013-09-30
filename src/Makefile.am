@@ -1,6 +1,7 @@
 ### Makefile.am
 
-AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
+AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
+AM_CPPFLAGS += -I$(top_srcdir)/lib
 AM_LDFLAGS =
 
 bin_PROGRAMS =
@@ -18,6 +19,7 @@ sbin_PROGRAMS = gandalfd
 gandalfd_SOURCES =
 EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_CPPFLAGS += -D_GNU_SOURCE
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDADD =
 gandalfd_SOURCES += gandalfd.ggo
@@ -43,6 +45,14 @@ gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
 gandalfd_LDADD += $(top_builddir)/lib/libgandalf.la
 BUILT_SOURCES += gandalfd.x gandalfd.xh
 endif ## BUILD_SERVER
+
+bin_PROGRAMS = gandalf
+gandalf_SOURCES = gandalf.c gandalf.ggo
+gandalf_CPPFLAGS = $(AM_CPPFLAGS)
+gandalf_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandalf_LDFLAGS = $(AM_LDFLAGS)
+gandalf_LDFLAGS += $(tokyocabinet_LIBS)
+BUILT_SOURCES += gandalf.x gandalf.xh
 
 
 ## our rule for gengetopt
