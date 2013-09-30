@@ -151,6 +151,15 @@ next_id(dict_t d)
 	return (dict_id_t)res;
 }
 
+static void
+set_next_id(dict_t d, dict_id_t id)
+{
+	static const char sid[] = SID_SPACE;
+
+	tcbdbput(d, sid, sizeof(sid), &id, sizeof(id));
+	return;
+}
+
 static dict_id_t
 get_sym(dict_t d, const char *sym, size_t ssz)
 {
@@ -273,6 +282,7 @@ Usage: gandalf build IDX2SYM_FILE\n";
 
 	with (const char *fn = argi->inputs[1U]) {
 		FILE *f;
+		dict_id_t max = 0U;
 
 		if ((f = fopen(fn, "r")) == NULL) {
 			res = 1;
@@ -280,10 +290,17 @@ Usage: gandalf build IDX2SYM_FILE\n";
 		}
 
 		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
-			add_sym(d, ln.sym, ln.sid);
+			dict_id_t i;
+
+			if ((i = add_sym(d, ln.sym, ln.sid)) > max) {
+				max = i;
+			}
 		}
 
 		fclose(f);
+
+		/* make sure the maximum index value is recorded */
+		set_next_id(d, max);
 	}
 
 	/* get ready to bugger off */
