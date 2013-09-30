@@ -34,11 +34,129 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
+#if !defined _GNU_SOURCE
+# define _GNU_SOURCE
+#endif	/* _GNU_SOURCE */
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
+#include <tcbdb.h>
+#include <fcntl.h>
 #include "nifty.h"
+
+typedef TCBDB *dict_t;
+
+typedef unsigned int dict_id_t;
+
+struct idx_ln_s {
+	unsigned int rid;
+	const char *sym;
+};
+
+
+static struct idx_ln_s
+get_idx_ln(FILE *f)
+{
+	static char *line;
+	static size_t llen;
+	static FILE *cf;
+	ssize_t nrd;
+	struct idx_ln_s res = {};
+
+	if (UNLIKELY(f == NULL)) {
+		goto out;
+	} else if (cf != f) {
+		if (line != NULL) {
+			free(line);
+		}
+		line = NULL;
+		llen = 0U;
+		if ((cf = f) == NULL) {
+			goto out;
+		}
+	}
+
+	if ((nrd = getline(&line, &llen, f)) > 0) {
+		char *on;
+
+		if ((res.rid = strtoul(line, &on, 10)) == 0U) {
+			;
+		} else if (*on != '\t') {
+			res.rid = 0U;
+		} else {
+			/* valid line it seems */
+			line[nrd - 1] = '\0';
+			res.sym = on + 1;
+		}
+	}
+out:
+	return res;
+}
+
+static dict_t
+make_dict(const char *fn, int oflags)
+{
+	int omode = BDBOREADER;
+	dict_t res;
+
+	if (oflags & O_RDWR) {
+		omode |= BDBOWRITER;
+	}
+	if (oflags & O_CREAT) {
+		omode |= BDBOCREAT;
+	}
+
+	if (UNLIKELY((res = tcbdbnew()) == NULL)) {
+		goto out;
+	} else if (UNLIKELY(!tcbdbopen(res, fn, omode))) {
+		goto free_out;
+	}
+
+	/* success, just return the handle we've got */
+	return res;
+
+free_out:
+	tcbdbdel(res);
+out:
+	return NULL;
+}
+
+static void
+free_dict(dict_t d)
+{
+	tcbdbclose(d);
+	tcbdbdel(d);
+	return;
+}
+
+#define SID_SPACE	"\x1d"
+#define SYM_SPACE	"\x20"
+
+static dict_id_t
+next_id(dict_t d)
+{
+	static const char sid[] = SID_SPACE;
+	int res;
+
+	if (UNLIKELY((res = tcbdbaddint(d, sid, sizeof(sid), 1)) <= 0)) {
+		return 0U;
+	}
+	return (dict_id_t)res;
+}
+
+static dict_id_t
+add_sym(dict_t d, const char *sym, dict_id_t sid)
+{
+/* add SYM with id SID (or if 0 generate one) and return the SID. */
+	if (!sid) {
+		sid = next_id(d);
+	}
+	tcbdbput(d, sym, strlen(sym), &sid, sizeof(sid));
+	return sid;
+}
 
 
 #if defined __INTEL_COMPILER
@@ -51,6 +169,46 @@
 # pragma warning (default:593)
 # pragma warning (default:181)
 #endif	/* __INTEL_COMPILER */
+
+static int
+cmd_build(struct gand_args_info argi[static 1U])
+{
+	static const char usage[] = "\
+Usage: gandalf build IDX2SYM_FILE\n";
+	const int oflags = O_RDWR | O_CREAT;
+	dict_t d;
+	int res = 0;
+
+	if (argi->inputs_num < 2U) {
+		fputs(usage, stderr);
+		res = 1;
+		goto out;
+	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
+		fputs("cannot create dict file\n", stderr);
+		res = 1;
+		goto out;
+	}
+
+	with (const char *fn = argi->inputs[1U]) {
+		FILE *f;
+
+		if ((f = fopen(fn, "r")) == NULL) {
+			res = 1;
+			break;
+		}
+
+		for (struct idx_ln_s ln; (ln = get_idx_ln(f)).rid;) {
+			add_sym(d, ln.sym, ln.rid);
+		}
+
+		fclose(f);
+	}
+
+	/* get ready to bugger off */
+	free_dict(d);
+out:
+	return res;
+}
 
 int
 main(int argc, char *argv[])
@@ -68,9 +226,9 @@ main(int argc, char *argv[])
 		goto out;
 	}
 
-	if_with (const char *cmd = argi->inputs[0U], cmd) {
+	with (const char *cmd = argi->inputs[0U]) {
 		if (!strcmp(cmd, "build")) {
-			;
+			res = cmd_build(argi);
 		} else {
 			/* print help */
 			fprintf(stderr, "Unknown command `%s'\n\n", cmd);
