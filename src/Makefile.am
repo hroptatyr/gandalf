@@ -1,6 +1,6 @@
 ### Makefile.am
 
-AM_CPPFLAGS = -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
+AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS =
 
 bin_PROGRAMS =
@@ -18,6 +18,7 @@ sbin_PROGRAMS = gandalfd
 gandalfd_SOURCES =
 EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_CPPFLAGS += -D_GNU_SOURCE
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDADD =
 gandalfd_SOURCES += gandalfd.ggo
