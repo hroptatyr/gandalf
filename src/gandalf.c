@@ -262,6 +262,49 @@ null:
 #endif	/* __INTEL_COMPILER */
 
 static int
+cmd_addget(struct gand_args_info argi[static 1U], bool addp)
+{
+	static const char usage[] = "\
+Usage: gandalf add [SYMBOL]...\n\
+   or: gandalf get [SYMBOL]...\n";
+	int oflags;
+	dict_t d;
+	int res = 0;
+
+	if (addp) {
+		oflags = O_RDWR | O_CREAT;
+	} else {
+		oflags = O_RDONLY;
+	}
+
+	if (argi->inputs_num < 1U) {
+		fputs(usage, stderr);
+		res = 1;
+		goto out;
+	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
+		fputs("cannot open symbol index file\n", stderr);
+		res = 1;
+		goto out;
+	}
+
+	if_with (const char *sym = argi->inputs[1U], sym) {
+		dict_id_t id;
+
+		if (addp && !(id = add_sym(d, sym))) {
+			fprintf(stderr, "cannot add symbol `%s'\n", sym);
+		} else if (!addp && !(id = get_sym(d, sym, strlen(sym)))) {
+			fprintf(stderr, "no symbol `%s' in index file\n", sym);
+		}
+		printf("%08u\n", id);
+	}
+
+	/* get ready to bugger off */
+	free_dict(d);
+out:
+	return res;
+}
+
+static int
 cmd_build(struct gand_args_info argi[static 1U])
 {
 	static const char usage[] = "\
@@ -356,7 +399,11 @@ main(int argc, char *argv[])
 	}
 
 	with (const char *cmd = argi->inputs[0U]) {
-		if (!strcmp(cmd, "build")) {
+		if (!strcmp(cmd, "add")) {
+			res = cmd_addget(argi, true);
+		} else if (!strcmp(cmd, "get")) {
+			res = cmd_addget(argi, false);
+		} else if (!strcmp(cmd, "build")) {
 			res = cmd_build(argi);
 		} else if (!strcmp(cmd, "dump")) {
 			res = cmd_dump(argi);

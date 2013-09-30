@@ -3,7 +3,9 @@ usage "gandalf COMMAND [OPTION]..."
 description "Helpers to bring the gandalf system into shape.
 
 COMMAND may be one of:
+  add     Add a symbol to the symbol index.
   build   Generate the symbol index.
   dump    Generate a dump of specified IDX file.
+  get     Get a symbol from the symbol index.
 "
 
