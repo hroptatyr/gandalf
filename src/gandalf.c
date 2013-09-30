@@ -41,6 +41,7 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <tcbdb.h>
@@ -51,13 +52,15 @@ typedef TCBDB *dict_t;
 
 typedef unsigned int dict_id_t;
 
-struct idx_ln_s {
-	unsigned int sid;
+typedef struct dict_si_s dict_si_t;
+
+struct dict_si_s {
+	dict_id_t sid;
 	const char *sym;
 };
 
 
-static struct idx_ln_s
+static dict_si_t
 get_idx_ln(FILE *f)
 {
 /* uses static state */
@@ -65,7 +68,7 @@ get_idx_ln(FILE *f)
 	static size_t llen;
 	static FILE *cf;
 	ssize_t nrd;
-	struct idx_ln_s res = {};
+	dict_si_t res = {};
 
 	if (UNLIKELY(f == NULL)) {
 		goto out;
@@ -149,9 +152,16 @@ next_id(dict_t d)
 }
 
 static dict_id_t
-add_sym(dict_t d, const char *sym, dict_id_t sid)
+add_sym(dict_t d, const char *sym, ...)
 {
 /* add SYM with id SID (or if 0 generate one) and return the SID. */
+	va_list ap;
+	dict_id_t sid;
+
+	va_start(ap, sym);
+	sid = va_arg(ap, dict_id_t);
+	va_end(ap);
+
 	if (!sid) {
 		sid = next_id(d);
 	}
@@ -159,12 +169,12 @@ add_sym(dict_t d, const char *sym, dict_id_t sid)
 	return sid;
 }
 
-static struct idx_ln_s
+static dict_si_t
 dict_iter(dict_t d)
 {
 /* uses static state */
 	static BDBCUR *c;
-	struct idx_ln_s res;
+	dict_si_t res;
 	const void *vp;
 	int z[1U];
 
@@ -195,7 +205,7 @@ null:
 		tcbdbcurdel(c);
 	}
 	c = NULL;
-	return (struct idx_ln_s){};
+	return (dict_si_t){};
 }
 
 
@@ -237,7 +247,7 @@ Usage: gandalf build IDX2SYM_FILE\n";
 			break;
 		}
 
-		for (struct idx_ln_s ln; (ln = get_idx_ln(f)).sid;) {
+		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
 			add_sym(d, ln.sym, ln.sid);
 		}
 
@@ -274,8 +284,8 @@ Usage: gandalf dump IDX_FILE\n";
 	}
 
 	/* just iterate (coroutine with static state) */
-	for (struct idx_ln_s ln; (ln = dict_iter(d)).sid;) {
-		printf("%s\t%08u\n", ln.sym, ln.sid);
+	for (dict_si_t si; (si = dict_iter(d)).sid;) {
+		printf("%s\t%08u\n", si.sym, si.sid);
 	}
 
 	/* and out we are */
