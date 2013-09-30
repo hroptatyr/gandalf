@@ -152,20 +152,42 @@ next_id(dict_t d)
 }
 
 static dict_id_t
-add_sym(dict_t d, const char *sym, ...)
+get_sym(dict_t d, const char *sym, size_t ssz)
+{
+	const dict_id_t *rp;
+	int rz[1];
+
+	if (UNLIKELY((rp = tcbdbget3(d, sym, ssz, rz)) == NULL)) {
+		return 0U;
+	} else if (UNLIKELY(*rz != sizeof(*rp))) {
+		return 0U;
+	}
+	return *rp;
+}
+
+static dict_id_t
+add_sym(dict_t d, const char sym[static 1U], ...)
 {
 /* add SYM with id SID (or if 0 generate one) and return the SID. */
 	va_list ap;
 	dict_id_t sid;
+	size_t ssz = strlen(sym);
 
 	va_start(ap, sym);
 	sid = va_arg(ap, dict_id_t);
 	va_end(ap);
 
 	if (!sid) {
+		if ((sid = get_sym(d, sym, ssz))) {
+			/* ok, nothing to do */
+			goto out;
+		}
+		/* otherwise just use our token machine for the next thing */
 		sid = next_id(d);
 	}
-	tcbdbput(d, sym, strlen(sym), &sid, sizeof(sid));
+	/* finally just assoc SYM with SID */
+	tcbdbput(d, sym, ssz, &sid, sizeof(sid));
+out:
 	return sid;
 }
 
