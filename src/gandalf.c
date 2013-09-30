@@ -275,7 +275,7 @@ Usage: gandalf build IDX2SYM_FILE\n";
 		res = 1;
 		goto out;
 	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
-		fputs("cannot create dict file\n", stderr);
+		fputs("cannot create symbol index file\n", stderr);
 		res = 1;
 		goto out;
 	}
@@ -313,21 +313,16 @@ static int
 cmd_dump(struct gand_args_info argi[static 1U])
 {
 	static const char usage[] = "\
-Usage: gandalf dump IDX_FILE\n";
-	const char *fn;
+Usage: gandalf dump\n";
 	dict_t d;
 	int res = 0;
 
-	if (argi->inputs_num < 2U) {
+	if (argi->inputs_num < 1U) {
 		fputs(usage, stderr);
 		res = 1;
 		goto out;
-	} else if ((fn = argi->inputs[1U]) == NULL) {
-		fputs(usage, stderr);
-		res = 1;
-		goto out;
-	} else if ((d = make_dict(argi->inputs[1U], O_RDONLY)) == NULL) {
-		fprintf(stderr, "cannot open dict file %s\n", fn);
+	} else if ((d = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
+		fputs("cannot open symbol index file\n", stderr);
 		res = 1;
 		goto out;
 	}
