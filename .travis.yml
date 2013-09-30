@@ -15,6 +15,7 @@ before_script:
   - sudo apt-get install -qq bison
   - sudo apt-get install -qq flex
   - sudo apt-get install -qq gperf
+  - sudo apt-get install -qq libtokyocabinet-dev
   - autoreconf -vfi
 
 script: ./configure && make clean all check distcheck || (cat test/test-suite.log && /bin/false)
