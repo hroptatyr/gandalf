@@ -1371,8 +1371,8 @@ write_pidfile(const char *pidfile)
 # pragma warning (disable:593)
 # pragma warning (disable:181)
 #endif	/* __INTEL_COMPILER */
-#include "gandalfd-clo.h"
-#include "gandalfd-clo.c"
+#include "gandalfd.xh"
+#include "gandalfd.x"
 #if defined __INTEL_COMPILER
 # pragma warning (default:593)
 # pragma warning (default:181)
