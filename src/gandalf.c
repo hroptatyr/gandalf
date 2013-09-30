@@ -41,7 +41,6 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <tcbdb.h>
@@ -161,7 +160,7 @@ set_next_id(dict_t d, dict_id_t id)
 }
 
 static dict_id_t
-get_sym(dict_t d, const char *sym, size_t ssz)
+get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
 	const dict_id_t *rp;
 	int rz[1];
@@ -175,38 +174,28 @@ get_sym(dict_t d, const char *sym, size_t ssz)
 }
 
 static int
-put_sym(dict_t d, const char *sym, size_t ssz, dict_id_t sid)
+put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_id_t sid)
 {
 	return tcbdbput(d, sym, ssz, &sid, sizeof(sid)) - 1;
 }
 
 static dict_id_t
-add_sym(dict_t d, const char sym[static 1U], ...)
+add_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
 /* add SYM with id SID (or if 0 generate one) and return the SID. */
-	va_list ap;
 	dict_id_t sid;
-	size_t ssz = strlen(sym);
 
-	va_start(ap, sym);
-	sid = va_arg(ap, dict_id_t);
-	va_end(ap);
-
-	if (!sid) {
-		if ((sid = get_sym(d, sym, ssz))) {
-			/* ok, nothing to do */
-			goto out;
-		} else if (UNLIKELY(!(sid = next_id(d)))) {
-			/* huh? */
-			goto out;
-		}
-	}
+	if ((sid = get_sym(d, sym, ssz))) {
+		/* ok, nothing to do */
+		;
+	} else if (UNLIKELY(!(sid = next_id(d)))) {
+		/* huh? */
+		;
 	/* finally just assoc SYM with SID */
-	if (UNLIKELY(put_sym(d, sym, ssz, sid) < 0)) {
+	} else if (UNLIKELY(put_sym(d, sym, ssz, sid) < 0)) {
 		/* grrrr */
 		sid = 0U;
 	}
-out:
 	return sid;
 }
 
@@ -287,15 +276,23 @@ Usage: gandalf add [SYMBOL]...\n\
 		goto out;
 	}
 
-	if_with (const char *sym = argi->inputs[1U], sym) {
-		dict_id_t id;
+	if (argi->inputs_num > 1U) {
+		for (unsigned int i = 1U; i < argi->inputs_num; i++) {
+			const char *sym = argi->inputs[i];
+			size_t ssz = strlen(sym);
+			dict_id_t id;
 
-		if (addp && !(id = add_sym(d, sym))) {
-			fprintf(stderr, "cannot add symbol `%s'\n", sym);
-		} else if (!addp && !(id = get_sym(d, sym, strlen(sym)))) {
-			fprintf(stderr, "no symbol `%s' in index file\n", sym);
+			if (addp && !(id = add_sym(d, sym, ssz))) {
+				fprintf(stderr, "\
+cannot add symbol `%s'\n", sym);
+			} else if (!addp && !(id = get_sym(d, sym, ssz))) {
+				fprintf(stderr, "\
+no symbol `%s' in index file\n", sym);
+			}
+			printf("%08u\n", id);
 		}
-		printf("%08u\n", id);
+	} else {
+		/* get symlist from stdin */
 	}
 
 	/* get ready to bugger off */
