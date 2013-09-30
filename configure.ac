@@ -104,6 +104,10 @@ AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.]
 	], [with_matlab="no"])
 AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
 
+PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
+AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
+with_database="tcbdb"
+
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
