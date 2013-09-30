@@ -165,6 +165,12 @@ get_sym(dict_t d, const char *sym, size_t ssz)
 	return *rp;
 }
 
+static int
+put_sym(dict_t d, const char *sym, size_t ssz, dict_id_t sid)
+{
+	return tcbdbput(d, sym, ssz, &sid, sizeof(sid)) - 1;
+}
+
 static dict_id_t
 add_sym(dict_t d, const char sym[static 1U], ...)
 {
@@ -181,12 +187,16 @@ add_sym(dict_t d, const char sym[static 1U], ...)
 		if ((sid = get_sym(d, sym, ssz))) {
 			/* ok, nothing to do */
 			goto out;
+		} else if (UNLIKELY(!(sid = next_id(d)))) {
+			/* huh? */
+			goto out;
 		}
-		/* otherwise just use our token machine for the next thing */
-		sid = next_id(d);
 	}
 	/* finally just assoc SYM with SID */
-	tcbdbput(d, sym, ssz, &sid, sizeof(sid));
+	if (UNLIKELY(put_sym(d, sym, ssz, sid) < 0)) {
+		/* grrrr */
+		sid = 0U;
+	}
 out:
 	return sid;
 }
