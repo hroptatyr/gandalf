@@ -20,7 +20,7 @@ EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDADD =
-gandalfd_SOURCES += gandalfd-clo.ggo
+gandalfd_SOURCES += gandalfd.ggo
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_SOURCES += logger.h
 gandalfd_SOURCES += trie.c trie.h triedefs.h
@@ -41,13 +41,13 @@ gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
 gandalfd_LDADD += $(top_builddir)/lib/libgandalf.la
-BUILT_SOURCES += gandalfd-clo.c gandalfd-clo.h
+BUILT_SOURCES += gandalfd.x gandalfd.xh
 endif ## BUILD_SERVER
 
 
 ## our rule for gengetopt
-%.c %.h: %.ggo
-	$(AM_V_GEN) gengetopt -l -i $< -F $*
+%.x %.xh: %.ggo
+	$(AM_V_GEN) gengetopt -l -c x -H xh -i $< -F $*
 
 # 
 # Help the developers get nice post-processed source files
