@@ -290,10 +290,11 @@ Usage: gandalf build IDX2SYM_FILE\n";
 		}
 
 		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
-			dict_id_t i;
-
-			if ((i = add_sym(d, ln.sym, ln.sid)) > max) {
-				max = i;
+			if (put_sym(d, ln.sym, strlen(ln.sym), ln.sid) < 0) {
+				/* ok, fuck that then */
+				;
+			} else if (ln.sid > max) {
+				max = ln.sid;
 			}
 		}
 
