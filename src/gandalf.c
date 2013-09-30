@@ -293,6 +293,25 @@ no symbol `%s' in index file\n", sym);
 		}
 	} else {
 		/* get symlist from stdin */
+		char *line = NULL;
+		size_t llen = 0UL;
+		ssize_t nrd;
+
+		while ((nrd = getline(&line, &llen, stdin)) > 0) {
+			const char *sym = line;
+			size_t ssz = nrd - 1U;
+			dict_id_t id;
+
+			line[ssz] = '\0';
+			if (addp && !(id = add_sym(d, sym, ssz))) {
+				fprintf(stderr, "\
+cannot add symbol `%s'\n", sym);
+			} else if (!addp && !(id = get_sym(d, sym, ssz))) {
+				fprintf(stderr, "\
+no symbol `%s' in index file\n", sym);
+			}
+			printf("%08u\n", id);
+		}
 	}
 
 	/* get ready to bugger off */
