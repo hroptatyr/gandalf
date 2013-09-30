@@ -54,6 +54,15 @@ gandalf_LDFLAGS = $(AM_LDFLAGS)
 gandalf_LDFLAGS += $(tokyocabinet_LIBS)
 BUILT_SOURCES += gandalf.x gandalf.xh
 
+noinst_PROGRAMS += gandalfd-onion
+gandalfd_onion_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_onion_CPPFLAGS += -I/home/freundt/usr/include
+gandalfd_onion_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandalfd_onion_LDFLAGS = $(AM_LDFALGS)
+gandalfd_onion_LDFLAGS += -L/home/freundt/usr/lib
+gandalfd_onion_LDFLAGS += $(tokyocabinet_LIBS)
+gandalfd_onion_LDADD = -lonion_static -lpthread
+
 
 ## our rule for gengetopt
 %.x %.xh: %.ggo
