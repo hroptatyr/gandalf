@@ -52,7 +52,7 @@ typedef TCBDB *dict_t;
 typedef unsigned int dict_id_t;
 
 struct idx_ln_s {
-	unsigned int rid;
+	unsigned int sid;
 	const char *sym;
 };
 
@@ -60,6 +60,7 @@ struct idx_ln_s {
 static struct idx_ln_s
 get_idx_ln(FILE *f)
 {
+/* uses static state */
 	static char *line;
 	static size_t llen;
 	static FILE *cf;
@@ -82,10 +83,10 @@ get_idx_ln(FILE *f)
 	if ((nrd = getline(&line, &llen, f)) > 0) {
 		char *on;
 
-		if ((res.rid = strtoul(line, &on, 10)) == 0U) {
+		if ((res.sid = strtoul(line, &on, 10)) == 0U) {
 			;
 		} else if (*on != '\t') {
-			res.rid = 0U;
+			res.sid = 0U;
 		} else {
 			/* valid line it seems */
 			line[nrd - 1] = '\0';
@@ -158,6 +159,45 @@ add_sym(dict_t d, const char *sym, dict_id_t sid)
 	return sid;
 }
 
+static struct idx_ln_s
+dict_iter(dict_t d)
+{
+/* uses static state */
+	static BDBCUR *c;
+	struct idx_ln_s res;
+	const void *vp;
+	int z[1U];
+
+	if (UNLIKELY(c == NULL)) {
+		c = tcbdbcurnew(d);
+		tcbdbcurjump(c, SYM_SPACE, sizeof(SYM_SPACE));
+	}
+
+	if (UNLIKELY((vp = tcbdbcurval3(c, z)) == NULL)) {
+		goto null;
+	} else if (*z != sizeof(int)) {
+		goto null;
+	}
+	/* otherwise fill res */
+	res.sid = *(const int*)vp;
+
+	if (UNLIKELY((vp = tcbdbcurkey3(c, z)) == NULL)) {
+		goto null;
+	}
+	/* or fill */
+	res.sym = vp;
+	/* also iterate to the next thing */
+	tcbdbcurnext(c);
+	return res;
+
+null:
+	if (LIKELY(c != NULL)) {
+		tcbdbcurdel(c);
+	}
+	c = NULL;
+	return (struct idx_ln_s){};
+}
+
 
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
@@ -197,14 +237,48 @@ Usage: gandalf build IDX2SYM_FILE\n";
 			break;
 		}
 
-		for (struct idx_ln_s ln; (ln = get_idx_ln(f)).rid;) {
-			add_sym(d, ln.sym, ln.rid);
+		for (struct idx_ln_s ln; (ln = get_idx_ln(f)).sid;) {
+			add_sym(d, ln.sym, ln.sid);
 		}
 
 		fclose(f);
 	}
 
 	/* get ready to bugger off */
+	free_dict(d);
+out:
+	return res;
+}
+
+static int
+cmd_dump(struct gand_args_info argi[static 1U])
+{
+	static const char usage[] = "\
+Usage: gandalf dump IDX_FILE\n";
+	const char *fn;
+	dict_t d;
+	int res = 0;
+
+	if (argi->inputs_num < 2U) {
+		fputs(usage, stderr);
+		res = 1;
+		goto out;
+	} else if ((fn = argi->inputs[1U]) == NULL) {
+		fputs(usage, stderr);
+		res = 1;
+		goto out;
+	} else if ((d = make_dict(argi->inputs[1U], O_RDONLY)) == NULL) {
+		fprintf(stderr, "cannot open dict file %s\n", fn);
+		res = 1;
+		goto out;
+	}
+
+	/* just iterate (coroutine with static state) */
+	for (struct idx_ln_s ln; (ln = dict_iter(d)).sid;) {
+		printf("%s\t%08u\n", ln.sym, ln.sid);
+	}
+
+	/* and out we are */
 	free_dict(d);
 out:
 	return res;
@@ -229,6 +303,8 @@ main(int argc, char *argv[])
 	with (const char *cmd = argi->inputs[0U]) {
 		if (!strcmp(cmd, "build")) {
 			res = cmd_build(argi);
+		} else if (!strcmp(cmd, "dump")) {
+			res = cmd_dump(argi);
 		} else {
 			/* print help */
 			fprintf(stderr, "Unknown command `%s'\n\n", cmd);
