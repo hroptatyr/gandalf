@@ -1,6 +1,7 @@
 args "--unamed-opts --no-handle-error --long-help -a gand_args_info -f gand_parser"
-usage "gandalf COMMAND [OPTION]..."
+usage "gandaux COMMAND [OPTION]..."
 description "Helpers to bring the gandalf system into shape.
+This is meant for the server side.
 
 COMMAND may be one of:
   add     Add a symbol to the symbol index.
