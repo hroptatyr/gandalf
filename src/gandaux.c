@@ -243,8 +243,8 @@ null:
 # pragma warning (disable:593)
 # pragma warning (disable:181)
 #endif	/* __INTEL_COMPILER */
-#include "gandalf.xh"
-#include "gandalf.x"
+#include "gandaux.xh"
+#include "gandaux.x"
 #if defined __INTEL_COMPILER
 # pragma warning (default:593)
 # pragma warning (default:181)
