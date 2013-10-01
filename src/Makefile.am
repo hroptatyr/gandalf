@@ -11,17 +11,16 @@ BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
 
-if BUILD_SERVER
 pkgconfigdir = ${libdir}/pkgconfig
 pkgconfig_DATA = gandalf.pc
 
-bin_PROGRAMS += gandalf
-gandalf_SOURCES = gandalf.c gandalf.ggo
-gandalf_CPPFLAGS = $(AM_CPPFLAGS)
-gandalf_CPPFLAGS += $(tokyocabinet_CFLAGS)
-gandalf_LDFLAGS = $(AM_LDFLAGS)
-gandalf_LDFLAGS += $(tokyocabinet_LIBS)
-BUILT_SOURCES += gandalf.x gandalf.xh
+bin_PROGRAMS += gandaux
+gandaux_SOURCES = gandaux.c gandaux.ggo
+gandaux_CPPFLAGS = $(AM_CPPFLAGS)
+gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandaux_LDFLAGS = $(AM_LDFLAGS)
+gandaux_LDFLAGS += $(tokyocabinet_LIBS)
+BUILT_SOURCES += gandaux.x gandaux.xh
 
 noinst_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
