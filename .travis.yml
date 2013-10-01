@@ -19,8 +19,8 @@ before_script:
   - autoreconf -vfi
 
 script:
-  ./configure --enable-server || (cat config.log && /bin/false)
-  make clean all check distcheck || (cat test/test-suite.log && /bin/false)
+  - ./configure --enable-server || (cat config.log && /bin/false)
+  - make clean all check distcheck || (cat test/test-suite.log && /bin/false)
 
 ## whitelist
 branches:
