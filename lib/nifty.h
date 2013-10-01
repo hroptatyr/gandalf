@@ -77,20 +77,6 @@
 # define xfree(_x)	free(_x)
 #endif	/* !xfree */
 
-#if defined DEBUG_FLAG
-# include <stdio.h>
-# define GAND_DEBUG(args...)			\
-	fprintf(gand_logout, "[gand] " args)
-# define GAND_DBGCONT(args...)			\
-	fprintf(gand_logout, args)
-#else  /* !DEBUG_FLAG */
-# define GAND_DEBUG(args...)
-# define GAND_DBGCONT(args...)
-#endif	/* DEBUG_FLAG */
-
-/* fixme, any chance we can get that one from the server? */
-extern void *gand_logout;
-
 /* just a service for mmap based allocators */
 #if !defined MAP_ANON && defined MAP_ANONYMOUS
 # define MAP_ANON	MAP_ANONYMOUS
