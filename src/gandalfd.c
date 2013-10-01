@@ -69,8 +69,16 @@
 #include "slut.h"
 #include "nifty.h"
 
-/* we assume unserding with logger feature */
-void *gand_logout;
+#if defined DEBUG_FLAG
+# include <stdio.h>
+# define GAND_DEBUG(args...)			\
+	fprintf(gand_logout, "[gand] " args)
+# define GAND_DBGCONT(args...)			\
+	fprintf(gand_logout, args)
+#else  /* !DEBUG_FLAG */
+# define GAND_DEBUG(args...)
+# define GAND_DBGCONT(args...)
+#endif	/* DEBUG_FLAG */
 
 #define GAND_MOD		"[mod/gand]"
 #define GAND_INFO_LOG(args...)				\
@@ -147,6 +155,9 @@ static size_t ntrolfdir;
 static char *nfo_fname = NULL;
 
 static struct slut_s i2s_s[1];
+
+/* we assume unserding with logger feature */
+static void *gand_logout;
 
 static size_t
 gand_get_trolfdir(char **tgt, cfg_t ctx)

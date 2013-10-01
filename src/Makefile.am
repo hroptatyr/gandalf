@@ -46,7 +46,7 @@ gandalfd_LDADD += $(top_builddir)/lib/libgandalf.la
 BUILT_SOURCES += gandalfd.x gandalfd.xh
 endif ## BUILD_SERVER
 
-bin_PROGRAMS = gandalf
+bin_PROGRAMS += gandalf
 gandalf_SOURCES = gandalf.c gandalf.ggo
 gandalf_CPPFLAGS = $(AM_CPPFLAGS)
 gandalf_CPPFLAGS += $(tokyocabinet_CFLAGS)
@@ -55,6 +55,11 @@ gandalf_LDFLAGS += $(tokyocabinet_LIBS)
 BUILT_SOURCES += gandalf.x gandalf.xh
 
 noinst_PROGRAMS += gandalfd-onion
+gandalfd_onion_SOURCES = gandalfd-onion.c
+gandalfd_onion_SOURCES += gandalfd.ggo
+gandalfd_onion_SOURCES += fops.h
+gandalfd_onion_SOURCES += logger.c logger.h
+gandalfd_onion_SOURCES += configger.c configger.h
 gandalfd_onion_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_onion_CPPFLAGS += -I/home/freundt/usr/include
 gandalfd_onion_CPPFLAGS += $(tokyocabinet_CFLAGS)
@@ -62,6 +67,11 @@ gandalfd_onion_LDFLAGS = $(AM_LDFALGS)
 gandalfd_onion_LDFLAGS += -L/home/freundt/usr/lib
 gandalfd_onion_LDFLAGS += $(tokyocabinet_LIBS)
 gandalfd_onion_LDADD = -lonion_static -lpthread
+if HAVE_LUA
+gandalfd_onion_SOURCES += lua-config.c lua-config.h
+gandalfd_onion_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
+gandalfd_onion_LDFLAGS += $(lua_LIBS)
+endif  HAVE_LUA
 
 
 ## our rule for gengetopt
