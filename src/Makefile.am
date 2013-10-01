@@ -11,7 +11,6 @@ BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
 
-if BUILD_SERVER
 pkgconfigdir = ${libdir}/pkgconfig
 pkgconfig_DATA = gandalf.pc
 
