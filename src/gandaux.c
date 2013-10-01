@@ -1,4 +1,4 @@
-/*** gandalf.c -- gandalf cli helper
+/*** gandaux.c -- gandalf cli auxiliary helper
  *
  * Copyright (C) 2011-2012 Sebastian Freundt
  *
@@ -254,8 +254,8 @@ static int
 cmd_addget(struct gand_args_info argi[static 1U], bool addp)
 {
 	static const char usage[] = "\
-Usage: gandalf add [SYMBOL]...\n\
-   or: gandalf get [SYMBOL]...\n";
+Usage: gandaux add [SYMBOL]...\n\
+   or: gandaux get [SYMBOL]...\n";
 	int oflags;
 	dict_t d;
 	int res = 0;
@@ -324,7 +324,7 @@ static int
 cmd_build(struct gand_args_info argi[static 1U])
 {
 	static const char usage[] = "\
-Usage: gandalf build IDX2SYM_FILE\n";
+Usage: gandaux build IDX2SYM_FILE\n";
 	const int oflags = O_RDWR | O_CREAT;
 	dict_t d;
 	int res = 0;
@@ -373,7 +373,7 @@ static int
 cmd_dump(struct gand_args_info argi[static 1U])
 {
 	static const char usage[] = "\
-Usage: gandalf dump\n";
+Usage: gandaux dump\n";
 	dict_t d;
 	int res = 0;
 
@@ -437,4 +437,4 @@ out:
 	return res;
 }
 
-/* gandalfd.c ends here */
+/* gandaux.c ends here */
