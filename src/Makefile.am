@@ -15,37 +15,6 @@ if BUILD_SERVER
 pkgconfigdir = ${libdir}/pkgconfig
 pkgconfig_DATA = gandalf.pc
 
-sbin_PROGRAMS = gandalfd
-gandalfd_SOURCES =
-EXTRA_gandalfd_SOURCES =
-gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_CPPFLAGS += -D_GNU_SOURCE
-gandalfd_LDFLAGS = $(AM_LDFLAGS)
-gandalfd_LDADD =
-gandalfd_SOURCES += gandalfd.ggo
-gandalfd_SOURCES += configger.c configger.h
-gandalfd_SOURCES += logger.h
-gandalfd_SOURCES += trie.c trie.h triedefs.h
-gandalfd_CPPFLAGS += -DSTATIC_TRIE_GUTS
-EXTRA_gandalfd_SOURCES += darray.c darray.h
-EXTRA_gandalfd_SOURCES += tail.c tail.h
-gandalfd_SOURCES += slut.c slut.h
-gandalfd_SOURCES += slut-trie-glue.h
-gandalfd_SOURCES += fileutils.h
-gandalfd_SOURCES += gandalfd.c
-EXTRA_gandalfd_SOURCES += gq.c gq.h
-gandalfd_CPPFLAGS += $(libev_CFLAGS)
-gandalfd_LDFLAGS += $(libev_LIBS)
-if HAVE_LUA
-gandalfd_SOURCES += lua-config.c lua-config.h
-gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
-gandalfd_LDFLAGS += $(lua_LIBS)
-endif  HAVE_LUA
-gandalfd_CPPFLAGS += -I$(top_srcdir)/lib
-gandalfd_LDADD += $(top_builddir)/lib/libgandalf.la
-BUILT_SOURCES += gandalfd.x gandalfd.xh
-endif ## BUILD_SERVER
-
 bin_PROGRAMS += gandalf
 gandalf_SOURCES = gandalf.c gandalf.ggo
 gandalf_CPPFLAGS = $(AM_CPPFLAGS)
@@ -54,23 +23,23 @@ gandalf_LDFLAGS = $(AM_LDFLAGS)
 gandalf_LDFLAGS += $(tokyocabinet_LIBS)
 BUILT_SOURCES += gandalf.x gandalf.xh
 
-noinst_PROGRAMS += gandalfd-onion
-gandalfd_onion_SOURCES = gandalfd-onion.c
-gandalfd_onion_SOURCES += gandalfd.ggo
-gandalfd_onion_SOURCES += fops.h
-gandalfd_onion_SOURCES += logger.c logger.h
-gandalfd_onion_SOURCES += configger.c configger.h
-gandalfd_onion_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_onion_CPPFLAGS += -I/home/freundt/usr/include
-gandalfd_onion_CPPFLAGS += $(tokyocabinet_CFLAGS)
-gandalfd_onion_LDFLAGS = $(AM_LDFALGS)
-gandalfd_onion_LDFLAGS += -L/home/freundt/usr/lib
-gandalfd_onion_LDFLAGS += $(tokyocabinet_LIBS)
-gandalfd_onion_LDADD = -lonion_static -lpthread
+noinst_PROGRAMS += gandalfd
+gandalfd_SOURCES = gandalfd.c
+gandalfd_SOURCES += gandalfd.ggo
+gandalfd_SOURCES += fops.h
+gandalfd_SOURCES += logger.c logger.h
+gandalfd_SOURCES += configger.c configger.h
+gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_CPPFLAGS += -I/home/freundt/usr/include
+gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandalfd_LDFLAGS = $(AM_LDFALGS)
+gandalfd_LDFLAGS += -L/home/freundt/usr/lib
+gandalfd_LDFLAGS += $(tokyocabinet_LIBS)
+gandalfd_LDADD = -lonion_static -lpthread
 if HAVE_LUA
-gandalfd_onion_SOURCES += lua-config.c lua-config.h
-gandalfd_onion_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
-gandalfd_onion_LDFLAGS += $(lua_LIBS)
+gandalfd_SOURCES += lua-config.c lua-config.h
+gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
+gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 
 
