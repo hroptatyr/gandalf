@@ -21,7 +21,7 @@ before_script:
   - autoreconf -vfi
 
 script:
-  - ./configure --enable-server onion_CFLAGS="-I/usr/include" onion_LIBS="-L/usr/lib -lonion_static -lgnutls -lpthread -lrt" || (cat config.log && /bin/false)
+  - ./configure --enable-server onion_CFLAGS="-I/usr/include" onion_LIBS="-L/usr/lib -lonion -lgnutls -lpthread -lrt" || (cat config.log && /bin/false)
   - make clean all check distcheck || (cat test/test-suite.log && /bin/false)
 
 ## whitelist
