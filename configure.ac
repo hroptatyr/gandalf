@@ -94,6 +94,9 @@ with_database="tcbdb"
 dnl CMAKE_FIND_PACKAGE([onion], [C], [GNU])
 AC_ARG_VAR([onion_CFLAGS], [C compiler flags for onion.])dnl
 AC_ARG_VAR([onion_LIBS], [linker flags for onion.])dnl
+if test -z "${onion_LIBS}" -o "${onion_LIBS}" = "''"; then
+	enable_server="no"
+fi
 
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
