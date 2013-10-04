@@ -10,7 +10,7 @@ config.sub
 install-sh
 missing
 ylwrap
-lib/config.h.in
+src/config.h.in
 *~
 =build*
 build*

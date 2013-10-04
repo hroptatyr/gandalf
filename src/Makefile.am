@@ -14,6 +14,7 @@ CLEANFILES =
 pkgconfigdir = ${libdir}/pkgconfig
 pkgconfig_DATA = gandalf.pc
 
+if BUILD_SERVER
 bin_PROGRAMS += gandaux
 gandaux_SOURCES = gandaux.c gandaux.ggo
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
@@ -40,6 +41,7 @@ gandalfd_SOURCES += lua-config.c lua-config.h
 gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
 gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
+endif  BUILD_SERVER
 
 
 ## our rule for gengetopt

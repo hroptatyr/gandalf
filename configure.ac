@@ -10,9 +10,9 @@ popdef([version])dnl
 ])
 AC_INIT([gandalf], [GIT_VERSION_GEN], [https://github.com/hroptatyr/gandalf])
 AC_CONFIG_AUX_DIR([.])
-AC_CONFIG_HEADER([lib/config.h])
+AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_SRCDIR([lib/])
+AC_CONFIG_SRCDIR([src/])
 
 dnl -------------------------------------------------------------------------
 dnl Local copyright notices.
@@ -86,10 +86,6 @@ AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
-AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library, default: no.])],
-	[enable_library="${enableval}"], [enable_library="no"])
-AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
@@ -111,10 +107,8 @@ with_database="tcbdb"
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
-AC_CONFIG_FILES([lib/Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([src/gandalf.pc])
-AC_CONFIG_FILES([lib/libgandalf.pc])
 AC_OUTPUT
 
 if test -n "${BUILD_SERVER_FALSE}"; then
@@ -127,11 +121,6 @@ if test -n "${BUILD_CLIAPPS_FALSE}"; then
 else
 	BUILD_CLI="no"
 fi
-if test -n "${BUILD_LIBRARY_FALSE}"; then
-	BUILD_LIB="yes"
-else
-	BUILD_LIB="no"
-fi
 
 echo
 echo
@@ -140,7 +129,6 @@ echo "============="
 echo
 echo "Build server: ${BUILD_SRV}"
 echo "Build cliapps: ${BUILD_CLI}"
-echo "Build library: ${BUILD_LIB}"
 echo
 
 dnl configure.ac ends here
