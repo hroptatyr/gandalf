@@ -32,26 +32,15 @@ AC_COPYRIGHT(
 AM_INIT_AUTOMAKE([foreign dist-xz])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-## initialise our cool message nest levels
-SXE_INIT_MSG_LEVEL
-
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CC_C99
 SXE_CHECK_CFLAGS
-SXE_CHECK_LDFLAGS
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
-
-AC_PATH_PROG([GPERF], [gperf])
-AC_ARG_VAR([GPERF], [full path to the gperf tool])
-
-## event loop
-SXE_CHECK_LIBEV
-AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
@@ -90,7 +79,6 @@ AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
 	[dnl
-		SXE_LANG_WERROR([off])
 		SXE_CHECK_MATLAB([${withval}])
 		if test "${enable_cliapps}" != "no" -a \
 			-n "${sxe_cv_matlabroot}"; then
@@ -103,6 +91,8 @@ AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
 PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
 AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
 with_database="tcbdb"
+
+CMAKE_FIND_PACKAGE([onion], [C], [GNU])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
