@@ -15,7 +15,7 @@ before_script:
 
 script:
   - ./configure --enable-server onion_CFLAGS="-I/usr/include" onion_LIBS="-L/usr/lib -lonion -lgnutls -lpthread -lrt" || (cat config.log && /bin/false)
-  - make V=1 clean all check distcheck || (cat test/test-suite.log && /bin/false)
+  - make clean all check distcheck || (cat test/test-suite.log && /bin/false)
 
 ## whitelist
 branches:
