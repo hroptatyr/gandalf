@@ -33,6 +33,8 @@ AC_DEFUN([SXE_CHECK_MATLAB], [dnl
 
 	AC_MSG_RESULT([${sxe_cv_matlabroot}])
 
+	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+	ac_[]_AC_LANG_ABBREV[]_werror_flag=
 	save_CPPFLAGS="${CPPFLAGS}"
 	CPPFLAGS="${CPPFLAGS} -I${MATLABROOT}/extern/include"
 	AC_CHECK_HEADERS([mex.h])
@@ -41,6 +43,7 @@ AC_DEFUN([SXE_CHECK_MATLAB], [dnl
 		AC_SUBST([matlab_CFLAGS])
 	fi
 	CPPFLAGS="${save_CPPFLAGS}"
+	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
 
 	rm -f -- "${foo}"
 	popdef([mroot])

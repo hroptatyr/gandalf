@@ -32,9 +32,6 @@ AC_COPYRIGHT(
 AM_INIT_AUTOMAKE([foreign dist-xz])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-## initialise our cool message nest levels
-SXE_INIT_MSG_LEVEL
-
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CC_C99
@@ -82,7 +79,6 @@ AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
 	[dnl
-		SXE_LANG_WERROR([off])
 		SXE_CHECK_MATLAB([${withval}])
 		if test "${enable_cliapps}" != "no" -a \
 			-n "${sxe_cv_matlabroot}"; then
