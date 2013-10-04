@@ -45,10 +45,6 @@ SXE_CHECK_LIBTOOL
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
 
-## event loop
-SXE_CHECK_LIBEV
-AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
-
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
