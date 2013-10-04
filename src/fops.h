@@ -1,11 +1,11 @@
-/*** umpf.h -- fixml position messages
+/*** fops.h -- file operations
  *
- * Copyright (C) 2011 Sebastian Freundt
+ * Copyright (C) 2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of the army of unserding daemons.
- * 
+ * This file is part of gandalf.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -34,21 +34,76 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
+#if !defined INCLUDED_fops_h_
+#define INCLUDED_fops_h_
 
-#if !defined INCLUDED_umpf_private_h_
-#define INCLUDED_umpf_private_h_
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
-#include <stdio.h>
-#include <stddef.h>
-#include <time.h>
+typedef struct gandf_s gandf_t;
+typedef struct gandfn_s gandfn_t;
 
-#if defined __cplusplus
-extern "C" {
-#endif	/* __cplusplus */
+struct gandf_s {
+	size_t z;
+	void *d;
+};
 
+struct gandfn_s {
+	int fd;
+	struct gandf_s fb;
+};
 
-#if defined __cplusplus
+static inline gandf_t
+mmap_fd(int fd, size_t fz)
+{
+	void *p;
+
+	if ((p = mmap(NULL, fz, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+		return (gandf_t){.z = 0U, .d = NULL};
+	}
+	return (gandf_t){.z = fz, .d = p};
 }
-#endif	/* __cplusplus */
 
-#endif	/* INCLUDED_umpf_private_h_ */
+static inline int
+munmap_fd(gandf_t map)
+{
+	return munmap(map.d, map.z);
+}
+
+static __attribute__((unused)) gandfn_t
+mmap_fn(const char *fn, int flags)
+{
+	struct stat st;
+	gandfn_t res;
+
+	if ((res.fd = open(fn, flags)) < 0) {
+		;
+	} else if (fstat(res.fd, &st) < 0) {
+		res.fb = (gandf_t){.z = 0U, .d = NULL};
+		goto clo;
+	} else if ((res.fb = mmap_fd(res.fd, st.st_size)).d == NULL) {
+	clo:
+		close(res.fd);
+		res.fd = -1;
+	}
+	return res;
+}
+
+static __attribute__((unused)) int
+munmap_fn(gandfn_t f)
+{
+	int rc = 0;
+
+	if (f.fb.d != NULL) {
+		rc += munmap_fd(f.fb);
+	}
+	if (f.fd >= 0) {
+		rc += close(f.fd);
+	}
+	return rc;
+}
+
+#endif	/* INCLUDED_fops_h_ */

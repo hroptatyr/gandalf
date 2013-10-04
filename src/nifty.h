@@ -77,20 +77,6 @@
 # define xfree(_x)	free(_x)
 #endif	/* !xfree */
 
-#if defined DEBUG_FLAG
-# include <stdio.h>
-# define GAND_DEBUG(args...)			\
-	fprintf(gand_logout, "[gand] " args)
-# define GAND_DBGCONT(args...)			\
-	fprintf(gand_logout, args)
-#else  /* !DEBUG_FLAG */
-# define GAND_DEBUG(args...)
-# define GAND_DBGCONT(args...)
-#endif	/* DEBUG_FLAG */
-
-/* fixme, any chance we can get that one from the server? */
-extern void *gand_logout;
-
 /* just a service for mmap based allocators */
 #if !defined MAP_ANON && defined MAP_ANONYMOUS
 # define MAP_ANON	MAP_ANONYMOUS
@@ -101,5 +87,31 @@ extern void *gand_logout;
 #if !defined PROT_MEM
 # define PROT_MEM	(PROT_READ | PROT_WRITE)
 #endif	/* PROT_MEM */
+
+#if !defined countof
+# define countof(x)	(sizeof(x) / sizeof(*x))
+#endif	/* !countof */
+
+#define _paste(x, y)	x ## y
+#define paste(x, y)	_paste(x, y)
+
+#if !defined with
+# define with(args...)							\
+	for (args, *paste(__ep, __LINE__) = (void*)1;			\
+	     paste(__ep, __LINE__); paste(__ep, __LINE__)= 0)
+#endif	/* !with */
+
+#if !defined if_with
+# define if_with(init, args...)					\
+	for (init, *paste(__ep, __LINE__) = (void*)1;			\
+	     paste(__ep, __LINE__) && (args); paste(__ep, __LINE__)= 0)
+#endif	/* !if_with */
+
+#define once					\
+	static int paste(__, __LINE__);		\
+	if (!paste(__, __LINE__)++)
+#define but_first				\
+	static int paste(__, __LINE__);		\
+	if (paste(__, __LINE__)++)
 
 #endif	/* INCLUDED_nifty_h_ */

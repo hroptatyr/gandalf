@@ -1,10 +1,10 @@
-/*** logger.h -- unserding logging service
+/*** logger.c -- gandalf logging facility
  *
  * Copyright (C) 2011-2012 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of unserding.
+ * This file is part of the army of unserding daemons.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,34 +34,24 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stdarg.h>
+#include <stdio.h>
+#include "logger.h"
+#include "nifty.h"
 
-#if !defined INCLUDED_logger_h_
-#define INCLUDED_logger_h_
-
-#include <syslog.h>
-
-#define GAND_LOG_FLAGS		(LOG_PID | LOG_NDELAY)
-#define GAND_FACILITY		(LOG_LOCAL4)
-#define GAND_MAKEPRI(x)		(x)
-#define GAND_SYSLOG(x, args...)	gand_log(GAND_MAKEPRI(x), args)
-
-static void(*gand_log)(int prio, const char *fmt, ...) = syslog;
-
-extern __attribute__((format(printf, 2, 3))) void
-gand_errlog(int prio, const char *fmt, ...);
-
-static inline void
-gand_openlog(void)
+void
+gand_errlog(int UNUSED(prio), const char *fmt, ...)
 {
-	openlog("gandalfd", GAND_LOG_FLAGS, GAND_FACILITY);
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	fputc('\n', stderr);
+	va_end(ap);
 	return;
 }
 
-static inline void
-gand_closelog(void)
-{
-	closelog();
-	return;
-}
-
-#endif	/* INCLUDED_logger_h_ */
+/* logger.c ends here */
