@@ -41,6 +41,7 @@ gandalfd_SOURCES += lua-config.c lua-config.h
 gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
 gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
+BUILT_SOURCES += gandalfd.x gandalfd.xh
 endif  BUILD_SERVER
 
 
