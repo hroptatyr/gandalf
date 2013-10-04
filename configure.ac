@@ -92,6 +92,8 @@ PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
 AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
 with_database="tcbdb"
 
+CMAKE_FIND_PACKAGE([onion], [C], [GNU])
+
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])

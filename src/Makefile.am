@@ -30,12 +30,11 @@ gandalfd_SOURCES += fops.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_CPPFLAGS += -I/home/freundt/usr/include
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandalfd_CPPFLAGS += $(onion_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFALGS)
-gandalfd_LDFLAGS += -L/home/freundt/usr/lib
 gandalfd_LDFLAGS += $(tokyocabinet_LIBS)
-gandalfd_LDADD = -lonion_static -lpthread
+gandalfd_LDFLAGS += $(onion_LIBS)
 if HAVE_LUA
 gandalfd_SOURCES += lua-config.c lua-config.h
 gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
