@@ -17,6 +17,7 @@ pkgconfig_DATA = gandalf.pc
 if BUILD_SERVER
 bin_PROGRAMS += gandaux
 gandaux_SOURCES = gandaux.c gandaux.ggo
+gandaux_SOURCES += nifty.h
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
@@ -27,6 +28,7 @@ noinst_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.ggo
 gandalfd_SOURCES += fops.h
+gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
