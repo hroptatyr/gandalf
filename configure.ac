@@ -39,7 +39,6 @@ SXE_INIT_MSG_LEVEL
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CC_C99
 SXE_CHECK_CFLAGS
-SXE_CHECK_LDFLAGS
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 
