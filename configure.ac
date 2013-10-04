@@ -36,8 +36,6 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CC_C99
 SXE_CHECK_CFLAGS
-## libtool goddess^Wgoodness
-SXE_CHECK_LIBTOOL
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
@@ -93,6 +91,10 @@ AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
 with_database="tcbdb"
 
 CMAKE_FIND_PACKAGE([onion], [C], [GNU])
+
+## libtool goddess^Wgoodness
+SXE_CHECK_LIBTOOL
+
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
