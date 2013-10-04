@@ -34,7 +34,7 @@ gandalfd_SOURCES += configger.c configger.h
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandalfd_CPPFLAGS += $(onion_CFLAGS)
-gandalfd_LDFLAGS = $(AM_LDFALGS)
+gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDFLAGS += $(tokyocabinet_LIBS)
 gandalfd_LDFLAGS += $(onion_LIBS)
 if HAVE_LUA
