@@ -38,7 +38,7 @@ AC_DEFUN([SXE_CHECK_MATLAB], [dnl
 	save_CPPFLAGS="${CPPFLAGS}"
 	CPPFLAGS="${CPPFLAGS} -I${MATLABROOT}/extern/include"
 	AC_CHECK_HEADERS([mex.h])
-	if test "${ac_cv_header_mex_h}"; then
+	if test "${ac_cv_header_mex_h}" = "yes"; then
 		matlab_CFLAGS="-I${MATLABROOT}/extern/include"
 		AC_SUBST([matlab_CFLAGS])
 	fi
