@@ -68,11 +68,9 @@ SXE_CHECK_UDP_SPLICE
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="yes"])
-AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
-AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
@@ -105,6 +103,9 @@ AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([src/gandalf.pc])
 AC_OUTPUT
+
+AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
+AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 
 if test -n "${BUILD_SERVER_FALSE}"; then
 	BUILD_SRV="yes"
