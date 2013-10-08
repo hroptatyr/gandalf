@@ -13,7 +13,6 @@ AC_DEFUN([SXE_CHECK_ONION], [dnl
 	save_LDFLAGS="${LDFLAGS}"
 	LDFLAGS="${onion_LIBS} ${LDFLAGS}"
 	AC_CHECK_LIB([onion], [onion_listen])
-	AC_CHECK_LIB([onion_static], [onion_listen])
 	LDFLAGS="${save_LDFLAGS}"
 
 	AC_MSG_CHECKING([for onion])
@@ -22,8 +21,6 @@ AC_DEFUN([SXE_CHECK_ONION], [dnl
 	if test "${ac_cv_header_onion_onion_h}" != "yes"; then
 		:
 	elif test "${ac_cv_lib_onion_onion_listen}" != "yes"; then
-		:
-	elif test "${ac_cv_lib_onion_static_onion_listen}" != "yes"; then
 		:
 	else
 		## finally
