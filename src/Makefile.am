@@ -5,6 +5,7 @@ AM_CPPFLAGS += -I$(top_srcdir)/lib
 AM_LDFLAGS =
 
 bin_PROGRAMS =
+sbin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
 BUILT_SOURCES =
