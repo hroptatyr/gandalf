@@ -101,7 +101,6 @@ AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([src/Makefile])
-AC_CONFIG_FILES([src/gandalf.pc])
 AC_OUTPUT
 
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
