@@ -12,9 +12,6 @@ BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
 
-pkgconfigdir = ${libdir}/pkgconfig
-pkgconfig_DATA = gandalf.pc
-
 if BUILD_SERVER
 bin_PROGRAMS += gandaux
 gandaux_SOURCES = gandaux.c gandaux.ggo
