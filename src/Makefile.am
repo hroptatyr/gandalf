@@ -24,7 +24,7 @@ gandaux_LDFLAGS = $(AM_LDFLAGS)
 gandaux_LDFLAGS += $(tokyocabinet_LIBS)
 BUILT_SOURCES += gandaux.x gandaux.xh
 
-noinst_PROGRAMS += gandalfd
+sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.ggo
 gandalfd_SOURCES += fops.h
