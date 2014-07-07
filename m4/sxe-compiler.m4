@@ -1,6 +1,6 @@
 dnl compiler.m4 --- compiler magic
 dnl
-dnl Copyright (C) 2005-2012 Sebastian Freundt
+dnl Copyright (C) 2005-2014 Sebastian Freundt
 dnl Copyright (c) 2005 Steven G. Johnson
 dnl Copyright (c) 2005 Matteo Frigo
 dnl
@@ -35,70 +35,160 @@ dnl IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 dnl
 dnl This file is part of SXEmacs.
 
+##### http://autoconf-archive.cryp.to/ax_check_compiler_flags.html
+## renamed the prefix to SXE_
+AC_DEFUN([SXE_CHECK_COMPILER_FLAG], [dnl
+dnl SXE_CHECK_COMPILER_FLAG([flag], [action-if-accepted], [action-if-not-accepted])
+	AC_MSG_CHECKING([whether _AC_LANG compiler accepts $1])
+
+	## store werror status, then turn -Werror on
+	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+	AC_LANG_WERROR
+
+	AC_CACHE_VAL(AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1), [dnl
+		sxe_save_FLAGS="${[]_AC_LANG_PREFIX[]FLAGS}"
+		_AC_LANG_PREFIX[]FLAGS="$1"
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM($4)],
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)="yes",
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)="no")
+		_AC_LANG_PREFIX[]FLAGS="${sxe_save_FLAGS}"
+	])
+	eval sxe_check_flag=$AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)
+	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+
+	AC_MSG_RESULT([${sxe_check_flag}])
+	if test "${sxe_check_flag}" = "yes"; then
+		:
+		$2
+	else
+		:
+		$3
+	fi
+])dnl SXE_CHECK_COMPILER_FLAG
+
+AC_DEFUN([SXE_CHECK_PREPROC_FLAG], [dnl
+dnl SXE_CHECK_CPP_FLAG([flag], [action-if-found], [action-if-not-found])
+	AC_MSG_CHECKING([whether _AC_LANG preprocessor accepts $1])
+
+	## store werror status, then turn -Werror on
+	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+	AC_LANG_WERROR
+
+	AC_CACHE_VAL(AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]pp_flag_$1), [dnl
+		sxe_save_FLAGS="${[]_AC_LANG_PREFIX[]PPFLAGS}"
+		_AC_LANG_PREFIX[]PPFLAGS="$1"
+		AC_PREPROC_IFELSE([AC_LANG_PROGRAM()],
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]pp_flag_$1)="yes",
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]pp_flag_$1)="no")
+		_AC_LANG_PREFIX[]PPFLAGS=$sxe_save_FLAGS
+	])
+	eval sxe_check_flag=$AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]pp_flag_$1)
+	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+
+	AC_MSG_RESULT([${sxe_check_flag}])
+	if test "${sxe_check_flag}" = "yes"; then
+		:
+		$2
+	else
+		:
+		$3
+	fi
+])dnl SXE_CHECK_PREPROC_FLAG
+
+AC_DEFUN([SXE_CHECK_CCLD_FLAG], [dnl
+dnl SXE_CHECK_CCLD_FLAG([flag], [action-if-accepted], [action-if-not-accepted])
+	AC_MSG_CHECKING([whether _AC_LANG linker accepts $1])
+
+	## store werror status, then turn -Werror on
+	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+	AC_LANG_WERROR
+
+	AC_CACHE_VAL(AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1), [dnl
+		sxe_save_FLAGS="${[]_AC_LANG_PREFIX[]FLAGS}"
+		_AC_LANG_PREFIX[]FLAGS="$1"
+		AC_LINK_IFELSE([AC_LANG_PROGRAM()],
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)="yes",
+			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)="no")
+		_AC_LANG_PREFIX[]FLAGS="${sxe_save_FLAGS}"
+	])
+	eval sxe_check_flag=$AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flag_$1)
+	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+
+	AC_MSG_RESULT([${sxe_check_flag}])
+	if test "${sxe_check_flag}" = "yes"; then
+		:
+		$2
+	else
+		:
+		$3
+	fi
+])dnl SXE_CHECK_CCLD_FLAG
+
+
 AC_DEFUN([SXE_DEBUGFLAGS], [dnl
 	## distinguish between different compilers, no?
-	SXE_CHECK_COMPILER_FLAGS([-g])
-	SXE_CHECK_COMPILER_FLAGS([-g3])
+	SXE_CHECK_COMPILER_FLAG([-g])
+	SXE_CHECK_COMPILER_FLAG([-g3])
 
 	AC_PATH_PROG([DBX], [dbx])
 	if test -n "$ac_cv_path_DBX"; then
-		SXE_CHECK_COMPILER_FLAGS([-gstabs])
-		SXE_CHECK_COMPILER_FLAGS([-gstabs3])
-		SXE_CHECK_COMPILER_FLAGS([-gxcoff])
-		SXE_CHECK_COMPILER_FLAGS([-gxcoff3])
+		SXE_CHECK_COMPILER_FLAG([-gstabs])
+		SXE_CHECK_COMPILER_FLAG([-gstabs3])
+		SXE_CHECK_COMPILER_FLAG([-gxcoff])
+		SXE_CHECK_COMPILER_FLAG([-gxcoff3])
 	fi
 
 	AC_PATH_PROG([GDB], [gdb])
 	if test -n "$ac_cv_path_GDB"; then
-		SXE_CHECK_COMPILER_FLAGS([-ggdb])
-		SXE_CHECK_COMPILER_FLAGS([-ggdb3])
+		SXE_CHECK_COMPILER_FLAG([-ggdb])
+		SXE_CHECK_COMPILER_FLAG([-ggdb3])
 	fi
 
 	AC_PATH_PROG([SDB], [sdb])
 	if test -n "$ac_cv_path_SDB"; then
-		SXE_CHECK_COMPILER_FLAGS([-gcoff])
-		SXE_CHECK_COMPILER_FLAGS([-gcoff3])
+		SXE_CHECK_COMPILER_FLAG([-gcoff])
+		SXE_CHECK_COMPILER_FLAG([-gcoff3])
 	fi
 
 	## final evaluation
 	debugflags=""
 	## gdb
-	if test "$sxe_cv_c_flags__ggdb3" = "yes"; then
+	if test "$sxe_cv_c_flag__ggdb3" = "yes"; then
 		debugflags="$debugflags -ggdb3"
-	elif test "$sxe_cv_c_flags__ggdb" = "yes"; then
+	elif test "$sxe_cv_c_flag__ggdb" = "yes"; then
 		debugflags="$debugflags -ggdb"
 	fi
 	## stabs
-	if test "$sxe_cv_c_flags__gstabs3" = "yes"; then
+	if test "$sxe_cv_c_flag__gstabs3" = "yes"; then
 		debugflags="$debugflags -gstabs3"
-	elif test "$sxe_cv_c_flags__gstabs" = "yes"; then
+	elif test "$sxe_cv_c_flag__gstabs" = "yes"; then
 		debugflags="$debugflags -gstabs"
 	fi
 	## coff
-	if test "$sxe_cv_c_flags__gcoff3" = "yes"; then
+	if test "$sxe_cv_c_flag__gcoff3" = "yes"; then
 		debugflags="$debugflags -gcoff3"
-	elif test "$sxe_cv_c_flags__gcoff" = "yes"; then
+	elif test "$sxe_cv_c_flag__gcoff" = "yes"; then
 		debugflags="$debugflags -gcoff"
 	fi
 	## xcoff
-	if test "$sxe_cv_c_flags__gxcoff3" = "yes"; then
+	if test "$sxe_cv_c_flag__gxcoff3" = "yes"; then
 		debugflags="$debugflags -gxcoff3"
-	elif test "$sxe_cv_c_flags__gxcoff" = "yes"; then
+	elif test "$sxe_cv_c_flag__gxcoff" = "yes"; then
 		debugflags="$debugflags -gxcoff"
 	fi
 
 	if test -z "debugflags" -a \
-		"$sxe_cv_c_flags__g" = "yes"; then
+		"$sxe_cv_c_flag__g" = "yes"; then
 		debugflags="$debugflags -g"
 	fi
 
-	SXE_CHECK_COMPILER_FLAGS([-ftime-report])
-	SXE_CHECK_COMPILER_FLAGS([-fmem-report])
-	SXE_CHECK_COMPILER_FLAGS([-fvar-tracking])
-	SXE_CHECK_COMPILER_FLAGS([-save-temps])
+	SXE_CHECK_COMPILER_FLAG([-ftime-report])
+	SXE_CHECK_COMPILER_FLAG([-fmem-report])
+	SXE_CHECK_COMPILER_FLAG([-fvar-tracking])
+	SXE_CHECK_COMPILER_FLAG([-save-temps])
 
-	#if test "$sxe_cv_c_flags__ggdb3" = "yes" -a \
-	#	"$sxe_cv_c_flags__fvar_tracking" = "yes"; then
+	#if test "$sxe_cv_c_flag__ggdb3" = "yes" -a \
+	#	"$sxe_cv_c_flag__fvar_tracking" = "yes"; then
 	#	debugflags="$debugflags -fvar-tracking"
 	#fi
 
@@ -112,12 +202,12 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 	## by everyone who doesn't specifically override them.
 
 	## by default we want the -Wall level
-	SXE_CHECK_COMPILER_FLAGS([-Wall], [warnflags="-Wall"])
+	SXE_CHECK_COMPILER_FLAG([-Wall], [warnflags="-Wall"])
 
-	SXE_CHECK_COMPILER_FLAGS([-qinfo], [
+	SXE_CHECK_COMPILER_FLAG([-qinfo], [
 		warnflags="${warnflags} -qinfo"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wextra], [
+	SXE_CHECK_COMPILER_FLAG([-Wextra], [
 		warnflags="${warnflags} -Wextra"])
 
 	## Yuck, bad compares have been worth at
@@ -125,32 +215,39 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 	## Warnings about char subscripts are pretty
 	## pointless, though,
 	## and we use them in various places.
-	SXE_CHECK_COMPILER_FLAGS([-Wsign-compare], [
+	SXE_CHECK_COMPILER_FLAG([-Wsign-compare], [
 		warnflags="$warnflags -Wsign-compare"])
-	SXE_CHECK_COMPILER_FLAGS([-Wno-char-subscripts], [
+	SXE_CHECK_COMPILER_FLAG([-Wno-char-subscripts], [
 		warnflags="$warnflags -Wno-char-subscripts"])
-	SXE_CHECK_COMPILER_FLAGS([-Wundef], [
+	SXE_CHECK_COMPILER_FLAG([-Wundef], [
 		warnflags="$warnflags -Wundef"])
 
 	## too much at the moment, we rarely define protos
 	#warnflags="$warnflags -Wmissing-prototypes -Wstrict-prototypes"
-	SXE_CHECK_COMPILER_FLAGS([-Wpacked], [
-		warnflags="$warnflags -Wpacked"])
+
+	## somehow clang seems to think -Wpacked is to inform me
+	## about how unnecessary the packed attr is, so conditionalise ...
+	SXE_CHECK_COMPILER_FLAG([-Wpacked], [
+		warnflags="$warnflags -Wpacked"], [:], [[
+#if defined __clang__
+# error
+#endif  /* __clang__ */
+]])
 
 	## glibc is intentionally not `-Wpointer-arith'-clean.
 	## Ulrich Drepper has rejected patches to fix
 	## the glibc header files.
 	## we dont care
-	SXE_CHECK_COMPILER_FLAGS([-Wpointer-arith], [
+	SXE_CHECK_COMPILER_FLAG([-Wpointer-arith], [
 		warnflags="$warnflags -Wpointer-arith"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wshadow], [
+	SXE_CHECK_COMPILER_FLAG([-Wshadow], [
 		warnflags="$warnflags -Wshadow"])
 
 	## our code lacks declarations almost all the time
-	SXE_CHECK_COMPILER_FLAGS([-Wmissing-declarations], [
+	SXE_CHECK_COMPILER_FLAG([-Wmissing-declarations], [
 		warnflags="$warnflags -Wmissing-declarations"])
-	SXE_CHECK_COMPILER_FLAGS([-Wmissing-prototypes], [
+	SXE_CHECK_COMPILER_FLAG([-Wmissing-prototypes], [
 		warnflags="$warnflags -Wmissing-prototypes"])
 
 	## gcc can't practically inline anything, so exclude this
@@ -160,70 +257,113 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 		;;
 	dnl (
 	*)
-		SXE_CHECK_COMPILER_FLAGS([-Winline], [
+		SXE_CHECK_COMPILER_FLAG([-Winline], [
 			warnflags="$warnflags -Winline"])
 		;;
 	esac
 
-	SXE_CHECK_COMPILER_FLAGS([-Wbad-function-cast], [
+	SXE_CHECK_COMPILER_FLAG([-Wbad-function-cast], [
 		warnflags="$warnflags -Wbad-function-cast"])
-	SXE_CHECK_COMPILER_FLAGS([-Wcast-qual], [
+	SXE_CHECK_COMPILER_FLAG([-Wcast-qual], [
 		warnflags="$warnflags -Wcast-qual"])
-	SXE_CHECK_COMPILER_FLAGS([-Wcast-align], [
+	SXE_CHECK_COMPILER_FLAG([-Wcast-align], [
 		warnflags="$warnflags -Wcast-align"])
 
 	## warn about incomplete switches
 	## for gcc, see http://gcc.gnu.org/bugzilla/show_bug.cgi?id=50422
 	## we used to have -Wswitch-default and -Wswitch-enum but that
 	## set gcc off quite badly in the nested switch case
-	SXE_CHECK_COMPILER_FLAGS([-Wswitch], [
-		warnflags="$warnflags -Wswitch"])
+	SXE_CHECK_COMPILER_FLAG([-Wno-switch], [
+		warnflags="$warnflags -Wno-switch"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wunused-function], [
+	SXE_CHECK_COMPILER_FLAG([-Wunused-function], [
 		warnflags="$warnflags -Wunused-function"])
-	SXE_CHECK_COMPILER_FLAGS([-Wunused-variable], [
+	SXE_CHECK_COMPILER_FLAG([-Wunused-variable], [
 		warnflags="$warnflags -Wunused-variable"])
-	SXE_CHECK_COMPILER_FLAGS([-Wunused-parameter], [
+	SXE_CHECK_COMPILER_FLAG([-Wunused-parameter], [
 		warnflags="$warnflags -Wunused-parameter"])
-	SXE_CHECK_COMPILER_FLAGS([-Wunused-value], [
+	SXE_CHECK_COMPILER_FLAG([-Wunused-value], [
 		warnflags="$warnflags -Wunused-value"])
-	SXE_CHECK_COMPILER_FLAGS([-Wunused], [
+	SXE_CHECK_COMPILER_FLAG([-Wunused], [
 		warnflags="$warnflags -Wunused"])
-	SXE_CHECK_COMPILER_FLAGS([-Wmaybe-uninitialized], [
+	SXE_CHECK_COMPILER_FLAG([-Wmaybe-uninitialized], [
 		warnflags="${warnflags} -Wmaybe-uninitialized"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wnopragma], [
+	SXE_CHECK_COMPILER_FLAG([-Wnopragma], [
 		warnflags="$warnflags -Wnopragma"])
 
-	SXE_CHECK_COMPILER_FLAGS([-fdiagnostics-show-option], [
+	SXE_CHECK_COMPILER_FLAG([-fdiagnostics-show-option], [
 		warnflags="${warnflags} -fdiagnostics-show-option"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wunknown-pragmas], [
+	SXE_CHECK_COMPILER_FLAG([-Wunknown-pragmas], [
 		warnflags="$warnflags -Wunknown-pragmas"])
-	SXE_CHECK_COMPILER_FLAGS([-Wuninitialized], [
+	SXE_CHECK_COMPILER_FLAG([-Wuninitialized], [
 		warnflags="$warnflags -Wuninitialized"])
-	SXE_CHECK_COMPILER_FLAGS([-Wreorder], [
+	SXE_CHECK_COMPILER_FLAG([-Wreorder], [
 		warnflags="$warnflags -Wreorder"])
-	SXE_CHECK_COMPILER_FLAGS([-Wdeprecated], [
+	SXE_CHECK_COMPILER_FLAG([-Wdeprecated], [
 		warnflags="$warnflags -Wdeprecated"])
 
-	SXE_CHECK_COMPILER_FLAGS([-Wparentheses], [
-		warnflags="${warnflags} -Wparentheses"])
+	SXE_CHECK_COMPILER_FLAG([-Wno-parentheses], [
+		warnflags="${warnflags} -Wno-parentheses"])
 
 	## icc specific
-	SXE_CHECK_COMPILER_FLAGS([-diag-disable 10237], [dnl
+	SXE_CHECK_COMPILER_FLAG([-Wcheck], [
+		warnflags="$warnflags -Wcheck"])
+
+	dnl SXE_CHECK_COMPILER_FLAG([-Wp64], [
+	dnl 	warnflags="$warnflags -Wp64"])
+
+	SXE_CHECK_COMPILER_FLAG([-Wstrict-aliasing], [
+		warnflags="$warnflags -Wstrict-aliasing"])
+
+	SXE_CHECK_COMPILER_FLAG([-w3], [
+		warnflags="$warnflags -w3"])
+
+	SXE_CHECK_COMPILER_FLAG([-diag-disable 10237], [dnl
 		warnflags="${warnflags} -diag-disable 10237"], [
-		SXE_CHECK_COMPILER_FLAGS([-wd 10237], [dnl
+		SXE_CHECK_COMPILER_FLAG([-wd 10237], [dnl
 			warnflags="${warnflags} -wd 10237"])])
-	SXE_CHECK_COMPILER_FLAGS([-w2], [
-		warnflags="$warnflags -w2"])
+
+	SXE_CHECK_COMPILER_FLAG([-debug inline-debug-info], [
+		warnflags="${warnflags} -debug inline-debug-info"])
+
+	SXE_CHECK_COMPILER_FLAG([-diag-enable remark,vec,par], [
+		warnflags="${warnflags} -diag-enable remark,vec,par"])
+
+	## for dfp754
+	SXE_CHECK_COMPILER_FLAG([-Wunsuffixed-float-constants], [
+		warnflags="$warnflags -Wunsuffixed-float-constants"])
 
 	AC_MSG_CHECKING([for preferred warning flags])
 	AC_MSG_RESULT([${warnflags}])
 ])dnl SXE_WARNFLAGS
 
 AC_DEFUN([SXE_OPTIFLAGS], [dnl
-	optiflags="-O3"
+	SXE_CHECK_COMPILER_FLAG([-O3], [
+		optiflags="${optiflags} -O3"])
+
+	SXE_CHECK_COMPILER_FLAG([-ipo256], [
+		optiflags="${optiflags} -ipo256"])
+
+	SXE_CHECK_COMPILER_FLAG([-ipo-jobs256], [
+		optiflags="${optiflags} -ipo-jobs256"])
+
+	SXE_CHECK_COMPILER_FLAG([-no-prec-div], [
+		optiflags="${optiflags} -no-prec-div"])
+
+	SXE_CHECK_COMPILER_FLAG([-xHost], [
+		optiflags="${optiflags} -xHost"])
+
+	dnl SXE_CHECK_COMPILER_FLAG([-fast], [
+	dnl 	optiflags="${optiflags} -fast"])
+
+	dnl SXE_CHECK_COMPILER_FLAG([-axMIC-AVX512,CORE-AVX2,CORE-AVX-I,AVX,SSSE3], [
+	dnl 	optiflags="${optiflags} -axMIC-AVX512,CORE-AVX2,CORE-AVX-I,AVX,SSSE3"])
+
+	SXE_CHECK_COMPILER_FLAG([-mtune=native -march=native], [
+		optiflags="${optiflags} -mtune=native -march=native"])
+
 ])dnl SXE_OPTIFLAGS
 
 AC_DEFUN([SXE_FEATFLAGS], [dnl
@@ -236,74 +376,33 @@ AC_DEFUN([SXE_FEATFLAGS], [dnl
 	## however I've got one report about a working PIE build
 	## we'll just check for -nopie here, if it works, we turn it on
 	## (and hence PIE off) and hope bug 16 remains fixed
-	SXE_CHECK_COMPILER_FLAGS([-nopie],
+	SXE_CHECK_COMPILER_FLAG([-nopie],
 		[featflags="$featflags -nopie"])
-
-	## it's utterly helpful to get the sse2 unit up
-	SXE_CHECK_COMPILER_FLAGS([-msse2], [dnl
-		## sse2 is the cure
-		featflags="$featflags -msse2"], [dnl
-		## oh bugger
-		AC_DEFINE([FPMATH_NO_SSE], [1], [no sse2 support for floats])])
 
 	## icc and gcc related
 	## check if some stuff can be staticalised
 	## actually requires SXE_WARNFLAGS so warnings would be disabled
 	## that affect the outcome of the following tests
-	SXE_CHECK_COMPILER_FLAGS([-static-intel], [
+	SXE_CHECK_COMPILER_FLAG([-static-intel], [
 		featflags="${featflags} -static-intel"
-		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-intel"], [:],
-		[${SXE_CFLAGS}])
-	SXE_CHECK_COMPILER_FLAGS([-static-libgcc], [
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-intel"], [:])
+	SXE_CHECK_COMPILER_FLAG([-static-libgcc], [
 		featflags="${featflags} -static-libgcc"
-		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-libgcc"], [:],
-		[${SXE_CFLAGS}])
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -static-libgcc"], [:])
+
+	SXE_CHECK_COMPILER_FLAG([-intel-extensions], [dnl
+		featflags="${featflags} -intel-extensions"])
 
 	AC_SUBST([XCCLDFLAGS])
 	AC_SUBST([XCCFLAG])
 ])dnl SXE_FEATFLAGS
 
-
-##### http://autoconf-archive.cryp.to/ax_check_compiler_flags.html
-## renamed the prefix to SXE_
-AC_DEFUN([SXE_CHECK_COMPILER_FLAGS], [dnl
-dnl SXE_CHECK_COMPILER_FLAGS([flag], [do-if-works], [do-if-not-works])
-	AC_MSG_CHECKING([whether _AC_LANG compiler accepts $1])
-
-	dnl Some hackery here since AC_CACHE_VAL can't handle a non-literal varname:
-	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
-	AC_LANG_WERROR
-	AS_LITERAL_IF([$1], [
-		AC_CACHE_VAL(AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1), [
-			sxe_save_FLAGS=$[]_AC_LANG_PREFIX[]FLAGS
-			_AC_LANG_PREFIX[]FLAGS="$1"
-			AC_COMPILE_IFELSE([AC_LANG_PROGRAM()],
-				AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)="yes",
-				AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)="no")
-			_AC_LANG_PREFIX[]FLAGS=$sxe_save_FLAGS])], [
-		sxe_save_FLAGS=$[]_AC_LANG_PREFIX[]FLAGS
-		_AC_LANG_PREFIX[]FLAGS="$1"
-		AC_COMPILE_IFELSE([AC_LANG_PROGRAM()],
-			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)="yes",
-			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)="no")
-		_AC_LANG_PREFIX[]FLAGS=$sxe_save_FLAGS])
-	eval sxe_check_compiler_flags=$AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)
-	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
-
-	AC_MSG_RESULT([$sxe_check_compiler_flags])
-	if test "$sxe_check_compiler_flags" = "yes"; then
-		m4_default([$2], :)
-	else
-		m4_default([$3], :)
-	fi
-])dnl SXE_CHECK_COMPILER_FLAGS
-
 AC_DEFUN([SXE_CHECK_COMPILER_XFLAG], [dnl
 	if test "${XFLAG}" = ""; then
-		SXE_CHECK_COMPILER_FLAGS([-XCClinker -foo], [XFLAG="-XCClinker"])
+		SXE_CHECK_CCLD_FLAG([-XCClinker -foo], [XFLAG="-XCClinker"])
 	fi
 	if test "${XFLAG}" = ""; then
-		SXE_CHECK_COMPILER_FLAGS([-Xlinker -foo], [XFLAG="-Xlinker"])
+		SXE_CHECK_CCLD_FLAG([-Xlinker -foo], [XFLAG="-Xlinker"])
 	fi
 
 	AC_SUBST([XFLAG])
@@ -324,9 +423,7 @@ AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
 	SXE_FEATFLAGS
 	SXE_CFLAGS="$SXE_CFLAGS $featflags"
 
-	## unset the werror flag again
-	save_ac_[]_AC_LANG_ABBREV[]_werror_flag="${ac_[]_AC_LANG_ABBREV[]_werror_flag}"
-	ac_[]_AC_LANG_ABBREV[]_werror_flag=
+	save_ac_c_werror_flag="${ac_c_werror_flag}"
 
 	CFLAGS="${SXE_CFLAGS} ${ac_cv_env_CFLAGS_value}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
@@ -345,7 +442,7 @@ or
 respectively
 		])
 
-	ac_[]_AC_LANG_ABBREV[]_werror_flag="${save_ac_[]_AC_LANG_ABBREV[]_werror_flag}"
+	ac_c_werror_flag="${save_ac_c_werror_flag}"
 ])dnl SXE_CHECK_CFLAGS
 
 AC_DEFUN([SXE_CHECK_CC], [dnl
@@ -356,6 +453,7 @@ dnl standards are flavours supported by the compiler chosen with AC_PROG_CC
 	AC_REQUIRE([AC_CANONICAL_HOST])
 	AC_REQUIRE([AC_CANONICAL_BUILD])
 	AC_REQUIRE([AC_PROG_CPP])
+	AC_REQUIRE([AC_PROG_CC])
 
 	AC_HEADER_STDC
 
@@ -366,7 +464,7 @@ dnl standards are flavours supported by the compiler chosen with AC_PROG_CC
 		dnl (
 	*)
 		for i in []stds[]; do
-			SXE_CHECK_COMPILER_FLAGS([-std="${i}"], [
+			SXE_CHECK_COMPILER_FLAG([-std="${i}"], [
 				std="-std=${i}"
 				save_CC="${CC}"
 				CC="${CC} ${std}"
@@ -486,7 +584,7 @@ AC_DEFUN([SXE_CHECK_SLOPPY_STRUCTS_INIT], [
 	save_CFLAGS="${CFLAGS}"
 	CFLAGS="-Werror"
 
-	SXE_CHECK_COMPILER_FLAGS([-Wmissing-field-initializers], [
+	SXE_CHECK_COMPILER_FLAG([-Wmissing-field-initializers], [
 		CFLAGS="${CFLAGS} -Wmissing-field-initializers"])
 
 	AC_MSG_CHECKING([dnl
@@ -521,5 +619,107 @@ Whether sloppy struct initialising works])
 	AC_LANG_POP()
 ])dnl SXE_CHECK_SLOPPY_STRUCTS_INIT
 
+AC_DEFUN([SXE_CHECK_INTRINS], [dnl
+	AC_CHECK_HEADERS([immintrin.h])
+	AC_CHECK_HEADERS([x86intrin.h])
+	AC_CHECK_HEADERS([ia32intrin.h])
+	AC_CHECK_HEADERS([popcntintrin.h])
+	AC_CHECK_TYPES([__m128i], [], [], [[
+#if defined HAVE_X86INTRIN_H
+# include <x86intrin.h>
+#elif defined HAVE_IMMINTRIN_H
+# include <immintrin.h>
+#endif
+]])
+	AC_CHECK_TYPES([__m256i], [], [], [[
+#if defined HAVE_X86INTRIN_H
+# include <x86intrin.h>
+#elif defined HAVE_IMMINTRIN_H
+# include <immintrin.h>
+#endif
+]])
+	AC_CHECK_TYPES([__m512i], [], [], [[
+#if defined HAVE_X86INTRIN_H
+# include <x86intrin.h>
+#elif defined HAVE_IMMINTRIN_H
+# include <immintrin.h>
+#endif
+]])
+])dnl SXE_CHECK_INTRINS
+
+AC_DEFUN([SXE_CHECK_SIMD], [dnl
+dnl Usage: SXE_CHECK_SIMD([INTRIN], [[SNIPPET], [IF-FOUND], [IF-NOT-FOUND]])
+	AC_REQUIRE([SXE_CHECK_INTRINS])
+
+	AC_MSG_CHECKING([for SIMD routine $1])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#if defined HAVE_IA32INTRIN_H
+# include <ia32intrin.h>
+#endif
+#if defined HAVE_X86INTRIN_H
+# include <x86intrin.h>
+#endif
+#if defined HAVE_IMMINTRIN_H
+# include <immintrin.h>
+#endif
+#if defined HAVE_POPCNTINTRIN_H
+# include <popcntintrin.h>
+#endif
+]], [ifelse([$2],[],[$1(0U)],[$2]);])], [
+	eval AS_TR_SH(ac_cv_func_$1)="yes"
+	$3
+], [
+	eval AS_TR_SH(ac_cv_func_$1)="no"
+	$4
+])
+	AC_MSG_RESULT([${ac_cv_func_$1}])
+])dnl SXE_CHECK_SIMD
+
+AC_DEFUN([SXE_CHECK_CILK], [dnl
+dnl Usage: SXE_CHECK_CILK([ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
+dnl defines sxe_cv_feat_cilk to "yes" if applicable, "no" otherwise
+dnl also AC_DEFINEs HAVE_CILK
+	AC_CHECK_HEADERS([cilk/cilk.h])
+
+	SXE_CHECK_COMPILER_FLAG([-fcilkplus], [CFLAGS="${CFLAGS} -fcilkplus"])
+
+	AC_MSG_CHECKING([whether Cilk+ keywords work])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <stdlib.h>
+#if defined HAVE_CILK_CILK_H
+# include <cilk/cilk.h>
+#else  /* !HAVE_CILK_CILK_H */
+# define cilk_spawn	_Cilk_spawn
+# define cilk_sync	_Cilk_sync
+# define cilk_for	_Cilk_for
+#endif /* HAVE_CILK_CILK_H */
+
+static char *trick;
+
+static int pcmp(const void *x, const void *y)
+{
+	return (const char*)x - (const char*)y;
+}
+]], [
+int x = 0;
+int j;
+
+cilk_spawn qsort(trick, 1, 2, pcmp);
+qsort(trick + 4, 1, 2, pcmp);
+cilk_sync;
+
+cilk_for(j = 0; j < 8; j++) {
+	x++;
+}
+])], [
+	AC_DEFINE([HAVE_CILK], [1], [define when compiler supports Cilk+ keywords])
+	sxe_cv_feat_cilk="yes"
+	$1
+], [
+	sxe_cv_feat_cilk="no"
+	$2
+])
+	AC_MSG_RESULT([${sxe_cv_feat_cilk}])
+])dnl SXE_CHECK_CILK
 
 dnl sxe-compiler.m4 ends here
