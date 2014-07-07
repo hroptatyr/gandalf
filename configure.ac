@@ -29,7 +29,7 @@ AC_COPYRIGHT(
 ###     autoreconf
 ])
 
-AM_INIT_AUTOMAKE([foreign dist-xz])
+AM_INIT_AUTOMAKE([foreign dist-xz color-tests parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 ## the build chain
