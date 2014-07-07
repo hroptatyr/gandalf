@@ -13,6 +13,8 @@ ylwrap
 src/config.h.in
 *~
 =build*
-build*
+build/
 depcomp
 ++*
+compile
+test-driver

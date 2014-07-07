@@ -20,45 +20,43 @@ cb(gand_res_t UNUSED(res), void *UNUSED(clo))
 }
 
 
-#if defined __INTEL_COMPILER
-# pragma warning (disable:593)
-#endif	/* __INTEL_COMPILER */
-#include "gandqry-clo.h"
-#include "gandqry-clo.c"
-#if defined __INTEL_COMPILER
-# pragma warning (default:593)
-#endif	/* __INTEL_COMPILER */
+#include "gandqry.yucc"
 
 int
 main(int argc, char *argv[])
 {
 	/* args */
-	struct gengetopt_args_info argi[1];
+	yuck_t argi[1U];
 	gand_ctx_t g;
-	int res = 0;
+	int timeout = 2000;
+	int rc = 0;
 
-	if (cmdline_parser(argc, argv, argi)) {
+	if (yuck_parse(argi, argc, argv)) {
 		exit(1);
 	}
 
-	if ((g = gand_open(argi->service_arg, argi->timeout_arg)) == NULL) {
+	if (argi->timeout_arg != NULL) {
+		timeout = strtoul(argi->timeout_arg, NULL, 0);
+	}
+
+	if ((g = gand_open(argi->service_arg, timeout)) == NULL) {
 		perror("gand_open()");
-		res = 1;
+		rc = 1;
 		goto bugger_off;
 	}
-	for (size_t i = 0; i < argi->inputs_num; i++) {
+	for (size_t i = 0U; i < argi->nargs; i++) {
 		npkt = 0;
 		gand_get_series(
-			g, argi->inputs[i],
-			argi->valflav_arg, argi->valflav_given,
+			g, argi->args[i],
+			argi->valflav_args, argi->valflav_nargs,
 			cb, NULL);
 		fprintf(stdout, "number of packets %zu\n", npkt);
 	}
 	gand_close(g);
 
 bugger_off:
-	cmdline_parser_free(argi);
-	return res;
+	yuck_free(argi);
+	return rc;
 }
 
 /* gandqry.c ends here */

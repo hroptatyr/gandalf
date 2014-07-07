@@ -1,0 +1,7 @@
+Usage: gandalf [OPTION]... [...]
+
+gandalf service
+
+  -c, --config=FILE   Configuration file
+  -d, --daemon        Detach from tty and run as daemon  (default=off)
+  -p, --pidfile=FILE  Output pid of server process into this file

@@ -525,28 +525,19 @@ write_pidfile(const char *pidfile)
 }
 
 
-#if defined __INTEL_COMPILER
-# pragma warning (disable:593)
-# pragma warning (disable:181)
-#endif	/* __INTEL_COMPILER */
-#include "gandalfd.xh"
-#include "gandalfd.x"
-#if defined __INTEL_COMPILER
-# pragma warning (default:593)
-# pragma warning (default:181)
-#endif	/* __INTEL_COMPILER */
+#include "gandalfd.yucc"
 
 int
 main(int argc, char *argv[])
 {
 	/* args */
-	struct gengetopt_args_info argi[1];
+	yuck_t argi[1U];
 	jmp_buf cont;
 	onion *o = NULL;
 	int daemonisep = 0;
 	uint16_t port;
 	cfg_t cfg;
-	int res = 0;
+	int rc = 0;
 
 	auto void unfold(int UNUSED(_))
 	{
@@ -561,8 +552,8 @@ main(int argc, char *argv[])
 	block_sigs();
 
 	/* parse the command line */
-	if (cmdline_parser(argc, argv, argi)) {
-		res = 1;
+	if (yuck_parse(argi, argc, argv)) {
+		rc = 1;
 		goto out0;
 	}
 
@@ -578,13 +569,13 @@ main(int argc, char *argv[])
 
 	/* run as daemon, do me properly */
 	if (daemonisep) {
-		int rc = daemonise();
+		int ret = daemonise();
 
-		if (rc < 0) {
+		if (ret < 0) {
 			perror("daemonisation failed");
-			res = 1;
+			rc = 1;
 			goto outd;
-		} else if (rc > 0) {
+		} else if (ret > 0) {
 			/* parent process */
 			goto outd;
 		}
@@ -600,19 +591,19 @@ main(int argc, char *argv[])
 
 	if ((gsymdb = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
 		GAND_ERR_LOG("cannot open symbol index file");
-		res = 1;
+		rc = 1;
 		goto out0;
 	}
 
 	if ((o = onion_new(O_POOL)) == NULL) {
 		GAND_ERR_LOG("cannot spawn onion server");
-		res = 1;
+		rc = 1;
 		goto out1;
 	}
 
 	/* write a pid file? */
 	with (const char *pidf) {
-		if (argi->pidfile_given && (pidf = argi->pidfile_arg) ||
+		if ((pidf = argi->pidfile_arg) ||
 		    (cfg && cfg_glob_lookup_s(&pidf, cfg, "pidfile") > 0)) {
 			/* command line has precedence */
 			if (write_pidfile(pidf) < 0) {
@@ -640,7 +631,7 @@ main(int argc, char *argv[])
 	onion_set_root_handler(o, onion_handler_new(work, NULL, NULL));
 
 	/* free cmdline parser goodness */
-	cmdline_parser_free(argi);
+	yuck_free(argi);
 	/* kick the config context */
 	gand_free_config(cfg);
 
@@ -669,7 +660,7 @@ main(int argc, char *argv[])
 
 outd:
 	/* free cmdline parser goodness */
-	cmdline_parser_free(argi);
+	yuck_free(argi);
 	/* kick the config context */
 	gand_free_config(cfg);
 
@@ -679,7 +670,7 @@ out1:
 	free_dict(gsymdb);
 out0:
 	gand_closelog();
-	return res;
+	return rc;
 }
 
 /* gandalfd-onion.c ends here */

@@ -239,26 +239,14 @@ null:
 }
 
 
-#if defined __INTEL_COMPILER
-# pragma warning (disable:593)
-# pragma warning (disable:181)
-#endif	/* __INTEL_COMPILER */
-#include "gandaux.xh"
-#include "gandaux.x"
-#if defined __INTEL_COMPILER
-# pragma warning (default:593)
-# pragma warning (default:181)
-#endif	/* __INTEL_COMPILER */
+#include "gandaux.yucc"
 
 static int
-cmd_addget(struct gand_args_info argi[static 1U], bool addp)
+cmd_addget(const struct yuck_cmd_get_s argi[static 1U], bool addp)
 {
-	static const char usage[] = "\
-Usage: gandaux add [SYMBOL]...\n\
-   or: gandaux get [SYMBOL]...\n";
 	int oflags;
 	dict_t d;
-	int res = 0;
+	int rc = 0;
 
 	if (addp) {
 		oflags = O_RDWR | O_CREAT;
@@ -266,19 +254,15 @@ Usage: gandaux add [SYMBOL]...\n\
 		oflags = O_RDONLY;
 	}
 
-	if (argi->inputs_num < 1U) {
-		fputs(usage, stderr);
-		res = 1;
-		goto out;
-	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
+	if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
 		fputs("cannot open symbol index file\n", stderr);
-		res = 1;
+		rc = 1;
 		goto out;
 	}
 
-	if (argi->inputs_num > 1U) {
-		for (unsigned int i = 1U; i < argi->inputs_num; i++) {
-			const char *sym = argi->inputs[i];
+	if (argi->nargs) {
+		for (unsigned int i = 0U; i < argi->nargs; i++) {
+			const char *sym = argi->args[i];
 			size_t ssz = strlen(sym);
 			dict_id_t id;
 
@@ -317,34 +301,32 @@ no symbol `%s' in index file\n", sym);
 	/* get ready to bugger off */
 	free_dict(d);
 out:
-	return res;
+	return rc;
 }
 
 static int
-cmd_build(struct gand_args_info argi[static 1U])
+cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 {
-	static const char usage[] = "\
-Usage: gandaux build IDX2SYM_FILE\n";
 	const int oflags = O_RDWR | O_CREAT;
 	dict_t d;
-	int res = 0;
+	int rc = 0;
 
-	if (argi->inputs_num < 2U) {
-		fputs(usage, stderr);
-		res = 1;
+	if (!argi->nargs) {
+		yuck_auto_help((const void*)argi);
+		rc = 1;
 		goto out;
 	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
 		fputs("cannot create symbol index file\n", stderr);
-		res = 1;
+		rc = 1;
 		goto out;
 	}
 
-	with (const char *fn = argi->inputs[1U]) {
-		FILE *f;
+	with (const char *fn = argi->args[0U]) {
 		dict_id_t max = 0U;
+		FILE *f;
 
 		if ((f = fopen(fn, "r")) == NULL) {
-			res = 1;
+			rc = 1;
 			break;
 		}
 
@@ -366,24 +348,18 @@ Usage: gandaux build IDX2SYM_FILE\n";
 	/* get ready to bugger off */
 	free_dict(d);
 out:
-	return res;
+	return rc;
 }
 
 static int
-cmd_dump(struct gand_args_info argi[static 1U])
+cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi)[static 1U])
 {
-	static const char usage[] = "\
-Usage: gandaux dump\n";
 	dict_t d;
-	int res = 0;
+	int rc = 0;
 
-	if (argi->inputs_num < 1U) {
-		fputs(usage, stderr);
-		res = 1;
-		goto out;
-	} else if ((d = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
+	if ((d = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
 		fputs("cannot open symbol index file\n", stderr);
-		res = 1;
+		rc = 1;
 		goto out;
 	}
 
@@ -395,46 +371,46 @@ Usage: gandaux dump\n";
 	/* and out we are */
 	free_dict(d);
 out:
-	return res;
+	return rc;
 }
 
 int
 main(int argc, char *argv[])
 {
-	struct gand_args_info argi[1];
-	int res = 0;
+	yuck_t argi[1U];
+	bool addp = false;
+	int rc = 0;
 
 	/* parse the command line */
-	if (gand_parser(argc, argv, argi)) {
-		res = 1;
-		goto out;
-	} else if (argi->inputs_num < 1U) {
-		gand_parser_print_help();
-		res = 1;
+	if (yuck_parse(argi, argc, argv)) {
+		rc = 1;
 		goto out;
 	}
 
-	with (const char *cmd = argi->inputs[0U]) {
-		if (!strcmp(cmd, "add")) {
-			res = cmd_addget(argi, true);
-		} else if (!strcmp(cmd, "get")) {
-			res = cmd_addget(argi, false);
-		} else if (!strcmp(cmd, "build")) {
-			res = cmd_build(argi);
-		} else if (!strcmp(cmd, "dump")) {
-			res = cmd_dump(argi);
-		} else {
-			/* print help */
-			fprintf(stderr, "Unknown command `%s'\n\n", cmd);
-			gand_parser_print_help();
-			res = 1;
-			break;
-		}
+	switch (argi->cmd) {
+	case GANDAUX_CMD_NONE:
+	default:
+		fputs("Unknown command\n\n", stderr);
+		/* print help */
+		yuck_auto_help(argi);
+		rc = 1;
+		break;
+	case GANDAUX_CMD_ADD:
+		addp = true;
+	case GANDAUX_CMD_GET:
+		rc = cmd_addget((const void*)argi, addp);
+		break;
+	case GANDAUX_CMD_BUILD:
+		rc = cmd_build((const void*)argi);
+		break;
+	case GANDAUX_CMD_DUMP:
+		rc = cmd_dump((const void*)argi);
+		break;
 	}
 
 out:
-	gand_parser_free(argi);
-	return res;
+	yuck_free(argi);
+	return rc;
 }
 
 /* gandaux.c ends here */
