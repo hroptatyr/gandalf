@@ -5,6 +5,7 @@ AM_LDFLAGS =
 
 EXTRA_DIST = $(BUILT_SOURCES)
 BUILT_SOURCES =
+SUFFIXES =
 
 SUBDIRS = .
 if BUILD_MATCLI
@@ -16,16 +17,18 @@ noinst_LTLIBRARIES = libgandapi.la
 libgandapi_la_SOURCES = gandapi.c gandapi.h
 
 noinst_PROGRAMS = gandqry
+gandqry_SOURCES = gandqry.c
+gandqry_SOURCES += gandqry.yuck
 gandqry_LDADD = libgandapi.la
-BUILT_SOURCES += gandqry-clo.c gandqry-clo.h
+BUILT_SOURCES += gandqry.yucc
 endif
 
-## ggo rule
-%.c %.h: %.ggo
-	gengetopt -l -i $< -F $*
-
-# 
-# Help the developers get nice post-processed source files
+## yuck rule
+SUFFIXES += .yuck
+SUFFIXES += .yucc
+.yuck.yucc:
+	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
+		yuck$(EXEEXT) gen -o $@ $<
 
 ## Create preprocessor output (debugging purposes only)
 .c.i:

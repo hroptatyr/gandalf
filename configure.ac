@@ -3,12 +3,7 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.63])
-m4_define([GIT_VERSION_GEN], [dnl
-pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
-ifelse([]version[], [], [0.2.2], []version[])[]dnl
-popdef([version])dnl
-])
-AC_INIT([gandalf], [GIT_VERSION_GEN], [https://github.com/hroptatyr/gandalf])
+AC_INIT([gandalf], [0.2.3.GIT], [https://github.com/hroptatyr/gandalf])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -32,6 +27,9 @@ AC_COPYRIGHT(
 AM_INIT_AUTOMAKE([foreign dist-xz color-tests parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
+AX_YUCK_SCMVER([version.mk])
+AC_CONFIG_LINKS([GNUmakefile:GNUmakefile])
+
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CPP
@@ -42,6 +40,9 @@ AC_C_BIGENDIAN
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
+
+## check if yuck is globally available
+AX_CHECK_YUCK
 
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
@@ -101,6 +102,7 @@ SXE_CHECK_LIBTOOL
 
 
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([build-aux/Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([src/Makefile])

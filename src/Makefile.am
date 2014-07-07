@@ -11,20 +11,24 @@ noinst_HEADERS =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
+SUFFIXES =
 
 if BUILD_SERVER
 bin_PROGRAMS += gandaux
-gandaux_SOURCES = gandaux.c gandaux.ggo
+gandaux_SOURCES = gandaux.c
+gandaux_SOURCES += gandaux.yuck
 gandaux_SOURCES += nifty.h
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
 gandaux_LDFLAGS += $(tokyocabinet_LIBS)
-BUILT_SOURCES += gandaux.x gandaux.xh
+endif  BUILD_SERVER
+BUILT_SOURCES += gandaux.yucc
 
+if BUILD_SERVER
 sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
-gandalfd_SOURCES += gandalfd.ggo
+gandalfd_SOURCES += gandalfd.yuck
 gandalfd_SOURCES += fops.h
 gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
@@ -40,16 +44,16 @@ gandalfd_SOURCES += lua-config.c lua-config.h
 gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
 gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
-BUILT_SOURCES += gandalfd.x gandalfd.xh
 endif  BUILD_SERVER
+BUILT_SOURCES += gandalfd.yucc
 
 
-## our rule for gengetopt
-%.x %.xh: %.ggo
-	$(AM_V_GEN) gengetopt -l -c x -H xh -i $< -F $*
-
-# 
-# Help the developers get nice post-processed source files
+## yuck rule
+SUFFIXES += .yuck
+SUFFIXES += .yucc
+.yuck.yucc:
+	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
+		yuck$(EXEEXT) gen -o $@ $<
 
 ## Create preprocessor output (debugging purposes only)
 .c.i:
