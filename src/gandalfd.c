@@ -408,35 +408,77 @@ make_lateglu_name(uint32_t rolf_id)
 
 
 /* rolf <-> onion glue */
-static ssize_t
-get_ser(onion_response *res, dict_id_t sid)
-{
-	const char *fn;
-	gandfn_t fb;
-
-	if (UNLIKELY((fn = make_lateglu_name(sid)) == NULL)) {
-		return -1;
-	} else if (UNLIKELY((fb = mmap_fn(fn, O_RDONLY)).fd < 0)) {
-		return -1;
-	}
-	onion_response_set_length(res, fb.fb.z);
-	onion_response_write(res, fb.fb.d, fb.fb.z);
-
-	munmap_fn(fb);
-	return fb.fb.z;
-}
+#include "gand-endpoints-gp.c"
+#include "gand-outfmts-gp.c"
 
 static onion_connection_status
 work(void *UNUSED(_), onion_request *req, onion_response *res)
 {
-	const char _sym[] = "sym";
-	const char *sym;
 	const char *cmd;
-	dict_id_t sid;
+	size_t cmz;
+	gand_ep_t ep = EP_UNK;
+	gand_of_t of = OF_CSV;
 
 	/* definitely leave our mark here */
 	onion_response_set_header(res, "Server", gandalf_pkg_string);
 
+	if (UNLIKELY((cmd = onion_request_get_path(req)) == NULL)) {
+		goto bugger;
+	} else if (UNLIKELY((cmz = strlen(cmd)) == 0U)) {
+		goto bugger;
+	}
+
+	with (const char *acc = onion_request_get_header(req, "Accept")) {
+		const char *on;
+
+		if (UNLIKELY(acc == NULL)) {
+			break;
+		}
+		/* otherwise */
+		do {
+			const struct gand_of_cell_s *ofc;
+			size_t acz;
+
+			if ((on = strchr(acc, ',')) == NULL) {
+				acz = strlen(acc);
+			} else {
+				acz = on++ - acc;
+			}
+			/* check if there's semicolon specs */
+			with (const char *sc = strchr(acc, ';')) {
+				if (sc && on && sc < on || sc) {
+					acz = sc - acc;
+				}
+			}
+
+			if (LIKELY((ofc = __gand_of(acc, acz)) != NULL)) {
+				/* first one wins */
+				of = ofc->of;
+				break;
+			}
+		} while ((acc = on));
+	}
+
+	with (const struct gand_ep_cell_s *epc = __gand_ep(cmd, cmz)) {
+		if (UNLIKELY(epc == NULL)) {
+			goto not_found;
+		}
+		ep = epc->ep;
+	}
+
+	switch (ep) {
+	case EP_UNK:
+	not_found:
+		onion_response_set_code(res, HTTP_BAD_REQUEST);
+		break;
+	case EP_V0_INFO:
+	case EP_V0_SERIES:
+		onion_response_printf(res, "got %u\n", ep);
+		break;
+	}
+
+#if 0
+	dict_id_t sid;
 	if ((sym = onion_request_get_query(req, _sym)) == NULL) {
 		static const char err[] = "no symbol given\n";
 		onion_response_set_length(res, sizeof(err) - 1);
@@ -447,8 +489,6 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 		onion_response_set_length(res, sizeof(err) - 1);
 		onion_response_write(res, err, sizeof(err) - 1);
 		onion_response_set_code(res, HTTP_NOT_FOUND);
-	} else if (UNLIKELY((cmd = onion_request_get_path(req)) == NULL)) {
-		goto bugger;
 	} else if (!strcmp(cmd, "info")) {
 		onion_response_printf(res, "%08u\n", sid);
 	} else if (!strcmp(cmd, "series")) {
@@ -458,6 +498,8 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 			goto bugger;
 		}
 	}
+#endif
+
 	/* when we get here it's most likely text/plain innit? */
 	onion_response_set_header(res, "Content-Type", "text/plain");
 	/* we process everything */

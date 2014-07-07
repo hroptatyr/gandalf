@@ -1,0 +1,28 @@
+%{
+typedef enum {
+	OF_UNK,
+	OF_CSV,
+	OF_JSON,
+} gand_of_t;
+
+%}
+%7bit
+%readonly-tables
+%enum
+%switch=1
+%struct-type
+%define slot-name of_str
+%define hash-function-name __gand_of_hash
+%define lookup-function-name __gand_of
+%null-strings
+%compare-strncmp
+%includes
+
+struct gand_of_cell_s {
+	const char *of_str;
+	gand_of_t of;
+};
+
+%%
+text/csv, OF_CSV
+application/json, OF_JSON

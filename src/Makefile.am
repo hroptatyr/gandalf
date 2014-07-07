@@ -40,6 +40,8 @@ gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_SOURCES += version.h version.c
+gandalfd_SOURCES += gand-endpoints-gp.erf
+gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += -DHAVE_VERSION_H
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
@@ -54,6 +56,8 @@ gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
+BUILT_SOURCES += gand-endpoints-gp.c
+BUILT_SOURCES += gand-outfmts-gp.c
 
 
 ## version rules
