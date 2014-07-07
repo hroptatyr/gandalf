@@ -34,8 +34,11 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
-AC_PROG_CC_C99
+AC_PROG_CPP
+SXE_CHECK_CC([c11 c1x c99 gnu99])
 SXE_CHECK_CFLAGS
+AC_CHECK_TOOLS([AR], [xiar ar], [false])
+AC_C_BIGENDIAN
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
