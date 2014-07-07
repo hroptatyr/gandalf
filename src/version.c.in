@@ -1,4 +1,5 @@
 /* -*- c -*- */
 #include "version.h"
 
+const char gandalf_pkg_string[] = "gandalf YUCK_SCMVER_VERSION";
 const char gandalf_version_string[] = "YUCK_SCMVER_VERSION";
