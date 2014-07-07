@@ -1,6 +1,6 @@
 /*** gandalfd.c -- rolf and milf accessor
  *
- * Copyright (C) 2011-2012 Sebastian Freundt
+ * Copyright (C) 2011-2014 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -630,6 +630,7 @@ main(int argc, char *argv[])
 
 	onion_set_root_handler(o, onion_handler_new(work, NULL, NULL));
 
+outd:
 	/* free cmdline parser goodness */
 	yuck_free(argi);
 	/* kick the config context */
@@ -655,14 +656,6 @@ main(int argc, char *argv[])
 	if (LIKELY(nfo_fname != NULL)) {
 		free(nfo_fname);
 	}
-	/* and off we bugger */
-	goto out2;
-
-outd:
-	/* free cmdline parser goodness */
-	yuck_free(argi);
-	/* kick the config context */
-	gand_free_config(cfg);
 
 out2:
 	onion_free(o);
