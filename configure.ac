@@ -3,12 +3,7 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.63])
-m4_define([GIT_VERSION_GEN], [dnl
-pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
-ifelse([]version[], [], [0.2.2], []version[])[]dnl
-popdef([version])dnl
-])
-AC_INIT([gandalf], [GIT_VERSION_GEN], [https://github.com/hroptatyr/gandalf])
+AC_INIT([gandalf], [0.2.3.GIT], [https://github.com/hroptatyr/gandalf])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
