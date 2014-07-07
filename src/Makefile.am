@@ -35,7 +35,7 @@ if BUILD_SERVER
 sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
-gandalfd_SOURCES += fops.h
+gandalfd_SOURCES += fops.c fops.h
 gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h

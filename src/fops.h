@@ -1,6 +1,6 @@
 /*** fops.h -- file operations
  *
- * Copyright (C) 2013 Sebastian Freundt
+ * Copyright (C) 2013-2014 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -56,54 +56,9 @@ struct gandfn_s {
 	struct gandf_s fb;
 };
 
-static inline gandf_t
-mmap_fd(int fd, size_t fz)
-{
-	void *p;
-
-	if ((p = mmap(NULL, fz, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
-		return (gandf_t){.z = 0U, .d = NULL};
-	}
-	return (gandf_t){.z = fz, .d = p};
-}
-
-static inline int
-munmap_fd(gandf_t map)
-{
-	return munmap(map.d, map.z);
-}
-
-static __attribute__((unused)) gandfn_t
-mmap_fn(const char *fn, int flags)
-{
-	struct stat st;
-	gandfn_t res;
-
-	if ((res.fd = open(fn, flags)) < 0) {
-		;
-	} else if (fstat(res.fd, &st) < 0) {
-		res.fb = (gandf_t){.z = 0U, .d = NULL};
-		goto clo;
-	} else if ((res.fb = mmap_fd(res.fd, st.st_size)).d == NULL) {
-	clo:
-		close(res.fd);
-		res.fd = -1;
-	}
-	return res;
-}
-
-static __attribute__((unused)) int
-munmap_fn(gandfn_t f)
-{
-	int rc = 0;
-
-	if (f.fb.d != NULL) {
-		rc += munmap_fd(f.fb);
-	}
-	if (f.fd >= 0) {
-		rc += close(f.fd);
-	}
-	return rc;
-}
+
+/* public api */
+extern gandfn_t mmap_fn(const char *fn, int flags);
+extern int munmap_fn(gandfn_t);
 
 #endif	/* INCLUDED_fops_h_ */
