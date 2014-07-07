@@ -352,7 +352,7 @@ out:
 }
 
 static int
-cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi)[static 1U])
+cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi[static 1U]))
 {
 	dict_t d;
 	int rc = 0;
