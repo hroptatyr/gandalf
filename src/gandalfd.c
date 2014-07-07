@@ -37,6 +37,9 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#if defined HAVE_VERSION_H
+# include "version.h"
+#endif	/* HAVE_VERSION_H */
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -432,7 +435,7 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 	dict_id_t sid;
 
 	/* definitely leave our mark here */
-	onion_response_set_header(res, "Server", "gandalf " VERSION);
+	onion_response_set_header(res, "Server", gandalf_pkg_string);
 
 	if ((sym = onion_request_get_query(req, _sym)) == NULL) {
 		static const char err[] = "no symbol given\n";
