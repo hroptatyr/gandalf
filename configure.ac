@@ -27,6 +27,9 @@ AC_COPYRIGHT(
 AM_INIT_AUTOMAKE([foreign dist-xz color-tests parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
+AX_YUCK_SCMVER([version.mk])
+AC_CONFIG_LINKS([GNUmakefile:GNUmakefile])
+
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 AC_PROG_CPP
@@ -37,6 +40,9 @@ AC_C_BIGENDIAN
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
+
+## check if yuck is globally available
+AX_CHECK_YUCK
 
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
@@ -96,6 +102,7 @@ SXE_CHECK_LIBTOOL
 
 
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([build-aux/Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([src/Makefile])
