@@ -657,7 +657,6 @@ outd:
 		free(nfo_fname);
 	}
 
-out2:
 	onion_free(o);
 out1:
 	free_dict(gsymdb);
