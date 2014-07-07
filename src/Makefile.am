@@ -13,12 +13,18 @@ EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
 SUFFIXES =
 
+CLEANFILES += version.c
+EXTRA_DIST += version.c.in
+noinst_HEADERS += version.h
+
 if BUILD_SERVER
 bin_PROGRAMS += gandaux
 gandaux_SOURCES = gandaux.c
 gandaux_SOURCES += gandaux.yuck
 gandaux_SOURCES += nifty.h
+gandaux_SOURCES += version.h version.c
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
+gandaux_CPPFLAGS += -DHAVE_VERSION_H
 gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
 gandaux_LDFLAGS += $(tokyocabinet_LIBS)
@@ -33,7 +39,9 @@ gandalfd_SOURCES += fops.h
 gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h
+gandalfd_SOURCES += version.h version.c
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_CPPFLAGS += -DHAVE_VERSION_H
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandalfd_CPPFLAGS += $(onion_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
@@ -47,6 +55,12 @@ endif  HAVE_LUA
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
 
+
+## version rules
+version.c: version.c.in $(top_builddir)/.version
+	$(AM_V_GEN) PATH="$(top_builddir)/build-aux:$${PATH}" \
+		yuck$(EXEEXT) scmver --ignore-noscm --force -o $@ \
+			--use-reference --reference $(top_builddir)/.version $<
 
 ## yuck rule
 SUFFIXES += .yuck
