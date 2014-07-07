@@ -61,6 +61,10 @@ version.c: version.c.in $(top_builddir)/.version
 	$(AM_V_GEN) PATH="$(top_builddir)/build-aux:$${PATH}" \
 		yuck$(EXEEXT) scmver --ignore-noscm --force -o $@ \
 			--use-reference --reference $(top_builddir)/.version $<
+## gperf rule
+SUFFIXES += .erf
+.erf.c:
+	$(AM_V_GEN) $(GPERF) -L ANSI-C "$<" --output-file "$@"
 
 ## yuck rule
 SUFFIXES += .yuck
