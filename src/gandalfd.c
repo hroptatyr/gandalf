@@ -479,7 +479,7 @@ daemonise(void)
 		break;
 	default:
 		/* i am the parent */
-		GAND_NOTI_LOG("Successfully bore a squaller: %d\n", pid);
+		GAND_NOTI_LOG("Successfully bore a squaller: %d", pid);
 		exit(0);
 	}
 
