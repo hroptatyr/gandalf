@@ -14,8 +14,6 @@ SUBDIRS += build-aux
 SUBDIRS += cli
 SUBDIRS += src
 
-EXTRA_DIST += README.md
-
 DISTCLEANFILES += version.mk
 EXTRA_DIST += version.mk.in
 BUILT_SOURCES += .version
