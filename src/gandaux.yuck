@@ -1,0 +1,24 @@
+Usage: gandaux COMMAND [OPTION]...
+
+Helpers to bring the gandalf system into shape.
+This is meant for the server side.
+
+
+Usage: gandaux add
+
+Add a symbol to the symbol index.
+
+
+Usage: gandaux build
+
+Generate the symbol index.
+
+
+Usage: gandaux dump
+
+Generate a dump of specified IDX file.
+
+
+Usage: gandaux get
+
+Get a symbol from the symbol index.
