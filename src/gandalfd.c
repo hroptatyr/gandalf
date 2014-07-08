@@ -88,6 +88,18 @@
 typedef TCBDB *dict_t;
 typedef unsigned int dict_id_t;
 
+typedef struct {
+	const char *s;
+	size_t z;
+} word_t;
+
+struct rln_s {
+	word_t sym;
+	word_t dat;
+	word_t vrb;
+	word_t val;
+};
+
 static dict_t gsymdb;
 static char *trolfdir;
 static size_t ntrolfdir;
@@ -608,10 +620,119 @@ make_lateglu_name(uint32_t rolf_id)
 	return f;
 }
 
+static struct rln_s
+snarf_rln(const char *ln, size_t lz)
+{
+	struct rln_s r;
+	const char *p;
+
+	/* normally first up is the rolf-id, overread him */
+	if (UNLIKELY((p = memchr(ln, '\t', lz)) == NULL)) {
+		goto b0rk;
+	}
+
+	/* snarf sym */
+	r.sym.s = ++p;
+	/* find separator between symbol and trans-id */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.sym.z = p++ - r.sym.s;
+
+	/* find separator between trans-id and date stamp */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+
+	/* snarf date */
+	r.dat.s = ++p;
+	/* find separator between date stamp and valflav aka verb */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.dat.z = p++ - r.dat.s;
+
+	/* snarf valflav aka verb */
+	r.vrb.s = p;
+	/* find separator between date stamp and valflav aka verb */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.vrb.z = p++ - r.vrb.s;
+
+	/* snarf value */
+	r.val.s = p;
+	r.val.z = ln + lz - p;
+
+	/* that's all */
+	return r;
+
+b0rk:
+	return (struct rln_s){NULL};
+}
+
+static ssize_t
+filter_csv(char *restrict scratch, size_t z, struct rln_s r)
+{
+	char *sp = scratch;
+
+	/* quick sanity check, should also warm up caches */
+	if (UNLIKELY(r.sym.s == NULL)) {
+		return -1;
+	} else if (UNLIKELY(r.sym.z + 1U/*\t*/ +
+			    r.dat.z + 1U/*\t*/ +
+			    r.vrb.z + 1U/*\t*/ +
+			    r.val.z + 1U/*\n*/ >= z)) {
+		return -1;
+	}
+
+	/* normally we'd do some filtering here as well */
+	;
+
+	/* now copy over sym, dat, vrb and val */
+	memcpy(sp, r.sym.s, r.sym.z);
+	sp += r.sym.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.dat.s, r.dat.z);
+	sp += r.dat.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.vrb.s, r.vrb.z);
+	sp += r.vrb.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.val.s, r.val.z);
+	sp += r.val.z;
+	*sp++ = '\n';
+
+	return sp - scratch;
+}
+
+static ssize_t
+filter_json(char *restrict scratch, size_t z, struct rln_s r)
+{
+	if (UNLIKELY(r.sym.s == NULL)) {
+		return -1;
+	}
+
+	/* normally we'd do some filtering here as well */
+	;
+
+	return -1;
+}
+
 
 /* rolf <-> onion glue */
 #include "gand-endpoints-gp.c"
 #include "gand-outfmts-gp.c"
+
+struct rtup_s {
+	enum onion_response_codes_e rc;
+	gand_of_t of;
+	const char *data;
+	size_t dlen;
+};
 
 static gand_ep_t
 req_get_endpoint(onion_request *req)
@@ -667,7 +788,7 @@ req_get_outfmt(onion_request *req)
 }
 
 static onion_connection_status
-work(void *UNUSED(_), onion_request *req, onion_response *res)
+srv_static(onion_response *res, struct rtup_s s)
 {
 	static const char *const ctypes[] = {
 		[OF_UNK] = "text/plain",
@@ -675,33 +796,148 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 		[OF_CSV] = "text/csv",
 		[OF_HTML] = "text/html",
 	};
-	gand_ep_t ep;
+
+	if (UNLIKELY(s.data == NULL)) {
+		return OCS_INTERNAL_ERROR;
+	}
+	/* otherwise this is good to go */
+	onion_response_set_code(res, s.rc);
+	onion_response_set_header(res, "Content-Type", ctypes[s.of]);
+	onion_response_set_length(res, s.dlen);
+	onion_response_write(res, s.data, s.dlen);
+
+	/* we process everything */
+	return OCS_PROCESSED;
+}
+
+static onion_connection_status
+work_ser(void *UNUSED(_), onion_request *req, onion_response *res)
+{
+	const char *sym;
+	dict_id_t rid;
+	struct rtup_s r;
 	gand_of_t of;
-	struct rtup_s {
-		enum onion_response_codes_e rc;
-		gand_of_t of;
-		const char *data;
-		size_t dlen;
-	} rtup;
+
+	if ((of = req_get_outfmt(req)) == OF_UNK) {
+		of = OF_CSV;
+	}
+	if ((sym = onion_request_get_query(req, "sym")) == NULL) {
+		switch (of) {
+			static const char bad_json[] = "{}";
+			static const char bad_text[] = "Bad Request";
+		default:
+		case OF_CSV:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_UNK,
+				bad_text, sizeof(bad_text) - 1U
+			};
+			break;
+		case OF_JSON:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_JSON,
+				bad_json, sizeof(bad_json) - 1U
+			};
+			break;
+		}
+	} else if (!(rid = get_sym(gsymdb, sym, strlen(sym)))) {
+#define HTTP_CONFLICT	(enum onion_response_codes_e)409U
+		switch (of) {
+			static const char bad_json[] = "{}";
+			static const char bad_text[] = "Symbol not found";
+		default:
+		case OF_CSV:
+			r = (struct rtup_s){
+				HTTP_CONFLICT, OF_UNK,
+				bad_text, sizeof(bad_text) - 1U
+			};
+			break;
+		case OF_JSON:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_JSON,
+				bad_json, sizeof(bad_json) - 1U
+			};
+			break;
+		}
+#undef HTTP_CONFLICT
+	} else goto yacka;
+
+	/* just serve static non-sense */
+	return srv_static(res, r);
+
+yacka:;
+	const char *ctype;
+	const char *fn;
+	gandfn_t fb;
+	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln);
+
+	/* otherwise we've got some real yacka to do */
+	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
+		return OCS_INTERNAL_ERROR;
+	} else if (UNLIKELY((fb = mmap_fn(fn, O_RDONLY)).fd < 0)) {
+		return OCS_INTERNAL_ERROR;
+	}
+
+	switch (of) {
+	default:
+	case OF_CSV:
+		ctype = "text/csv";
+		filter = filter_csv;
+		break;
+	case OF_JSON:
+		ctype = "application/json";
+		filter = filter_json;
+		break;
+	}
+	/* set response header now */
+	onion_response_set_header(res, "Content-Type", ctype);
+
+	/* traverse the lines, filter and rewrite them */
+	const char *const buf = fb.fb.d;
+	const size_t bsz = fb.fb.z;
+	for (size_t i = 0U; i < bsz; i++) {
+		const char *const bol = buf + i;
+		const size_t max = bsz - i;
+		const char *eol;
+		struct rln_s ln;
+		char proto[256U];
+		ssize_t z;
+
+		if (UNLIKELY((eol = memchr(bol, '\n', max)) == NULL)) {
+			eol = bol + max;
+		}
+		/* snarf the line, v0 format, zero copy */
+		ln = snarf_rln(bol, eol - bol);
+		/* filter, maybe */
+		if (LIKELY((z = filter(proto, sizeof(proto), ln)) > 0)) {
+			/* yep, all good, just write to response buffer */
+			onion_response_write(res, proto, z);
+		}
+		i += eol - bol;
+	}
+
+	munmap_fn(fb);
+	return OCS_PROCESSED;
+}
+
+static onion_connection_status
+work(void *UNUSED(_), onion_request *req, onion_response *res)
+{
+	struct rtup_s rtup;
 
 	/* definitely leave our mark here */
 	onion_response_set_header(res, "Server", gandalf_pkg_string);
 
-	/* get output format and endpoint */
-	of = req_get_outfmt(req);
-	ep = req_get_endpoint(req);
-
-	switch (ep) {
+	/* split by endpoint */
+	switch (req_get_endpoint(req)) {
 	default:
 	case EP_UNK:
+	case EP_V0_INFO:
 		rtup = (struct rtup_s){
 			HTTP_NOT_FOUND, OF_HTML, v0_404, sizeof(v0_404) - 1U
 		};
 		break;
-	case EP_V0_INFO:
 	case EP_V0_SERIES:
-		onion_response_printf(res, "got %u\n", ep);
-		break;
+		return work_ser(_, req, res);
 	case EP_V0_MAIN:
 		rtup = (struct rtup_s){
 			HTTP_OK, OF_HTML, v0_main, sizeof(v0_main) - 1U
@@ -710,13 +946,7 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 	}
 
 	/* set response type */
-	onion_response_set_code(res, rtup.rc);
-	onion_response_set_header(res, "Content-Type", ctypes[rtup.of]);
-	onion_response_set_length(res, rtup.dlen);
-	onion_response_write(res, rtup.data, rtup.dlen);
-
-	/* we process everything */
-	return OCS_PROCESSED;
+	return srv_static(res, rtup);
 }
 
 
