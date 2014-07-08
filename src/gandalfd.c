@@ -1042,6 +1042,12 @@ main(int argc, char *argv[])
 		return;
 	}
 
+	auto void unpipe(int UNUSED(_))
+	{
+		/* no further interruptions please */
+		return;
+	}
+
 	/* best not to be signalled for a minute */
 	block_sigs();
 
@@ -1136,6 +1142,7 @@ outd:
 		/* set up sig handlers */
 		signal(SIGINT, unfold);
 		signal(SIGTERM, unfold);
+		signal(SIGPIPE, unpipe);
 		/* set them loose */
 		unblock_sigs();
 		/* and here we go */
