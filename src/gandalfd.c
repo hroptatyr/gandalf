@@ -629,6 +629,7 @@ main(int argc, char *argv[])
 	} else {
 		/* fiddle with gandalf logging (default to syslog) */
 		gand_log = gand_errlog;
+		onion_log = onion_log_stderr;
 	}
 
 	/* start them log files */
