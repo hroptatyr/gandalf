@@ -3,6 +3,7 @@ typedef enum {
 	EP_UNK,
 	EP_V0_SERIES,
 	EP_V0_INFO,
+	EP_V0_MAIN,
 } gand_ep_t;
 
 %}

@@ -93,6 +93,208 @@ static char *trolfdir;
 static size_t ntrolfdir;
 static char *nfo_fname;
 
+static const char v0_main[] = "\
+<!DOCTYPE html>\n\
+<html>\n\
+  <head>\n\
+    <title>gandalf</title>\n\
+    <meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\">\n\
+    <style type=\"text/css\" media=\"screen\">\n\
+      article, aside, details, figcaption, figure,\n\
+      footer, header, hgroup, menu, nav, section {\n\
+	display: block;\n\
+      }\n\
+      .search {\n\
+	position: relative;\n\
+	margin-left: 20%;\n\
+	margin-right: 20%;\n\
+	margin-top: 1%;\n\
+      }\n\
+      .search section {\n\
+	text-align: center;\n\
+      }\n\
+      header {\n\
+	margin-top: 10%;\n\
+	text-align: center;\n\
+      }\n\
+      footer {\n\
+	text-align: center;\n\
+      }\n\
+      .search input {\n\
+        height: 4ex;\n\
+        width: 100%;\n\
+        margin: 0.7ex 0;\n\
+        padding: 0.3ex 10px;\n\
+	font-size: x-large;\n\
+	font-family: serif;\n\
+	color: #555860;\n\
+	border: 1px solid;\n\
+	border-radius: 10px;\n\
+	border-color: #a8acbc #babdcc #c0c3d2;\n\
+	-webkit-appearance: textfield;\n\
+	-webkit-box-sizing: border-box;\n\
+	-moz-box-sizing: border-box;\n\
+	box-sizing: border-box;\n\
+	box-shadow: inset 0 1px #e5e7ed, 0 1px #fcfcfc;\n\
+      }\n\
+.search input:focus {\n\
+	outline: 0;\n\
+	border-color: #66b1ee;\n\
+	-webkit-box-shadow: 0 0 2px rgba(85, 168, 236, 0.9);\n\
+	box-shadow: 0 0 2px rgba(85, 168, 236, 0.9);\n\
+}\n\
+\n\
+.search input:focus + .search-ac, .search-ac:active {\n\
+	display: block;\n\
+}\n\
+\n\
+:-moz-placeholder {\n\
+	color: #a7aabc;\n\
+	font-weight: 200;\n\
+}\n\
+\n\
+::-webkit-input-placeholder {\n\
+	color: #a7aabc;\n\
+	font-weight: 200;\n\
+	line-height: 14px;\n\
+}\n\
+\n\
+::-webkit-search-decoration,\n\
+::-webkit-search-cancel-button {\n\
+	-webkit-appearance: none;\n\
+}\n\
+\n\
+    </style>\n\
+  </head>\n\
+  <body>\n\
+    <header>\n\
+      <img alt=\"gandalf logo\" src=\"data:image/jpeg;base64,\n\
+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\n\
+QmCC\" />\n\
+    </header>\n\
+    <section class=\"search\">\n\
+      <form id=\"frm_main\" role=\"search\" method=\"POST\" action=\"javascript:gand_show()\">\n\
+	<input type=\"text\" title=\"Search\" autocomplete=\"off\" placeholder=\"Search...\" maxlength=\"2048\" onkeyup=\"gand_ac(this.value)\"></input>\n\
+	<ul id=\"res_search_ac\" class=\"search-ac\">\n\
+	  <!-- auto filled in -->\n\
+	</ul>\n\
+      </form>\n\
+    </section>\n\
+    <section class=\"result\">\n\
+      <ul></ul>\n\
+    </section>\n\
+    <footer>\n\
+      &copy; 2010-2014\n\
+    </footer>\n\
+  </body>\n\
+</html>\n\
+";
+
+static const char v0_404[] = "\
+<!DOCTYPE html>\n\
+<html>\n\
+  <head>\n\
+    <meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\">\n\
+    <style type=\"text/css\" media=\"screen\">\n\
+      body {\n\
+        position: relative;\n\
+        z-index: 0;\n\
+        margin-top: 5%;\n\
+        text-align: center;\n\
+      }\n\
+    </style>\n\
+  </head>\n\
+  <body>\n\
+    <img alt=\"404 NOT FOUND\" title=\"404 NOT FOUND\"\n\
+      src=\"data:image/jpeg;base64,\n\
+iVBORw0KGgoAAAANSUhEUgAAAWQAAABMCAYAAABak83PAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A\n\
+/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB94HCAczAoxeMZkAAAExSURBVHja\n\
+7dRBDoMgFEXRh/vfM06caGIQBaPJORPTWswvpbckqdkr27UeXqfxfk4+l87n1JPnlUHrcnH96Hln\n\
+z9Oa4+rvUzvXPf2+d+d+e397z3dr3q/sb+//bdY5u7ufo+4/PS8ZsZ9LAPgEQQYQZAAEGUCQARBk\n\
+AEEGQJABBBkAQQYQZAAEGUCQARBkAEEGQJABBBkAQQYQZAAEGUCQARBkAEEGQJABEGQAQQZAkAEE\n\
+GQBBBhBkAAQZQJABEGQAQQZAkAEEGQBBBhBkAAQZQJABEGQAQQZAkAEEGQBBBkCQAQQZAEEGEGQA\n\
+BBlAkAEQZABBBkCQAQQZAEEGEGQABBlAkAEQZABBBkCQAQQZAEEGEGQABBkAQQYQZAAEGUCQARBk\n\
+AEEGQJABBBkAQQb4rxUwkDGXa8H4QwAAAABJRU5ErkJggg==\" />\n\
+    <div>\n\
+      404 NOT FOUND\n\
+    </div>\n\
+  </body>\n\
+</html>\n\
+";
+
 
 static void
 block_sigs(void)
@@ -421,7 +623,7 @@ req_get_endpoint(onion_request *req)
 	if (UNLIKELY((cmd = onion_request_get_path(req)) == NULL)) {
 		return EP_UNK;
 	} else if (UNLIKELY((cmz = strlen(cmd)) == 0U)) {
-		return EP_UNK;
+		return EP_V0_MAIN;
 	} else if (UNLIKELY((epc = __gand_ep(cmd, cmz)) == NULL)) {
 		return EP_UNK;
 	}
@@ -471,9 +673,16 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 		[OF_UNK] = "text/plain",
 		[OF_JSON] = "application/json",
 		[OF_CSV] = "text/csv",
+		[OF_HTML] = "text/html",
 	};
 	gand_ep_t ep;
 	gand_of_t of;
+	struct rtup_s {
+		enum onion_response_codes_e rc;
+		gand_of_t of;
+		const char *data;
+		size_t dlen;
+	} rtup;
 
 	/* definitely leave our mark here */
 	onion_response_set_header(res, "Server", gandalf_pkg_string);
@@ -485,18 +694,27 @@ work(void *UNUSED(_), onion_request *req, onion_response *res)
 	switch (ep) {
 	default:
 	case EP_UNK:
-		onion_response_set_code(res, HTTP_BAD_REQUEST);
-		onion_response_write(res, "{}", 2U);
-		of = OF_JSON;
+		rtup = (struct rtup_s){
+			HTTP_NOT_FOUND, OF_HTML, v0_404, sizeof(v0_404) - 1U
+		};
 		break;
 	case EP_V0_INFO:
 	case EP_V0_SERIES:
 		onion_response_printf(res, "got %u\n", ep);
 		break;
+	case EP_V0_MAIN:
+		rtup = (struct rtup_s){
+			HTTP_OK, OF_HTML, v0_main, sizeof(v0_main) - 1U
+		};
+		break;
 	}
 
 	/* set response type */
-	onion_response_set_header(res, "Content-Type", ctypes[of]);
+	onion_response_set_code(res, rtup.rc);
+	onion_response_set_header(res, "Content-Type", ctypes[rtup.of]);
+	onion_response_set_length(res, rtup.dlen);
+	onion_response_write(res, rtup.data, rtup.dlen);
+
 	/* we process everything */
 	return OCS_PROCESSED;
 }

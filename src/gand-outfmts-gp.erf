@@ -3,6 +3,7 @@ typedef enum {
 	OF_UNK,
 	OF_CSV,
 	OF_JSON,
+	OF_HTML,
 } gand_of_t;
 
 %}
