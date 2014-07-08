@@ -1096,7 +1096,7 @@ main(int argc, char *argv[])
 		goto out0;
 	}
 
-	if ((o = onion_new(O_POOL)) == NULL) {
+	if ((o = onion_new(O_POLL)) == NULL) {
 		GAND_ERR_LOG("cannot spawn onion server");
 		rc = 1;
 		goto out1;
