@@ -678,7 +678,7 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 
 	/* quick sanity check, should also warm up caches */
 	if (UNLIKELY(r.sym.s == NULL)) {
-		return -1;
+		return 0;
 	} else if (UNLIKELY(r.sym.z + 1U/*\t*/ +
 			    r.dat.z + 1U/*\t*/ +
 			    r.vrb.z + 1U/*\t*/ +
@@ -894,12 +894,13 @@ yacka:;
 	/* traverse the lines, filter and rewrite them */
 	const char *const buf = fb.fb.d;
 	const size_t bsz = fb.fb.z;
+	char proto[4096U];
+	size_t tot = 0U;
 	for (size_t i = 0U; i < bsz; i++) {
 		const char *const bol = buf + i;
 		const size_t max = bsz - i;
 		const char *eol;
 		struct rln_s ln;
-		char proto[256U];
 		ssize_t z;
 
 		if (UNLIKELY((eol = memchr(bol, '\n', max)) == NULL)) {
@@ -907,13 +908,20 @@ yacka:;
 		}
 		/* snarf the line, v0 format, zero copy */
 		ln = snarf_rln(bol, eol - bol);
+	filt:
 		/* filter, maybe */
-		if (LIKELY((z = filter(proto, sizeof(proto), ln)) > 0)) {
-			/* yep, all good, just write to response buffer */
-			onion_response_write(res, proto, z);
+		z = filter(proto + tot, sizeof(proto) - tot, ln);
+		if (UNLIKELY(z < 0)) {
+			/* flush buffer */
+			onion_response_write(res, proto, tot);
+			tot = 0U;
+			goto filt;
 		}
+		tot += z;
 		i += eol - bol;
 	}
+	/* flush */
+	onion_response_write(res, proto, tot);
 
 	munmap_fn(fb);
 	return OCS_PROCESSED;
