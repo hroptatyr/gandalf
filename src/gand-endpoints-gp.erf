@@ -1,0 +1,29 @@
+%{
+typedef enum {
+	EP_UNK,
+	EP_V0_SERIES,
+	EP_V0_INFO,
+	EP_V0_MAIN,
+} gand_ep_t;
+
+%}
+%7bit
+%readonly-tables
+%enum
+%switch=1
+%struct-type
+%define slot-name ep_str
+%define hash-function-name __gand_ep_hash
+%define lookup-function-name __gand_ep
+%null-strings
+%compare-strncmp
+%includes
+
+struct gand_ep_cell_s {
+	const char *ep_str;
+	gand_ep_t ep;
+};
+
+%%
+v0/info, EP_V0_INFO
+v0/series, EP_V0_SERIES

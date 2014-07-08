@@ -44,6 +44,12 @@ AC_CHECK_HEADERS([fcntl.h])
 ## check if yuck is globally available
 AX_CHECK_YUCK
 
+AC_PATH_PROG([GPERF], [gperf])
+if test -z "${GPERF}"; then
+	GPERF="gperf"
+fi
+AC_ARG_VAR([GPERF], [full path to the gperf tool])
+
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"

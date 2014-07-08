@@ -35,11 +35,13 @@ if BUILD_SERVER
 sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
-gandalfd_SOURCES += fops.h
+gandalfd_SOURCES += fops.c fops.h
 gandalfd_SOURCES += nifty.h
 gandalfd_SOURCES += logger.c logger.h
 gandalfd_SOURCES += configger.c configger.h
 gandalfd_SOURCES += version.h version.c
+gandalfd_SOURCES += gand-endpoints-gp.erf
+gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += -DHAVE_VERSION_H
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
@@ -54,6 +56,8 @@ gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
+BUILT_SOURCES += gand-endpoints-gp.c
+BUILT_SOURCES += gand-outfmts-gp.c
 
 
 ## version rules
@@ -61,6 +65,10 @@ version.c: version.c.in $(top_builddir)/.version
 	$(AM_V_GEN) PATH="$(top_builddir)/build-aux:$${PATH}" \
 		yuck$(EXEEXT) scmver --ignore-noscm --force -o $@ \
 			--use-reference --reference $(top_builddir)/.version $<
+## gperf rule
+SUFFIXES += .erf
+.erf.c:
+	$(AM_V_GEN) $(GPERF) -L ANSI-C "$<" --output-file "$@"
 
 ## yuck rule
 SUFFIXES += .yuck

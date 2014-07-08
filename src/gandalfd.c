@@ -88,10 +88,224 @@
 typedef TCBDB *dict_t;
 typedef unsigned int dict_id_t;
 
+typedef struct {
+	const char *s;
+	size_t z;
+} word_t;
+
+struct rln_s {
+	word_t sym;
+	word_t dat;
+	word_t vrb;
+	word_t val;
+};
+
 static dict_t gsymdb;
 static char *trolfdir;
 static size_t ntrolfdir;
 static char *nfo_fname;
+
+static const char v0_main[] = "\
+<!DOCTYPE html>\n\
+<html>\n\
+  <head>\n\
+    <title>gandalf</title>\n\
+    <meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\">\n\
+    <style type=\"text/css\" media=\"screen\">\n\
+      article, aside, details, figcaption, figure,\n\
+      footer, header, hgroup, menu, nav, section {\n\
+	display: block;\n\
+      }\n\
+      .search {\n\
+	position: relative;\n\
+	margin-left: 20%;\n\
+	margin-right: 20%;\n\
+	margin-top: 1%;\n\
+      }\n\
+      .search section {\n\
+	text-align: center;\n\
+      }\n\
+      header {\n\
+	margin-top: 10%;\n\
+	text-align: center;\n\
+      }\n\
+      footer {\n\
+	text-align: center;\n\
+      }\n\
+      .search input {\n\
+        height: 4ex;\n\
+        width: 100%;\n\
+        margin: 0.7ex 0;\n\
+        padding: 0.3ex 10px;\n\
+	font-size: x-large;\n\
+	font-family: serif;\n\
+	color: #555860;\n\
+	border: 1px solid;\n\
+	border-radius: 10px;\n\
+	border-color: #a8acbc #babdcc #c0c3d2;\n\
+	-webkit-appearance: textfield;\n\
+	-webkit-box-sizing: border-box;\n\
+	-moz-box-sizing: border-box;\n\
+	box-sizing: border-box;\n\
+	box-shadow: inset 0 1px #e5e7ed, 0 1px #fcfcfc;\n\
+      }\n\
+.search input:focus {\n\
+	outline: 0;\n\
+	border-color: #66b1ee;\n\
+	-webkit-box-shadow: 0 0 2px rgba(85, 168, 236, 0.9);\n\
+	box-shadow: 0 0 2px rgba(85, 168, 236, 0.9);\n\
+}\n\
+\n\
+.search input:focus + .search-ac, .search-ac:active {\n\
+	display: block;\n\
+}\n\
+\n\
+:-moz-placeholder {\n\
+	color: #a7aabc;\n\
+	font-weight: 200;\n\
+}\n\
+\n\
+::-webkit-input-placeholder {\n\
+	color: #a7aabc;\n\
+	font-weight: 200;\n\
+	line-height: 14px;\n\
+}\n\
+\n\
+::-webkit-search-decoration,\n\
+::-webkit-search-cancel-button {\n\
+	-webkit-appearance: none;\n\
+}\n\
+\n\
+    </style>\n\
+  </head>\n\
+  <body>\n\
+    <header>\n\
+      <img alt=\"gandalf logo\" src=\"data:image/jpeg;base64,\n\
+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\n\
+QmCC\" />\n\
+    </header>\n\
+    <section class=\"search\">\n\
+      <form id=\"frm_main\" role=\"search\" method=\"POST\" action=\"javascript:gand_show()\">\n\
+	<input type=\"text\" title=\"Search\" autocomplete=\"off\" placeholder=\"Search...\" maxlength=\"2048\" onkeyup=\"gand_ac(this.value)\"></input>\n\
+	<ul id=\"res_search_ac\" class=\"search-ac\">\n\
+	  <!-- auto filled in -->\n\
+	</ul>\n\
+      </form>\n\
+    </section>\n\
+    <section class=\"result\">\n\
+      <ul></ul>\n\
+    </section>\n\
+    <footer>\n\
+      &copy; 2010-2014\n\
+    </footer>\n\
+  </body>\n\
+</html>\n\
+";
+
+static const char v0_404[] = "\
+<!DOCTYPE html>\n\
+<html>\n\
+  <head>\n\
+    <meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\">\n\
+    <style type=\"text/css\" media=\"screen\">\n\
+      body {\n\
+        position: relative;\n\
+        z-index: 0;\n\
+        margin-top: 5%;\n\
+        text-align: center;\n\
+      }\n\
+    </style>\n\
+  </head>\n\
+  <body>\n\
+    <img alt=\"404 NOT FOUND\" title=\"404 NOT FOUND\"\n\
+      src=\"data:image/jpeg;base64,\n\
+iVBORw0KGgoAAAANSUhEUgAAAWQAAABMCAYAAABak83PAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A\n\
+/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB94HCAczAoxeMZkAAAExSURBVHja\n\
+7dRBDoMgFEXRh/vfM06caGIQBaPJORPTWswvpbckqdkr27UeXqfxfk4+l87n1JPnlUHrcnH96Hln\n\
+z9Oa4+rvUzvXPf2+d+d+e397z3dr3q/sb+//bdY5u7ufo+4/PS8ZsZ9LAPgEQQYQZAAEGUCQARBk\n\
+AEEGQJABBBkAQQYQZAAEGUCQARBkAEEGQJABBBkAQQYQZAAEGUCQARBkAEEGQJABEGQAQQZAkAEE\n\
+GQBBBhBkAAQZQJABEGQAQQZAkAEEGQBBBhBkAAQZQJABEGQAQQZAkAEEGQBBBkCQAQQZAEEGEGQA\n\
+BBlAkAEQZABBBkCQAQQZAEEGEGQABBlAkAEQZABBBkCQAQQZAEEGEGQABBkAQQYQZAAEGUCQARBk\n\
+AEEGQJABBBkAQQb4rxUwkDGXa8H4QwAAAABJRU5ErkJggg==\" />\n\
+    <div>\n\
+      404 NOT FOUND\n\
+    </div>\n\
+  </body>\n\
+</html>\n\
+";
 
 
 static void
@@ -406,64 +620,341 @@ make_lateglu_name(uint32_t rolf_id)
 	return f;
 }
 
-
-/* rolf <-> onion glue */
-static ssize_t
-get_ser(onion_response *res, dict_id_t sid)
+static struct rln_s
+snarf_rln(const char *ln, size_t lz)
 {
-	const char *fn;
-	gandfn_t fb;
+	struct rln_s r;
+	const char *p;
 
-	if (UNLIKELY((fn = make_lateglu_name(sid)) == NULL)) {
-		return -1;
-	} else if (UNLIKELY((fb = mmap_fn(fn, O_RDONLY)).fd < 0)) {
+	/* normally first up is the rolf-id, overread him */
+	if (UNLIKELY((p = memchr(ln, '\t', lz)) == NULL)) {
+		goto b0rk;
+	}
+
+	/* snarf sym */
+	r.sym.s = ++p;
+	/* find separator between symbol and trans-id */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.sym.z = p++ - r.sym.s;
+
+	/* find separator between trans-id and date stamp */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+
+	/* snarf date */
+	r.dat.s = ++p;
+	/* find separator between date stamp and valflav aka verb */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.dat.z = p++ - r.dat.s;
+
+	/* snarf valflav aka verb */
+	r.vrb.s = p;
+	/* find separator between date stamp and valflav aka verb */
+	if (UNLIKELY((p = memchr(p, '\t', ln + lz - p)) == NULL)) {
+		goto b0rk;
+	}
+	r.vrb.z = p++ - r.vrb.s;
+
+	/* snarf value */
+	r.val.s = p;
+	r.val.z = ln + lz - p;
+
+	/* that's all */
+	return r;
+
+b0rk:
+	return (struct rln_s){NULL};
+}
+
+static ssize_t
+filter_csv(char *restrict scratch, size_t z, struct rln_s r)
+{
+	char *sp = scratch;
+
+	/* quick sanity check, should also warm up caches */
+	if (UNLIKELY(r.sym.s == NULL)) {
+		return 0;
+	} else if (UNLIKELY(r.sym.z + 1U/*\t*/ +
+			    r.dat.z + 1U/*\t*/ +
+			    r.vrb.z + 1U/*\t*/ +
+			    r.val.z + 1U/*\n*/ >= z)) {
 		return -1;
 	}
-	onion_response_set_length(res, fb.fb.z);
-	onion_response_write(res, fb.fb.d, fb.fb.z);
+
+	/* normally we'd do some filtering here as well */
+	;
+
+	/* now copy over sym, dat, vrb and val */
+	memcpy(sp, r.sym.s, r.sym.z);
+	sp += r.sym.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.dat.s, r.dat.z);
+	sp += r.dat.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.vrb.s, r.vrb.z);
+	sp += r.vrb.z;
+	*sp++ = '\t';
+
+	memcpy(sp, r.val.s, r.val.z);
+	sp += r.val.z;
+	*sp++ = '\n';
+
+	return sp - scratch;
+}
+
+static ssize_t
+filter_json(char *restrict scratch, size_t z, struct rln_s r)
+{
+	if (UNLIKELY(r.sym.s == NULL)) {
+		return -1;
+	}
+
+	/* normally we'd do some filtering here as well */
+	;
+
+	return -1;
+}
+
+
+/* rolf <-> onion glue */
+#include "gand-endpoints-gp.c"
+#include "gand-outfmts-gp.c"
+
+struct rtup_s {
+	enum onion_response_codes_e rc;
+	gand_of_t of;
+	const char *data;
+	size_t dlen;
+};
+
+static gand_ep_t
+req_get_endpoint(onion_request *req)
+{
+	const struct gand_ep_cell_s *epc;
+	const char *cmd;
+	size_t cmz;
+
+	if (UNLIKELY((cmd = onion_request_get_path(req)) == NULL)) {
+		return EP_UNK;
+	} else if (UNLIKELY((cmz = strlen(cmd)) == 0U)) {
+		return EP_V0_MAIN;
+	} else if (UNLIKELY((epc = __gand_ep(cmd, cmz)) == NULL)) {
+		return EP_UNK;
+	}
+	return epc->ep;
+}
+
+static gand_of_t
+req_get_outfmt(onion_request *req)
+{
+	const char *acc = onion_request_get_header(req, "Accept");
+	gand_of_t of = OF_UNK;
+	const char *on;
+
+	if (UNLIKELY(acc == NULL)) {
+		return OF_UNK;
+	}
+	/* otherwise */
+	do {
+		const struct gand_of_cell_s *ofc;
+		size_t acz;
+
+		if ((on = strchr(acc, ',')) == NULL) {
+			acz = strlen(acc);
+		} else {
+			acz = on++ - acc;
+		}
+		/* check if there's semicolon specs */
+		with (const char *sc = strchr(acc, ';')) {
+			if (sc && on && sc < on || sc) {
+				acz = sc - acc;
+			}
+		}
+
+		if (LIKELY((ofc = __gand_of(acc, acz)) != NULL)) {
+			/* first one wins */
+			of = ofc->of;
+			break;
+		}
+	} while ((acc = on));
+	return of;
+}
+
+static onion_connection_status
+srv_static(onion_response *res, struct rtup_s s)
+{
+	static const char *const ctypes[] = {
+		[OF_UNK] = "text/plain",
+		[OF_JSON] = "application/json",
+		[OF_CSV] = "text/csv",
+		[OF_HTML] = "text/html",
+	};
+
+	if (UNLIKELY(s.data == NULL)) {
+		return OCS_INTERNAL_ERROR;
+	}
+	/* otherwise this is good to go */
+	onion_response_set_code(res, s.rc);
+	onion_response_set_header(res, "Content-Type", ctypes[s.of]);
+	onion_response_set_length(res, s.dlen);
+	onion_response_write(res, s.data, s.dlen);
+
+	/* we process everything */
+	return OCS_PROCESSED;
+}
+
+static onion_connection_status
+work_ser(void *UNUSED(_), onion_request *req, onion_response *res)
+{
+	const char *sym;
+	dict_id_t rid;
+	struct rtup_s r;
+	gand_of_t of;
+
+	if ((of = req_get_outfmt(req)) == OF_UNK) {
+		of = OF_CSV;
+	}
+	if ((sym = onion_request_get_query(req, "sym")) == NULL) {
+		switch (of) {
+			static const char bad_json[] = "{}";
+			static const char bad_text[] = "Bad Request";
+		default:
+		case OF_CSV:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_UNK,
+				bad_text, sizeof(bad_text) - 1U
+			};
+			break;
+		case OF_JSON:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_JSON,
+				bad_json, sizeof(bad_json) - 1U
+			};
+			break;
+		}
+	} else if (!(rid = get_sym(gsymdb, sym, strlen(sym)))) {
+#define HTTP_CONFLICT	(enum onion_response_codes_e)409U
+		switch (of) {
+			static const char bad_json[] = "{}";
+			static const char bad_text[] = "Symbol not found";
+		default:
+		case OF_CSV:
+			r = (struct rtup_s){
+				HTTP_CONFLICT, OF_UNK,
+				bad_text, sizeof(bad_text) - 1U
+			};
+			break;
+		case OF_JSON:
+			r = (struct rtup_s){
+				HTTP_BAD_REQUEST, OF_JSON,
+				bad_json, sizeof(bad_json) - 1U
+			};
+			break;
+		}
+#undef HTTP_CONFLICT
+	} else goto yacka;
+
+	/* just serve static non-sense */
+	return srv_static(res, r);
+
+yacka:;
+	const char *ctype;
+	const char *fn;
+	gandfn_t fb;
+	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln);
+
+	/* otherwise we've got some real yacka to do */
+	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
+		return OCS_INTERNAL_ERROR;
+	} else if (UNLIKELY((fb = mmap_fn(fn, O_RDONLY)).fd < 0)) {
+		return OCS_INTERNAL_ERROR;
+	}
+
+	switch (of) {
+	default:
+	case OF_CSV:
+		ctype = "text/csv";
+		filter = filter_csv;
+		break;
+	case OF_JSON:
+		ctype = "application/json";
+		filter = filter_json;
+		break;
+	}
+	/* set response header now */
+	onion_response_set_header(res, "Content-Type", ctype);
+
+	/* traverse the lines, filter and rewrite them */
+	const char *const buf = fb.fb.d;
+	const size_t bsz = fb.fb.z;
+	char proto[4096U];
+	size_t tot = 0U;
+	for (size_t i = 0U; i < bsz; i++) {
+		const char *const bol = buf + i;
+		const size_t max = bsz - i;
+		const char *eol;
+		struct rln_s ln;
+		ssize_t z;
+
+		if (UNLIKELY((eol = memchr(bol, '\n', max)) == NULL)) {
+			eol = bol + max;
+		}
+		/* snarf the line, v0 format, zero copy */
+		ln = snarf_rln(bol, eol - bol);
+	filt:
+		/* filter, maybe */
+		z = filter(proto + tot, sizeof(proto) - tot, ln);
+		if (UNLIKELY(z < 0)) {
+			/* flush buffer */
+			onion_response_write(res, proto, tot);
+			tot = 0U;
+			goto filt;
+		}
+		tot += z;
+		i += eol - bol;
+	}
+	/* flush */
+	onion_response_write(res, proto, tot);
 
 	munmap_fn(fb);
-	return fb.fb.z;
+	return OCS_PROCESSED;
 }
 
 static onion_connection_status
 work(void *UNUSED(_), onion_request *req, onion_response *res)
 {
-	const char _sym[] = "sym";
-	const char *sym;
-	const char *cmd;
-	dict_id_t sid;
+	struct rtup_s rtup;
 
 	/* definitely leave our mark here */
 	onion_response_set_header(res, "Server", gandalf_pkg_string);
 
-	if ((sym = onion_request_get_query(req, _sym)) == NULL) {
-		static const char err[] = "no symbol given\n";
-		onion_response_set_length(res, sizeof(err) - 1);
-		onion_response_write(res, err, sizeof(err) - 1);
-		onion_response_set_code(res, HTTP_BAD_REQUEST);
-	} else if (!(sid = get_sym(gsymdb, sym, strlen(sym)))) {
-		static const char err[] = "symbol not found\n";
-		onion_response_set_length(res, sizeof(err) - 1);
-		onion_response_write(res, err, sizeof(err) - 1);
-		onion_response_set_code(res, HTTP_NOT_FOUND);
-	} else if (UNLIKELY((cmd = onion_request_get_path(req)) == NULL)) {
-		goto bugger;
-	} else if (!strcmp(cmd, "info")) {
-		onion_response_printf(res, "%08u\n", sid);
-	} else if (!strcmp(cmd, "series")) {
-		ssize_t z;
-
-		if (UNLIKELY((z = get_ser(res, sid)) < 0)) {
-			goto bugger;
-		}
+	/* split by endpoint */
+	switch (req_get_endpoint(req)) {
+	default:
+	case EP_UNK:
+	case EP_V0_INFO:
+		rtup = (struct rtup_s){
+			HTTP_NOT_FOUND, OF_HTML, v0_404, sizeof(v0_404) - 1U
+		};
+		break;
+	case EP_V0_SERIES:
+		return work_ser(_, req, res);
+	case EP_V0_MAIN:
+		rtup = (struct rtup_s){
+			HTTP_OK, OF_HTML, v0_main, sizeof(v0_main) - 1U
+		};
+		break;
 	}
-	/* when we get here it's most likely text/plain innit? */
-	onion_response_set_header(res, "Content-Type", "text/plain");
-	/* we process everything */
-	return OCS_PROCESSED;
-bugger:
-	return OCS_INTERNAL_ERROR;
+
+	/* set response type */
+	return srv_static(res, rtup);
 }
 
 
@@ -551,6 +1042,12 @@ main(int argc, char *argv[])
 		return;
 	}
 
+	auto void unpipe(int UNUSED(_))
+	{
+		/* no further interruptions please */
+		return;
+	}
+
 	/* best not to be signalled for a minute */
 	block_sigs();
 
@@ -587,6 +1084,7 @@ main(int argc, char *argv[])
 	} else {
 		/* fiddle with gandalf logging (default to syslog) */
 		gand_log = gand_errlog;
+		onion_log = onion_log_stderr;
 	}
 
 	/* start them log files */
@@ -598,7 +1096,7 @@ main(int argc, char *argv[])
 		goto out0;
 	}
 
-	if ((o = onion_new(O_POOL)) == NULL) {
+	if ((o = onion_new(O_POLL)) == NULL) {
 		GAND_ERR_LOG("cannot spawn onion server");
 		rc = 1;
 		goto out1;
@@ -644,6 +1142,7 @@ outd:
 		/* set up sig handlers */
 		signal(SIGINT, unfold);
 		signal(SIGTERM, unfold);
+		signal(SIGPIPE, unpipe);
 		/* set them loose */
 		unblock_sigs();
 		/* and here we go */
