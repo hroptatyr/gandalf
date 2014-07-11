@@ -42,6 +42,9 @@
 #include "logger.h"
 #include "nifty.h"
 
+void(*gand_log)(int prio, const char *fmt, ...) = syslog;
+
+
 void
 gand_errlog(int UNUSED(prio), const char *fmt, ...)
 {

@@ -45,11 +45,13 @@
 #define GAND_MAKEPRI(x)		(x)
 #define GAND_SYSLOG(x, args...)	gand_log(GAND_MAKEPRI(x), args)
 
-static void(*gand_log)(int prio, const char *fmt, ...) = syslog;
+
+extern void(*gand_log)(int prio, const char *fmt, ...);
 
 extern __attribute__((format(printf, 2, 3))) void
 gand_errlog(int prio, const char *fmt, ...);
 
+
 static inline void
 gand_openlog(void)
 {
