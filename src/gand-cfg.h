@@ -38,12 +38,15 @@
 #define INCLUDED_gand_cfg_h_
 
 #include <stddef.h>
-#include <stdbool.h>
 #include "configger.h"
 
 
 extern cfg_t gand_read_config(const char *user_cf);
 
 extern void gand_free_config(cfg_t ctx);
+
+extern size_t gand_get_trolfdir(char **tgt, cfg_t ctx);
+
+extern short unsigned int gand_get_port(cfg_t ctx);
 
 #endif	/* INCLUDED_gand_cfg_h_ */
