@@ -76,6 +76,14 @@ BUILT_SOURCES += gandalfd.yucc
 BUILT_SOURCES += gand-endpoints-gp.c
 BUILT_SOURCES += gand-outfmts-gp.c
 
+noinst_PROGRAMS += clidalf
+clidalf_CPPFLAGS = $(AM_CPPFLAGS)
+clidalf_CPPFLAGS += $(dict_CFLAGS)
+clidalf_LDFLAGS = $(AM_LDFLAGS)
+clidalf_LDFLAGS += $(dict_LIBS)
+clidalf_LDADD = libgand.a
+BUILT_SOURCES += clidalf.yucc
+
 
 ## version rules
 version.c: version.c.in $(top_builddir)/.version
