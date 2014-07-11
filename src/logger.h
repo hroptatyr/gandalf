@@ -45,11 +45,44 @@
 #define GAND_MAKEPRI(x)		(x)
 #define GAND_SYSLOG(x, args...)	gand_log(GAND_MAKEPRI(x), args)
 
-static void(*gand_log)(int prio, const char *fmt, ...) = syslog;
+
+extern void(*gand_log)(int prio, const char *fmt, ...);
 
 extern __attribute__((format(printf, 2, 3))) void
 gand_errlog(int prio, const char *fmt, ...);
 
+/* convenience macros */
+#define GAND_DEBUG(args...)
+#define GAND_DBGCONT(args...)
+
+#if defined GAND_LOG_PREFIX
+# define GAND_LOG_XPRE		GAND_LOG_PREFIX " "
+#else  /* !GAND_LOG_PREFIX */
+# define GAND_LOG_XPRE
+#endif	/* GAND_LOG_PREFIX */
+
+#define GAND_INFO_LOG(args...)					\
+	do {							\
+		GAND_SYSLOG(LOG_INFO, GAND_LOG_XPRE args);	\
+		GAND_DEBUG("INFO " args);			\
+	} while (0)
+#define GAND_ERR_LOG(args...)						\
+	do {								\
+		GAND_SYSLOG(LOG_ERR, GAND_LOG_XPRE "ERROR " args);	\
+		GAND_DEBUG("ERROR " args);				\
+	} while (0)
+#define GAND_CRIT_LOG(args...)						\
+	do {								\
+		GAND_SYSLOG(LOG_CRIT, GAND_LOG_XPRE "CRITICAL " args);	\
+		GAND_DEBUG("CRITICAL " args);				\
+	} while (0)
+#define GAND_NOTI_LOG(args...)						\
+	do {								\
+		GAND_SYSLOG(LOG_NOTICE, GAND_LOG_XPRE "NOTICE " args);	\
+		GAND_DEBUG("NOTICE " args);				\
+	} while (0)
+
+
 static inline void
 gand_openlog(void)
 {

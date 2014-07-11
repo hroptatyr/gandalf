@@ -1,13 +1,15 @@
 ### Makefile.am
 
-AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
+AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
 AM_CPPFLAGS += -I$(top_srcdir)/lib
+AM_CPPFLAGS += -DHAVE_VERSION_H
 AM_LDFLAGS =
 
 bin_PROGRAMS =
 sbin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
+noinst_LIBRARIES =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
@@ -16,6 +18,20 @@ SUFFIXES =
 CLEANFILES += version.c
 EXTRA_DIST += version.c.in
 noinst_HEADERS += version.h
+
+
+noinst_LIBRARIES += libgand.a
+libgand_a_SOURCES =
+libgand_a_SOURCES += nifty.h
+libgand_a_SOURCES += version.h version.c
+libgand_a_SOURCES += fops.c fops.h
+libgand_a_SOURCES += logger.c logger.h
+libgand_a_SOURCES += configger.c configger.h
+libgand_a_SOURCES += gand-cfg.c gand-cfg.h
+libgand_a_CPPFLAGS = $(AM_CPPFLAGS)
+libgand_a_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
+##libgand_a_LDFLAGS = $(lua_LIBS)
+
 
 if BUILD_SERVER
 bin_PROGRAMS += gandaux
@@ -35,16 +51,10 @@ if BUILD_SERVER
 sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
-gandalfd_SOURCES += fops.c fops.h
-gandalfd_SOURCES += nifty.h
-gandalfd_SOURCES += logger.c logger.h
-gandalfd_SOURCES += configger.c configger.h
-gandalfd_SOURCES += version.h version.c
 EXTRA_gandalfd_SOURCES =
 EXTRA_gandalfd_SOURCES += gand-endpoints-gp.erf
 EXTRA_gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_CPPFLAGS += -DHAVE_VERSION_H
 gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandalfd_CPPFLAGS += $(onion_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
@@ -55,6 +65,7 @@ gandalfd_SOURCES += lua-config.c lua-config.h
 gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
 gandalfd_LDFLAGS += $(lua_LIBS)
 endif  HAVE_LUA
+gandalfd_LDADD = libgand.a
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
 BUILT_SOURCES += gand-endpoints-gp.c

@@ -1,10 +1,10 @@
-/*** logger.c -- gandalf logging facility
+/*** gand-cfg.h -- unified config file reading bishbosh
  *
- * Copyright (C) 2011-2012 Sebastian Freundt
+ * Copyright (C) 2009-2014 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of the army of unserding daemons.
+ * This file is part of gandalf.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,27 +34,19 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if defined HAVE_CONFIG_H
-# include "config.h"
-#endif	/* HAVE_CONFIG_H */
-#include <stdarg.h>
-#include <stdio.h>
-#include "logger.h"
-#include "nifty.h"
+#if !defined INCLUDED_gand_cfg_h_
+#define INCLUDED_gand_cfg_h_
 
-void(*gand_log)(int prio, const char *fmt, ...) = syslog;
+#include <stddef.h>
+#include "configger.h"
 
 
-void
-gand_errlog(int UNUSED(prio), const char *fmt, ...)
-{
-	va_list ap;
+extern cfg_t gand_read_config(const char *user_cf);
 
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	fputc('\n', stderr);
-	va_end(ap);
-	return;
-}
+extern void gand_free_config(cfg_t ctx);
 
-/* logger.c ends here */
+extern size_t gand_get_trolfdir(char **tgt, cfg_t ctx);
+
+extern short unsigned int gand_get_port(cfg_t ctx);
+
+#endif	/* INCLUDED_gand_cfg_h_ */

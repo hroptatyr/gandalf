@@ -49,7 +49,7 @@
 #include <onion/onion.h>
 #include <onion/log.h>
 #include <tcbdb.h>
-#include "configger.h"
+#include "gand-cfg.h"
 #include "logger.h"
 #include "fops.h"
 #include "nifty.h"
@@ -57,33 +57,6 @@
 #if defined __INTEL_COMPILER
 # define auto	static
 #endif	/* __INTEL_COMPILER */
-
-#define GAND_DEBUG(args...)
-#define GAND_DBGCONT(args...)
-
-#define GAND_MOD		"[mod/gand]"
-#define GAND_INFO_LOG(args...)				\
-	do {						\
-		GAND_SYSLOG(LOG_INFO, GAND_MOD " " args);	\
-		GAND_DEBUG("INFO " args);		\
-	} while (0)
-#define GAND_ERR_LOG(args...)					\
-	do {							\
-		GAND_SYSLOG(LOG_ERR, GAND_MOD " ERROR " args);	\
-		GAND_DEBUG("ERROR " args);			\
-	} while (0)
-#define GAND_CRIT_LOG(args...)						\
-	do {								\
-		GAND_SYSLOG(LOG_CRIT, GAND_MOD " CRITICAL " args);	\
-		GAND_DEBUG("CRITICAL " args);				\
-	} while (0)
-#define GAND_NOTI_LOG(args...)						\
-	do {								\
-		GAND_SYSLOG(LOG_NOTICE, GAND_MOD " NOTICE " args);	\
-		GAND_DEBUG("NOTICE " args);				\
-	} while (0)
-
-#define GAND_DEFAULT_PORT	8080U
 
 typedef TCBDB *dict_t;
 typedef unsigned int dict_id_t;
@@ -386,133 +359,6 @@ get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 }
 
 
-/* rolf specific */
-#define GLOB_CFG_PRE	"/etc/unserding"
-#if !defined MAX_PATH_LEN
-# define MAX_PATH_LEN	64
-#endif	/* !MAX_PATH_LEN */
-
-/* do me properly */
-static const char cfg_glob_prefix[] = GLOB_CFG_PRE;
-
-#if defined USE_LUA
-/* that should be pretty much the only mention of lua in here */
-static const char cfg_file_name[] = "gandalf.lua";
-#endif	/* USE_LUA */
-
-static void
-gand_expand_user_cfg_file_name(char *tgt)
-{
-	char *p;
-	const char *homedir = getenv("HOME");
-	size_t homedirlen = strlen(homedir);
-
-	/* get the user's home dir */
-	memcpy(tgt, homedir, homedirlen);
-	p = tgt + homedirlen;
-	*p++ = '/';
-	*p++ = '.';
-	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
-	return;
-}
-
-static void
-gand_expand_glob_cfg_file_name(char *tgt)
-{
-	char *p;
-
-	/* get the user's home dir */
-	strncpy(tgt, cfg_glob_prefix, sizeof(cfg_glob_prefix));
-	p = tgt + sizeof(cfg_glob_prefix);
-	*p++ = '/';
-	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
-	return;
-}
-
-static cfg_t
-gand_read_config(const char *user_cf)
-{
-	char cfgf[PATH_MAX];
-	cfg_t cfg;
-
-        GAND_DEBUG("reading configuration from config file ...");
-
-	/* we prefer the user's config file, then fall back to the
-	 * global config file if that's not available */
-	if (user_cf != NULL && (cfg = configger_init(user_cf)) != NULL) {
-		GAND_DBGCONT("done\n");
-		return cfg;
-	}
-
-	gand_expand_user_cfg_file_name(cfgf);
-	if (cfgf != NULL && (cfg = configger_init(cfgf)) != NULL) {
-		GAND_DBGCONT("done\n");
-		return cfg;
-	}
-
-	/* otherwise there must have been an error */
-	gand_expand_glob_cfg_file_name(cfgf);
-	if (cfgf != NULL && (cfg = configger_init(cfgf)) != NULL) {
-		GAND_DBGCONT("done\n");
-		return cfg;
-	}
-	GAND_DBGCONT("failed\n");
-	return NULL;
-}
-
-static void
-gand_free_config(cfg_t ctx)
-{
-	if (ctx != NULL) {
-		configger_fini(ctx);
-	}
-	return;
-}
-
-static size_t
-gand_get_trolfdir(char **tgt, cfg_t ctx)
-{
-	static char __trolfdir[] = "/var/scratch/freundt/trolf";
-	size_t rsz;
-	const char *res = NULL;
-	cfgset_t *cs;
-
-	if (UNLIKELY(ctx == NULL)) {
-		goto dflt;
-	}
-
-	/* start out with an empty target */
-	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "trolfdir"))) {
-			struct stat st = {0};
-
-			if (stat(res, &st) == 0) {
-				/* set up the IO watcher and timer */
-				goto out;
-			}
-		}
-	}
-
-	/* otherwise try the root domain */
-	if ((rsz = cfg_glob_lookup_s(&res, ctx, "trolfdir"))) {
-		struct stat st = {0};
-
-		if (stat(res, &st) == 0) {
-			goto out;
-		}
-	}
-
-	/* quite fruitless today */
-dflt:
-	res = __trolfdir;
-	rsz = sizeof(__trolfdir) -1;
-
-out:
-	/* make sure *tgt is freeable */
-	*tgt = strndup(res, rsz);
-	return rsz;
-}
-
 static char*
 gand_get_nfo_file(cfg_t ctx)
 {
@@ -565,34 +411,6 @@ dflt:
 out:
 	/* make sure the return value is freeable */
 	return strndup(res, rsz);
-}
-
-static uint16_t
-gand_get_port(cfg_t ctx)
-{
-	cfgset_t *cs;
-	int res;
-
-	if (UNLIKELY(ctx == NULL)) {
-		goto dflt;
-	}
-
-	/* start out with an empty target */
-	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((res = cfg_tbl_lookup_i(ctx, cs[i], "port"))) {
-			goto out;
-		}
-	}
-
-	/* otherwise try the root domain */
-	res = cfg_glob_lookup_i(ctx, "port");
-
-out:
-	if (res > 0 && res < 65536) {
-		return (uint16_t)res;
-	}
-dflt:
-	return GAND_DEFAULT_PORT;
 }
 
 static const char*
