@@ -27,10 +27,18 @@ libgand_a_SOURCES += version.h version.c
 libgand_a_SOURCES += fops.c fops.h
 libgand_a_SOURCES += logger.c logger.h
 libgand_a_SOURCES += configger.c configger.h
+if HAVE_LUA
+libgand_a_SOURCES += lua-config.c lua-config.h
 libgand_a_SOURCES += gand-cfg.c gand-cfg.h
+endif HAVE_LUA
+libgand_a_SOURCES += gand-dict.c gand-dict.h
 libgand_a_CPPFLAGS = $(AM_CPPFLAGS)
 libgand_a_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
-##libgand_a_LDFLAGS = $(lua_LIBS)
+libgand_a_CPPFLAGS += $(tokyocabinet_CFLAGS)
+cfg_CFLAGS = -DUSE_LUA
+cfg_LIBS = $(lua_LIBS)
+dict_CFLAGS =
+dict_LIBS = $(tokyocabinet_LIBS)
 
 
 if BUILD_SERVER
@@ -55,16 +63,13 @@ EXTRA_gandalfd_SOURCES =
 EXTRA_gandalfd_SOURCES += gand-endpoints-gp.erf
 EXTRA_gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandalfd_CPPFLAGS += $(dict_CFLAGS)
 gandalfd_CPPFLAGS += $(onion_CFLAGS)
+gandalfd_CPPFLAGS += $(cfg_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
-gandalfd_LDFLAGS += $(tokyocabinet_LIBS)
+gandalfd_LDFLAGS += $(dict_LIBS)
 gandalfd_LDFLAGS += $(onion_LIBS)
-if HAVE_LUA
-gandalfd_SOURCES += lua-config.c lua-config.h
-gandalfd_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
-gandalfd_LDFLAGS += $(lua_LIBS)
-endif  HAVE_LUA
+gandalfd_LDFLAGS += $(cfg_LIBS)
 gandalfd_LDADD = libgand.a
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc

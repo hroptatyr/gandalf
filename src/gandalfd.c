@@ -40,6 +40,7 @@
 #if defined HAVE_VERSION_H
 # include "version.h"
 #endif	/* HAVE_VERSION_H */
+#include <stdio.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -48,7 +49,7 @@
 #include <limits.h>
 #include <onion/onion.h>
 #include <onion/log.h>
-#include <tcbdb.h>
+#include "gand-dict.h"
 #include "gand-cfg.h"
 #include "logger.h"
 #include "fops.h"
@@ -57,9 +58,6 @@
 #if defined __INTEL_COMPILER
 # define auto	static
 #endif	/* __INTEL_COMPILER */
-
-typedef TCBDB *dict_t;
-typedef unsigned int dict_id_t;
 
 typedef struct {
 	const char *s;
@@ -308,57 +306,6 @@ unblock_sigs(void)
 }
 
 
-static dict_t
-make_dict(const char *fn, int oflags)
-{
-	int omode = BDBOREADER;
-	dict_t res;
-
-	if (oflags & O_RDWR) {
-		omode |= BDBOWRITER;
-	}
-	if (oflags & O_CREAT) {
-		omode |= BDBOCREAT;
-	}
-
-	if (UNLIKELY((res = tcbdbnew()) == NULL)) {
-		goto out;
-	} else if (UNLIKELY(!tcbdbopen(res, fn, omode))) {
-		goto free_out;
-	}
-
-	/* success, just return the handle we've got */
-	return res;
-
-free_out:
-	tcbdbdel(res);
-out:
-	return NULL;
-}
-
-static void
-free_dict(dict_t d)
-{
-	tcbdbclose(d);
-	tcbdbdel(d);
-	return;
-}
-
-static dict_id_t
-get_sym(dict_t d, const char sym[static 1U], size_t ssz)
-{
-	const dict_id_t *rp;
-	int rz[1];
-
-	if (UNLIKELY((rp = tcbdbget3(d, sym, ssz, rz)) == NULL)) {
-		return 0U;
-	} else if (UNLIKELY(*rz != sizeof(*rp))) {
-		return 0U;
-	}
-	return *rp;
-}
-
-
 static char*
 gand_get_nfo_file(cfg_t ctx)
 {
@@ -414,7 +361,7 @@ out:
 }
 
 static const char*
-make_lateglu_name(uint32_t rolf_id)
+make_lateglu_name(dict_oid_t rolf_id)
 {
 	static const char glud[] = "show_lateglu/";
 	static char f[PATH_MAX];
@@ -632,7 +579,7 @@ static onion_connection_status
 work_ser(void *UNUSED(_), onion_request *req, onion_response *res)
 {
 	const char *sym;
-	dict_id_t rid;
+	dict_oid_t rid;
 	struct rtup_s r;
 	gand_of_t of;
 
@@ -657,7 +604,7 @@ work_ser(void *UNUSED(_), onion_request *req, onion_response *res)
 			};
 			break;
 		}
-	} else if (!(rid = get_sym(gsymdb, sym, strlen(sym)))) {
+	} else if (!(rid = dict_sym2oid(gsymdb, sym, strlen(sym)))) {
 #define HTTP_CONFLICT	(enum onion_response_codes_e)409U
 		switch (of) {
 			static const char bad_json[] = "{}";
@@ -847,7 +794,7 @@ main(int argc, char *argv[])
 	jmp_buf cont;
 	onion *o = NULL;
 	int daemonisep = 0;
-	uint16_t port;
+	short unsigned int port;
 	cfg_t cfg;
 	int rc = 0;
 
@@ -908,7 +855,7 @@ main(int argc, char *argv[])
 	/* start them log files */
 	gand_openlog();
 
-	if ((gsymdb = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
+	if ((gsymdb = open_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
 		GAND_ERR_LOG("cannot open symbol index file");
 		rc = 1;
 		goto out0;
@@ -979,7 +926,7 @@ outd:
 
 	onion_free(o);
 out1:
-	free_dict(gsymdb);
+	close_dict(gsymdb);
 out0:
 	gand_closelog();
 	return rc;
