@@ -58,31 +58,6 @@
 # define auto	static
 #endif	/* __INTEL_COMPILER */
 
-#define GAND_DEBUG(args...)
-#define GAND_DBGCONT(args...)
-
-#define GAND_MOD		"[mod/gand]"
-#define GAND_INFO_LOG(args...)				\
-	do {						\
-		GAND_SYSLOG(LOG_INFO, GAND_MOD " " args);	\
-		GAND_DEBUG("INFO " args);		\
-	} while (0)
-#define GAND_ERR_LOG(args...)					\
-	do {							\
-		GAND_SYSLOG(LOG_ERR, GAND_MOD " ERROR " args);	\
-		GAND_DEBUG("ERROR " args);			\
-	} while (0)
-#define GAND_CRIT_LOG(args...)						\
-	do {								\
-		GAND_SYSLOG(LOG_CRIT, GAND_MOD " CRITICAL " args);	\
-		GAND_DEBUG("CRITICAL " args);				\
-	} while (0)
-#define GAND_NOTI_LOG(args...)						\
-	do {								\
-		GAND_SYSLOG(LOG_NOTICE, GAND_MOD " NOTICE " args);	\
-		GAND_DEBUG("NOTICE " args);				\
-	} while (0)
-
 #define GAND_DEFAULT_PORT	8080U
 
 typedef TCBDB *dict_t;
