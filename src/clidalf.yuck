@@ -1,0 +1,11 @@
+Usage: clidalf
+
+  --trolfdir=PATH       Path to trolf/ directory.
+
+
+Usage: clidalf show
+
+  -s, --symbol=STRING...  Request date for symbol STRING.
+  --verb=VALFLAV...     Filter verb VALFLAV, can be used multiple times.
+  --from=DATE           Ignore data before DATE.
+  --till=DATE           Ignore data after DATE.

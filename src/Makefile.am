@@ -9,7 +9,7 @@ bin_PROGRAMS =
 sbin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
-noinst_LIBRARIES =
+noinst_LTLIBRARIES =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
@@ -20,23 +20,25 @@ EXTRA_DIST += version.c.in
 noinst_HEADERS += version.h
 
 
-noinst_LIBRARIES += libgand.a
-libgand_a_SOURCES =
-libgand_a_SOURCES += nifty.h
-libgand_a_SOURCES += version.h version.c
-libgand_a_SOURCES += fops.c fops.h
-libgand_a_SOURCES += logger.c logger.h
-libgand_a_SOURCES += configger.c configger.h
+noinst_LTLIBRARIES += libgand.la
+libgand_la_SOURCES =
+libgand_la_SOURCES += nifty.h
+libgand_la_SOURCES += version.h version.c
+libgand_la_SOURCES += fops.c fops.h
+libgand_la_SOURCES += logger.c logger.h
+libgand_la_SOURCES += configger.c configger.h
 if HAVE_LUA
-libgand_a_SOURCES += lua-config.c lua-config.h
-libgand_a_SOURCES += gand-cfg.c gand-cfg.h
-endif HAVE_LUA
-libgand_a_SOURCES += gand-dict.c gand-dict.h
-libgand_a_CPPFLAGS = $(AM_CPPFLAGS)
-libgand_a_CPPFLAGS += -DUSE_LUA $(lua_CFLAGS)
-libgand_a_CPPFLAGS += $(tokyocabinet_CFLAGS)
-cfg_CFLAGS = -DUSE_LUA
+libgand_la_SOURCES += lua-config.c lua-config.h
+libgand_la_SOURCES += gand-cfg.c gand-cfg.h
+cfg_CFLAGS = -DUSE_LUA $(lua_CFLAGS)
 cfg_LIBS = $(lua_LIBS)
+endif HAVE_LUA
+libgand_la_SOURCES += gand-dict.c gand-dict.h
+libgand_la_CPPFLAGS = $(AM_CPPFLAGS)
+libgand_la_CPPFLAGS += $(cfg_CFLAGS)
+libgand_la_CPPFLAGS += $(dict_CFLAGS)
+libgand_la_LDFLAGS = $(AM_LDFLAGS)
+libgand_la_LDFLAGS += $(cfg_LIBS) $(dict_LIBS)
 dict_CFLAGS =
 dict_LIBS = $(tokyocabinet_LIBS)
 
@@ -70,11 +72,19 @@ gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDFLAGS += $(dict_LIBS)
 gandalfd_LDFLAGS += $(onion_LIBS)
 gandalfd_LDFLAGS += $(cfg_LIBS)
-gandalfd_LDADD = libgand.a
+gandalfd_LDADD = libgand.la
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
 BUILT_SOURCES += gand-endpoints-gp.c
 BUILT_SOURCES += gand-outfmts-gp.c
+
+noinst_PROGRAMS += clidalf
+clidalf_CPPFLAGS = $(AM_CPPFLAGS)
+clidalf_CPPFLAGS += $(dict_CFLAGS)
+clidalf_LDFLAGS = $(AM_LDFLAGS)
+clidalf_LDFLAGS += $(dict_LIBS)
+clidalf_LDADD = libgand.la
+BUILT_SOURCES += clidalf.yucc
 
 
 ## version rules
