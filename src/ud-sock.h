@@ -182,4 +182,28 @@ tcp_uncork(int s)
 #endif	/* TCP_CORK */
 }
 
+
+/* stuff operating on our ud_sockaddr_t */
+static inline __attribute__((const, pure)) short unsigned int
+ud_sockaddr_fam(ud_sockaddr_t sa)
+{
+	return sa.sa.sa_family;
+}
+
+static inline __attribute__((const, pure)) short unsigned int
+ud_sockaddr_port(ud_sockaddr_t sa)
+{
+	return ntohs(sa.s6.sin6_port);
+}
+
+static inline int
+ud_sockaddr_ntop(char *restrict buf, size_t len, ud_sockaddr_t sa)
+{
+	short unsigned int fam = ud_sockaddr_fam(sa);
+	if (inet_ntop(fam, (void*)&sa.s6.sin6_addr, buf, len) == NULL) {
+		return -1;
+	}
+	return 0;
+}
+
 #endif	/* INCLUDED_ud_sock_h_ */

@@ -38,6 +38,9 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/signal.h>
 #include <arpa/inet.h>
 #include <ev.h>
@@ -94,11 +97,91 @@ make_listener(int s, ud_sockaddr_t sa[static 1U])
 	return listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
 }
 
+static void
+log_conn(int fd, ud_sockaddr_t sa)
+{
+	char abuf[INET6_ADDRSTRLEN];
+	short unsigned int p;
+
+	ud_sockaddr_ntop(abuf, sizeof(abuf), sa);
+	p = ud_sockaddr_port(sa);
+	GAND_INFO_LOG(":sock %d  connection from [%s]:%hu", fd, abuf, p);
+	return;
+}
+
+
+/* libev conn handling */
+#define MAX_CONNS	(sizeof(free_conns) * 8U)
+static uint_fast32_t free_conns = (uint_fast32_t)-1;
+static ev_io conns[MAX_CONNS];
+
+static ev_io*
+make_io(void)
+{
+
+	int c = ffs(free_conns & 0xffffffffU)
+		?: ffs(free_conns >> 32U & 0xffffffffU);
+
+	if (LIKELY(c-- > 0)) {
+		/* toggle bit in free conns */
+		free_conns ^= 1UL << c;
+		return conns + c;
+	}
+	GAND_ERR_LOG("connection pool exhausted");
+	return NULL;
+}
+
+static void
+free_io(ev_io *o)
+{
+	size_t c = o - conns;
+
+	if (UNLIKELY(c >= MAX_CONNS)) {
+		/* huh? */
+		return;
+	}
+	/* toggle C-th bit */
+	free_conns ^= 1UL << c;
+	memset(o, 0, sizeof(*o));
+	return;
+}
+
 
 /* callbacks */
 static void
-sock_cb(EV_P_ ev_io *s, int UNUSED(revents))
+sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
+	const int fd = w->fd;
+
+	GAND_INFO_LOG("reading from %d", fd);
+	ev_io_stop(EV_A_ w);
+	shutdown(fd, SHUT_RDWR);
+	close(fd);
+	free_io(w);
+	return;
+}
+
+static void
+sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	ud_sockaddr_t sa;
+	socklen_t z = sizeof(sa);
+	ev_io *nio;
+	int s;
+
+	if ((s = accept(w->fd, &sa.sa, &z)) < 0) {
+		GAND_ERR_LOG("connection vanished");
+		return;
+	}
+	log_conn(s, sa);
+
+	if (UNLIKELY((nio = make_io()) == NULL)) {
+		GAND_ERR_LOG("too many concurrent connections");
+		close(s);
+		return;
+	}
+	ev_io_init(nio, sock_data_cb, s, EV_READ);
+	ev_io_start(EV_A_ nio);
 	return;
 }
 
