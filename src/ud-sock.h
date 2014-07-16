@@ -38,6 +38,7 @@
 #define INCLUDED_ud_sock_h_
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <fcntl.h>
@@ -64,6 +65,16 @@ static inline int
 setsockopt_int(int s, int level, int optname, int value)
 {
 	return setsockopt(s, level, optname, &value, sizeof(value));
+}
+
+static inline int
+setsockopt_tv(int s, int level, int optname, unsigned int value)
+{
+	struct timeval tv = {
+		.tv_sec = value / 1000000U,
+		.tv_usec = value % 1000000U,
+	};
+	return setsockopt(s, level, optname, &tv, sizeof(tv));
 }
 
 
@@ -105,11 +116,19 @@ setsock_reuseport(int __attribute__((unused)) s)
 }
 
 /**
- * Impose a receive timeout upon S. */
+ * Impose a receive timeout upon S, TIMEO in microseconds. */
 static inline int
-setsock_rcvtimeo(int s, int timeo)
+setsock_rcvtimeo(int s, unsigned int timeo)
 {
-	return setsockopt_int(s, SOL_SOCKET, SO_RCVTIMEO, timeo);
+	return setsockopt_tv(s, SOL_SOCKET, SO_RCVTIMEO, timeo);
+}
+
+/**
+ * Impose a send timeout upon S, TIMEO in microseconds. */
+static inline int
+setsock_sndtimeo(int s, unsigned int timeo)
+{
+	return setsockopt_tv(s, SOL_SOCKET, SO_SNDTIMEO, timeo);
 }
 
 /**
