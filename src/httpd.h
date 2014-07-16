@@ -45,7 +45,8 @@ typedef struct gand_httpd_s *gand_httpd_t;
 
 typedef struct {
 	short unsigned int port;
-	int timeout;
+	/* timeout in useconds, 0 to disable */
+	unsigned int timeout;
 } gand_httpd_param_t;
 
 /* public part of gand_httpd_s */
