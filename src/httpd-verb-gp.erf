@@ -1,0 +1,29 @@
+%{
+#include "httpd.h"
+%}
+%7bit
+%readonly-tables
+%enum
+%switch=1
+%struct-type
+%define slot-name verb_str
+%define hash-function-name __httpd_verb_hash
+%define lookup-function-name __httpd_verb
+%null-strings
+%compare-strncmp
+%includes
+
+struct httpd_verb_cell_s {
+	const char *verb_str;
+	gand_httpd_verb_t verb;
+};
+
+%%
+GET, VERB_GET
+HEAD, VERB_HEAD
+POST, VERB_POST
+PUT, VERB_PUT
+DELETE, VERB_DELETE
+CONNECT, VERB_CONNECT
+OPTIONS, VERB_OPTIONS
+TRACE, VERB_TRACE

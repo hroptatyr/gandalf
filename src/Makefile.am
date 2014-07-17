@@ -45,12 +45,15 @@ dict_LIBS = $(tokyocabinet_LIBS)
 ## our own take on a http server
 noinst_LTLIBRARIES += libbeef.la
 libbeef_la_SOURCES =
+EXTRA_libbeef_la_SOURCES =
 libbeef_la_SOURCES += httpd.c httpd.h
 libbeef_la_SOURCES += ud-sock.h
+EXTRA_libbeef_la_SOURCES += httpd-verb-gp.erf
 libbeef_la_CPPFLAGS = $(AM_CPPFLAGS)
 libbeef_la_CPPFLAGS += $(libev_CFLAGS)
 libbeef_la_LDFLAGS = $(AM_LDFLAGS)
 libbeef_la_LDFLAGS += $(libev_LIBS)
+BUILT_SOURCES += httpd-verb-gp.c
 
 
 if BUILD_SERVER
