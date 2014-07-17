@@ -1,10 +1,10 @@
 /*** nifty.h -- generally handy macroes
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2009-2014 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of unserding.
+ * This file is part of glod.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,59 +34,23 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
 #if !defined INCLUDED_nifty_h_
 #define INCLUDED_nifty_h_
 
-#include <stdlib.h>
-#include <unistd.h>
-
-#if !defined index_t
-# define index_t	long unsigned int
-#endif	/* !index_t */
-
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
-#endif
+#endif	/* !LIKELY */
 #if !defined UNLIKELY
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
-#endif
+#endif	/* UNLIKELY */
+
 #if !defined UNUSED
 # define UNUSED(_x)	_x __attribute__((unused))
 #endif	/* !UNUSED */
-#define ALGN16(_x)	__attribute__((aligned(16))) _x
 
-#define countof(x)		(sizeof(x) / sizeof(*x))
-#define countof_m1(x)		(countof(x) - 1)
-
-/* The encoded parameter sizes will be rounded up to match pointer alignment. */
-#if !defined ROUND
-# define ROUND(s, a)		(a * ((s + a - 1) / a))
-#endif	/* !ROUND */
-#if !defined aligned_sizeof
-# define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
-#endif	/* !aligned_sizeof */
-
-#if !defined xmalloc
-# define xmalloc(_x)	malloc(_x)
-#endif	/* !xmalloc */
-#if !defined xnew
-# define xnew(_a)	xmalloc(sizeof(_a))
-#endif	/* !xnew */
-#if !defined xfree
-# define xfree(_x)	free(_x)
-#endif	/* !xfree */
-
-/* just a service for mmap based allocators */
-#if !defined MAP_ANON && defined MAP_ANONYMOUS
-# define MAP_ANON	MAP_ANONYMOUS
-#endif	/* MAP_ANON && !MAP_ANONYMOUS */
-#if !defined MAP_MEM
-# define MAP_MEM	(MAP_PRIVATE | MAP_ANON)
-#endif	/* MAP_MEM */
-#if !defined PROT_MEM
-# define PROT_MEM	(PROT_READ | PROT_WRITE)
-#endif	/* PROT_MEM */
+#if !defined ALGN
+# define ALGN(_x, to)	_x __attribute__((aligned(to)))
+#endif	/* !ALGN */
 
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
@@ -113,5 +77,15 @@
 #define but_first				\
 	static int paste(__, __LINE__);		\
 	if (paste(__, __LINE__)++)
+
+static __inline void*
+deconst(const void *cp)
+{
+	union {
+		const void *c;
+		void *p;
+	} tmp = {cp};
+	return tmp.p;
+}
 
 #endif	/* INCLUDED_nifty_h_ */
