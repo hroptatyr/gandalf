@@ -49,9 +49,47 @@ typedef struct {
 	unsigned int timeout;
 } gand_httpd_param_t;
 
+typedef enum {
+	STATUS_NOT_PROCESSED = 0,
+	STATUS_NEED_MORE_DATA = 1,
+	STATUS_PROCESSED = 2,
+	STATUS_CLOSE_CONNECTION = -2,
+	STATUS_KEEP_ALIVE = 3,
+	STATUS_WEBSOCKET = 4,
+	STATUS_INTERNAL_ERROR = -500,
+	STATUS_NOT_IMPLEMENTED = -501,
+	STATUS_FORBIDDEN = -502
+} gand_httpd_status_t;
+
+typedef enum {
+	VERB_UNSUPP = 0U,
+	VERB_GET,
+	VERB_HEAD,
+	VERB_POST,
+	VERB_PUT,
+	VERB_DELETE,
+	VERB_CONNECT,
+	VERB_OPTIONS,
+	VERB_TRACE,
+} gand_httpd_verb_t;
+
+typedef struct {
+	const char *str;
+	size_t len;
+} gand_word_t;
+
+typedef struct {
+	gand_httpd_verb_t verb;
+	gand_word_t hdr;
+	const char *host;
+	const char *path;
+	const char *query;
+} gand_httpd_req_t;
+
 /* public part of gand_httpd_s */
 struct gand_httpd_s {
 	const gand_httpd_param_t param;
+	gand_httpd_status_t(*workf)(gand_httpd_req_t);
 };
 
 

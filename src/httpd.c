@@ -38,7 +38,9 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/signal.h>
@@ -52,6 +54,7 @@
 /* private version of struct gand_httpd_s */
 struct _httpd_s {
 	gand_httpd_param_t param;
+	gand_httpd_status_t(*workf)(gand_httpd_req_t);
 
 	ev_signal sigint;
 	ev_signal sighup;
@@ -66,6 +69,80 @@ struct _httpd_s {
 /* massage the EV macroes a bit */
 #undef EV_P
 #define EV_P  struct ev_loop *loop __attribute__((unused))
+
+
+/* our take on memmem() */
+static char*
+xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
+{
+	const char *const eoh = hay + hz;
+	const char *const eon = ndl + nz;
+	const char *hp;
+	const char *np;
+	const char *cand;
+	unsigned int hsum;
+	unsigned int nsum;
+	unsigned int eqp;
+
+	/* trivial checks first
+	 * a 0-sized needle is defined to be found anywhere in haystack
+	 * then run strchr() to find a candidate in HAYSTACK (i.e. a portion
+	 * that happens to begin with *NEEDLE) */
+	if (nz == 0UL) {
+		return deconst(hay);
+	} else if ((hay = memchr(hay, *ndl, hz)) == NULL) {
+		/* trivial */
+		return NULL;
+	}
+
+	/* First characters of haystack and needle are the same now. Both are
+	 * guaranteed to be at least one character long.  Now computes the sum
+	 * of characters values of needle together with the sum of the first
+	 * needle_len characters of haystack. */
+	for (hp = hay + 1U, np = ndl + 1U, hsum = *hay, nsum = *hay, eqp = 1U;
+	     hp < eoh && np < eon;
+	     hsum ^= *hp, nsum ^= *np, eqp &= *hp == *np, hp++, np++);
+
+	/* HP now references the (NZ + 1)-th character. */
+	if (np < eon) {
+		/* haystack is smaller than needle, :O */
+		return NULL;
+	} else if (eqp) {
+		/* found a match */
+		return deconst(hay);
+	}
+
+	/* now loop through the rest of haystack,
+	 * updating the sum iteratively */
+	for (cand = hay; hp < eoh; hp++) {
+		hsum ^= *cand++;
+		hsum ^= *hp;
+
+		/* Since the sum of the characters is already known to be
+		 * equal at that point, it is enough to check just NZ - 1
+		 * characters for equality,
+		 * also CAND is by design < HP, so no need for range checks */
+		if (hsum == nsum && memcmp(cand, ndl, nz - 1U) == 0) {
+			return deconst(cand);
+		}
+	}
+	return NULL;
+}
+
+/* our take on isspace */
+static bool
+xisspace(int x)
+{
+	switch (x) {
+	default:
+		break;
+	case ' ':
+	case '\r':
+	case '\t':
+		return true;
+	}
+	return false;
+}
 
 
 /* socket goodness */
@@ -147,13 +224,129 @@ free_io(ev_io *o)
 }
 
 
+/* http goodness */
+#include "httpd-verb-gp.c"
+
+static __attribute__((const, pure))  gand_httpd_verb_t
+parse_verb(const char *str, size_t len)
+{
+	const struct httpd_verb_cell_s *const x = __httpd_verb(str, len);
+
+	if (UNLIKELY(x == NULL)) {
+		return VERB_UNSUPP;
+	}
+	return x->verb;
+}
+
+static gand_httpd_req_t
+parse_hdr(const char *str, size_t len)
+{
+	gand_httpd_req_t res = {VERB_UNSUPP};
+	const char *const ep = str + len;
+	char *eox;
+
+	/* guess the verb first */
+	if (UNLIKELY((eox = memchr(str, ' ', len)) == NULL)) {
+		return res;
+	} else if (UNLIKELY(!(res.verb = parse_verb(str, eox - str)))) {
+		return res;
+	}
+
+	/* nothing much can go wrong now */
+	str = ++eox;
+	if (UNLIKELY((eox = memchr(str, ' ', ep - str)) == NULL)) {
+		/* no path then */
+		return res;
+	} else if (UNLIKELY(!memcmp(str, "http", 4U) &&
+			    (str[4U] == ':' ||
+			     str[4U] == 's' && str[5U] == ':'))) {
+		char *eoh;
+
+		/* absolute form, read over / and : */
+		for (str += 5U; *str == '/' || *str == ':'; str++);
+		/* save this reference as host */
+		res.host = str;
+		/* find the path */
+		if (UNLIKELY((eoh = memchr(str, '/', eox - str)) == NULL)) {
+			return res;
+		}
+		/* we need to squeeze a separator between host and path */
+		memmove(eoh + 1U, eoh, eox++ - str);
+		*eoh++ = '\0';
+		res.path = eoh;
+	} else {
+		char *ho, *eoh;
+
+		/* path is trivial otherwise */
+		res.path = str;
+
+		/* but we have to snarf the Host: line */
+		if ((ho = xmemmem(eox, ep - eox, "Host:", 5U)) != NULL &&
+		    (eoh = memchr(ho, '\n', ep - ho)) != NULL) {
+			/* read over leading whitespace */
+			for (ho += 5U, eoh--; ho < eoh && xisspace(*ho); ho++);
+			/* shrink trailing whitespace */
+			for (; eoh > ho && xisspace(eoh[-1]); eoh--);
+			/* and assign */
+			res.host = ho;
+			*eoh = '\0';
+		}
+	}
+
+	/* demark the end of the request line */
+	*eox = '\0';
+	/* we may need to split off the query string as well */
+	if ((eox = memchr(str, '?', eox - str)) != NULL) {
+		*eox++ = '\0';
+		res.query = eox;
+	}
+
+	/* and finally find beginning of actual headers */
+	if (LIKELY((eox = memchr(eox, '\n', ep - eox)) != NULL)) {
+		/* overread trailing/leading whitespace */
+		for (eox++; xisspace(*eox); eox++);
+		res.hdr = (gand_word_t){eox, ep - eox};
+	}
+	return res;
+}
+
+
 /* callbacks */
 static void
 sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
+	char buf[4096U];
 	const int fd = w->fd;
+	ssize_t nrd;
+	gand_httpd_req_t req;
+	const char *eoh;
 
-	GAND_INFO_LOG("reading from %d", fd);
+	if (UNLIKELY((nrd = read(w->fd, buf, sizeof(buf))) <= 0)) {
+		goto clo;
+	}
+
+	/* parse at least http header boundaries */
+	if (UNLIKELY((eoh = xmemmem(buf, nrd, "\r\n\r\n", 4U)) == NULL)) {
+		/* header boundary not found, fuck right off */
+		goto clo;
+	}
+
+	/* now get all them headers parsed */
+	req = parse_hdr(buf, eoh - buf);
+
+	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
+		goto clo;
+	}
+
+	with (const struct _httpd_s *h = w->data) {
+		switch (h->workf(req)) {
+		case STATUS_CLOSE_CONNECTION:
+		default:
+			goto clo;
+		}
+	}
+
+clo:
 	ev_io_stop(EV_A_ w);
 	shutdown(fd, SHUT_RDWR);
 	close(fd);
@@ -180,6 +373,7 @@ sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		close(s);
 		return;
 	}
+	nio->data = w->data;
 	ev_io_init(nio, sock_data_cb, s, EV_READ);
 	ev_io_start(EV_A_ nio);
 	return;
@@ -240,6 +434,7 @@ make_gand_httpd(const gand_httpd_param_t p)
 			socklen_t z = sizeof(addr);
 
 			/* yay */
+			res->sock.data = res;
 			ev_io_init(&res->sock, sock_cb, s, EV_READ);
 			ev_io_start(EV_A_ &res->sock);
 
