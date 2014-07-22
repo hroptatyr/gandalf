@@ -106,4 +106,12 @@ extern void free_gand_httpd(gand_httpd_t);
  * Main loop. */
 extern void gand_httpd_run(gand_httpd_t);
 
+/**
+ * Helper getter for gand requests. */
+extern gand_word_t gand_req_get_xhdr(gand_httpd_req_t req, const char *hdr);
+
+/**
+ * Helper getter for gand requests. */
+extern gand_word_t gand_req_get_xqry(gand_httpd_req_t req, const char *fld);
+
 #endif	/* INCLUDED_httpd_h_ */

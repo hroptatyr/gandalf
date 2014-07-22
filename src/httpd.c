@@ -310,6 +310,65 @@ parse_hdr(const char *str, size_t len)
 	return res;
 }
 
+/* auxiliary helpers */
+gand_word_t
+gand_req_get_xhdr(gand_httpd_req_t req, const char *hdr)
+{
+	const gand_word_t r = req.hdr;
+	char _hdr[64U], *const eo_ = _hdr + countof(_hdr);
+	size_t hz;
+	const char *h, *eoh;
+
+	with (char *_ = _hdr) {
+		for (h = hdr; LIKELY(_ < eo_) && LIKELY((*_ = *h)); _++, h++);
+		if (_ >= eo_) {
+			goto nul;
+		} else if (_ > _hdr && _[-1] != ':') {
+			if (UNLIKELY(_ + 1U >= eo_)) {
+				/* no room for an additional : */
+				goto nul;
+			}
+			/* otherwise append a colon */
+			*_++ = ':';
+			*_ = '\0';
+		}
+		hz = _ - _hdr;
+	}
+
+	if (UNLIKELY((h = strstr(r.str, _hdr)) == NULL)) {
+		goto nul;
+	} else if (UNLIKELY((eoh = memchr(
+				     h, '\n', r.len - (h - r.str))) == NULL)) {
+		goto nul;
+	}
+	/* overread leading space */
+	for (h += hz; h < eoh && xisspace(*h); h++);
+	/* rewind trailing space */
+	for (; eoh > h && xisspace(eoh[-1]); eoh--);
+
+	/* that's it, pack up */
+	return (gand_word_t){h, eoh - h};
+
+nul:
+	return (gand_word_t){NULL};
+}
+
+gand_word_t
+gand_req_get_xqry(gand_httpd_req_t req, const char *fld)
+{
+	const char *f;
+	const char *eof;
+
+	if (UNLIKELY((f = strstr(req.query, fld)) == NULL)) {
+		goto nul;
+	} else if ((eof = strchr(f, '&')) == NULL) {
+		eof = f + strlen(f);
+	}
+	return (gand_word_t){f, eof - f};
+nul:
+	return (gand_word_t){NULL};
+}
+
 
 /* callbacks */
 static void
@@ -319,7 +378,7 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	const int fd = w->fd;
 	ssize_t nrd;
 	gand_httpd_req_t req;
-	const char *eoh;
+	char *eoh;
 
 	if (UNLIKELY((nrd = read(w->fd, buf, sizeof(buf))) <= 0)) {
 		goto clo;
@@ -332,6 +391,7 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	}
 
 	/* now get all them headers parsed */
+	*eoh = '\0';
 	req = parse_hdr(buf, eoh - buf);
 
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
