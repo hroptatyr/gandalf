@@ -253,8 +253,10 @@ parse_hdr(const char *str, size_t len)
 	}
 
 	/* nothing much can go wrong now */
-	str = ++eox;
-	if (UNLIKELY((eox = memchr(str, ' ', ep - str)) == NULL)) {
+	if (UNLIKELY((str = ++eox) >= ep)) {
+		/* don't bother */
+		return res;
+	} else if (UNLIKELY((eox = memchr(str, ' ', ep - str)) == NULL)) {
 		/* no path then */
 		return res;
 	} else if (UNLIKELY(!memcmp(str, "http", 4U) &&
@@ -296,9 +298,11 @@ parse_hdr(const char *str, size_t len)
 	/* demark the end of the request line */
 	*eox = '\0';
 	/* we may need to split off the query string as well */
-	if ((eox = memchr(str, '?', eox - str)) != NULL) {
-		*eox++ = '\0';
-		res.query = eox;
+	with (char *q) {
+		if ((q = memchr(str, '?', eox - str)) != NULL) {
+			*q++ = '\0';
+			res.query = q;
+		}
 	}
 
 	/* and finally find beginning of actual headers */
