@@ -395,8 +395,8 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	}
 
 	/* now get all them headers parsed */
-	*eoh = '\0';
-	req = parse_hdr(buf, eoh - buf);
+	eoh[2U] = '\0';
+	req = parse_hdr(buf, eoh + 2U - buf);
 
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
 		goto clo;
