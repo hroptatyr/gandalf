@@ -25,5 +25,5 @@ struct gand_ep_cell_s {
 };
 
 %%
-v0/info, EP_V0_INFO
-v0/series, EP_V0_SERIES
+/v0/info, EP_V0_INFO
+/v0/series, EP_V0_SERIES
