@@ -54,7 +54,7 @@
 /* private version of struct gand_httpd_s */
 struct _httpd_s {
 	gand_httpd_param_t param;
-	gand_httpd_status_t(*workf)(gand_httpd_req_t);
+	gand_httpd_res_t(*workf)(gand_httpd_req_t);
 
 	ev_signal sigint;
 	ev_signal sighup;
@@ -403,12 +403,14 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	}
 
 	with (const struct _httpd_s *h = w->data) {
-		switch (h->workf(req)) {
-		case STATUS_CLOSE_CONNECTION:
+		gand_httpd_res_t res = h->workf(req);
+
+		switch (res.rd.dtyp) {
 		default:
 			goto clo;
 		}
 	}
+	return;
 
 clo:
 	ev_io_stop(EV_A_ w);

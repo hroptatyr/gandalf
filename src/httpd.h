@@ -50,18 +50,6 @@ typedef struct {
 } gand_httpd_param_t;
 
 typedef enum {
-	STATUS_NOT_PROCESSED = 0,
-	STATUS_NEED_MORE_DATA = 1,
-	STATUS_PROCESSED = 2,
-	STATUS_CLOSE_CONNECTION = -2,
-	STATUS_KEEP_ALIVE = 3,
-	STATUS_WEBSOCKET = 4,
-	STATUS_INTERNAL_ERROR = -500,
-	STATUS_NOT_IMPLEMENTED = -501,
-	STATUS_FORBIDDEN = -502
-} gand_httpd_status_t;
-
-typedef enum {
 	VERB_UNSUPP = 0U,
 	VERB_GET,
 	VERB_HEAD,
@@ -78,6 +66,24 @@ typedef struct {
 	size_t len;
 } gand_word_t;
 
+/* just an ordinary pointer but managed by ourselves. */
+typedef void *gand_buf_t;
+
+typedef struct {
+	enum {
+		DTYP_NONE,
+		DTYP_FILE,
+		DTYP_DATA,
+		DTYP_GBUF,
+	} dtyp;
+	union {
+		const void *ptr;
+		const char *file;
+		const char *data;
+		gand_buf_t gbuf;
+	};
+} gand_res_data_t;
+
 typedef struct {
 	gand_httpd_verb_t verb;
 	gand_word_t hdr;
@@ -86,10 +92,24 @@ typedef struct {
 	const char *query;
 } gand_httpd_req_t;
 
+typedef struct {
+	/** http response code */
+	unsigned int rc;
+	/** content type */
+	const char *ctyp;
+	/** content length
+	 * if unknown use CLEN_UNKNOWN and it will be
+	 * calculated in the case of DTYP_FILE, or DTYP_GBUF. */
+	size_t clen;
+#define CLEN_UNKNOWN	(0U)
+	/** response data */
+	gand_res_data_t rd;
+} gand_httpd_res_t;
+
 /* public part of gand_httpd_s */
 struct gand_httpd_s {
 	const gand_httpd_param_t param;
-	gand_httpd_status_t(*workf)(gand_httpd_req_t);
+	gand_httpd_res_t(*workf)(gand_httpd_req_t);
 };
 
 
