@@ -10,6 +10,7 @@ sbin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
 noinst_LTLIBRARIES =
+pkgdata_DATA =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
@@ -89,6 +90,8 @@ endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
 BUILT_SOURCES += gand-endpoints-gp.c
 BUILT_SOURCES += gand-outfmts-gp.c
+pkgdata_DATA += $(top_srcdir)/www/index.html
+pkgdata_DATA += $(top_srcdir)/www/404.html
 
 noinst_PROGRAMS += clidalf
 clidalf_CPPFLAGS = $(AM_CPPFLAGS)
