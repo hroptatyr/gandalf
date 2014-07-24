@@ -79,13 +79,12 @@ EXTRA_gandalfd_SOURCES += gand-endpoints-gp.erf
 EXTRA_gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += $(dict_CFLAGS)
-gandalfd_CPPFLAGS += $(onion_CFLAGS)
 gandalfd_CPPFLAGS += $(cfg_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDFLAGS += $(dict_LIBS)
-gandalfd_LDFLAGS += $(onion_LIBS)
 gandalfd_LDFLAGS += $(cfg_LIBS)
 gandalfd_LDADD = libgand.la
+gandalfd_LDADD += libbeef.la
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
 BUILT_SOURCES += gand-endpoints-gp.c
