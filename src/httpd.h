@@ -44,9 +44,12 @@
 typedef struct gand_httpd_s *gand_httpd_t;
 
 typedef struct {
+	/** port to listen on */
 	short unsigned int port;
-	/* timeout in useconds, 0 to disable */
+	/** timeout in useconds, 0 to disable */
 	unsigned int timeout;
+	/** directory from which to serve files */
+	const char *www_dir;
 } gand_httpd_param_t;
 
 typedef enum {

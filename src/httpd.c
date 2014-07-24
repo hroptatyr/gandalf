@@ -45,6 +45,7 @@
 #include <strings.h>
 #include <sys/signal.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <ev.h>
 #include "ud-sock.h"
 #include "httpd.h"
@@ -477,6 +478,13 @@ make_gand_httpd(const gand_httpd_param_t p)
 
 	/* populate public bit */
 	res->param = p;
+
+	/* try changing directories */
+	if (p.www_dir && chdir(p.www_dir) < 0) {
+		GAND_ERR_LOG("cannot change to www directory `%s': %s",
+			     p.www_dir, strerror(errno));
+		goto foul;
+	}
 
 	/* get the socket on the way */
 	{
