@@ -386,6 +386,7 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	char *eoh;
 
 	if (UNLIKELY((nrd = read(w->fd, buf, sizeof(buf))) <= 0)) {
+		/* EOF or some other failure */
 		goto clo;
 	}
 
@@ -400,6 +401,7 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	req = parse_hdr(buf, eoh + 2U - buf);
 
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
+		/* don't deal with deliquents, we speak HTTP/1.1 only */
 		goto clo;
 	}
 
@@ -495,12 +497,16 @@ make_gand_httpd(const gand_httpd_param_t p)
 		};
 		int s;
 
-		if ((s = make_tcp()) < 0) {
+		if (UNLIKELY((s = make_tcp()) < 0)) {
 			/* big bugger */
+			GAND_ERR_LOG("cannot obtain a tcp socket: %s",
+				     strerror(errno));
 			goto foul;
 		} else if (make_listener(s, &addr) < 0 ||
 			   setsock_rcvtimeo(s, p.timeout) < 0 ||
 			   setsock_sndtimeo(s, p.timeout) < 0) {
+			GAND_ERR_LOG("cannot listen on tcp socket: %s",
+				     strerror(errno));
 			/* even bigger bugger */
 			close(s);
 			goto foul;
