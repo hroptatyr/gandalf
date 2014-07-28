@@ -413,72 +413,83 @@ shut_conn(struct gand_conn_s *c)
 }
 
 static int
-_tx_resp(int fd, struct gand_wrqi_s *restrict q)
+_tx_hdr(int fd, const struct gand_wrqi_s *x)
 {
-	if (LIKELY(!q->o)) {
-		/* cork and send header */
-		struct tm *t;
-		time_t now;
-		size_t z;
+	struct tm *t;
+	time_t now;
+	size_t z;
 
+	/* fill in return code */
+	snprintf(proto + OFF_STATUS, 4U, "%3u", x->res.rc);
+	proto[OFF_STATUS + 3U] = ' ';
+
+	/* fill in Date */
+	time(&now);
+	t = gmtime(&now);
+	strftime(proto + OFF_DATE, 30U, "%b, %d %a %Y %H:%M:%S UTC", t);
+	proto[OFF_DATE + 29U] = '\r';
+
+	/* fill in content length */
+	snprintf(proto + OFF_CLEN, 9U, "%8zu", x->z);
+	proto[OFF_CLEN + 8U] = '\r';
+
+	/* fill in content type */
+	z = off_ctyp;
+	z += xstrlcpy(proto + z, x->res.ctyp, sizeof(proto) - z);
+	proto[z++] = '\r';
+	proto[z++] = '\n';
+	proto[z++] = '\r';
+	proto[z++] = '\n';
+
+	if (UNLIKELY(send(fd, proto, z, 0) < (ssize_t)z)) {
+		/* oh my god, lucky we didn't send this,
+		 * just ask to close the socket */
+		return -1;
+	}
+	return 0;
+}
+
+static int
+_tx_resp(int fd, struct gand_wrqi_s *restrict x)
+{
+	ssize_t z;
+
+	if (LIKELY(!x->o)) {
+		/* cork ... */
 		tcp_cork(fd);
 
-		/* fill in return code */
-		snprintf(proto + OFF_STATUS, 4U, "%3u", q->res.rc);
-		proto[OFF_STATUS + 3U] = ' ';
-
-		/* fill in Date */
-		time(&now);
-		t = gmtime(&now);
-		strftime(proto + OFF_DATE, 30U, "%b, %d %a %Y %H:%M:%S UTC", t);
-		proto[OFF_DATE + 29U] = '\r';
-
-		/* fill in content length */
-		snprintf(proto + OFF_CLEN, 9U, "%8zu", q->z);
-		proto[OFF_CLEN + 8U] = '\r';
-
-		/* fill in content type */
-		z = off_ctyp;
-		z += xstrlcpy(proto + z, q->res.ctyp, sizeof(proto) - z);
-		proto[z++] = '\r';
-		proto[z++] = '\n';
-		proto[z++] = '\r';
-		proto[z++] = '\n';
-
-		if (UNLIKELY(send(fd, proto, z, 0) < (ssize_t)z)) {
-			/* oh my god, lucky we didn't send this,
-			 * just ask to close the socket */
+		/* ... and send header */
+		if (UNLIKELY(_tx_hdr(fd, x))) {
+			/* keep him corked? */
 			return -1;
 		}
 	}
 
-	switch (q->res.rd.dtyp) {
-		ssize_t z;
-
+	switch (x->res.rd.dtyp) {
 	default:
 	case DTYP_NONE:
 		/* uncork and send nothing */
-		tcp_uncork(fd);
+		z = 0U;
 		break;
 
 	case DTYP_FILE:
 	case DTYP_TMPF:
-		z = sendfile(fd, q->fd, &q->o, q->z);
-		tcp_uncork(fd);
-		if (UNLIKELY(z < 0)) {
-			return -1;
-		}
-		if ((q->z -= z) == 0U) {
-			return 1;
-		}
+		z = sendfile(fd, x->fd, &x->o, x->z);
 		break;
 	case DTYP_DATA:
+		z = send(fd, x->res.rd.data, x->z, 0);
 		break;
 	case DTYP_GBUF:
+		z = send(fd, "", x->z, 0);
 		break;
 	}
 
-	/* update q */
+	tcp_uncork(fd);
+	if (UNLIKELY(z < 0)) {
+		return -1;
+	} else if ((x->z -= z) == 0U) {
+		return 1;
+	}
 	return 0;
 }
 
