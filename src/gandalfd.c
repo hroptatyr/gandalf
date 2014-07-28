@@ -367,7 +367,7 @@ work_ser(gand_httpd_req_t req)
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
-	} else if ((sym.str += 4U, sym.len -= 4U, true)) {
+	} else if ((sym.str += 4U, sym.len -= 4U, false)) {
 		/* not reached */
 		;
 	} else if (!(rid = dict_sym2oid(gsymdb, sym.str, sym.len))) {
