@@ -71,6 +71,20 @@ struct _httpd_s {
 #undef EV_P
 #define EV_P  struct ev_loop *loop __attribute__((unused))
 
+/* standard header */
+static const char min_hdr[] = "\
+HTTP/1.1 xxx DESCRIPTION\r\n\
+Date: bbb, dd aaa YYYY HH:MM:SS ZZZ\r\n\
+Connection: keep-alive\r\n\
+Content-Length: 01234567\r\n\
+Server: ";
+#define OFF_STATUS	sizeof("HTTP/1.1")
+#define OFF_DATE	32U
+#define OFF_CLEN	103U
+/* this is the header with the server line appended */
+static off_t off_ctyp;
+static char proto[256U];
+
 
 /* our take on memmem() */
 static char*
@@ -143,6 +157,18 @@ xisspace(int x)
 		return true;
 	}
 	return false;
+}
+
+static size_t
+xstrlcpy(char *restrict dst, const char *src, size_t dsz)
+{
+	size_t ssz = strlen(src);
+	if (ssz > dsz) {
+		ssz = dsz - 1U;
+	}
+	memcpy(dst, src, ssz);
+	dst[ssz] = '\0';
+	return ssz;
 }
 
 
@@ -374,6 +400,27 @@ nul:
 	return (gand_word_t){NULL};
 }
 
+static void
+_build_proto(const char *srv)
+{
+	static const char ct[] = "\r\nContent-Type: ";
+	size_t zrv;
+
+	if (srv == NULL) {
+		srv = PACKAGE_STRING;
+	}
+
+	memcpy(proto, min_hdr, sizeof(min_hdr));
+	zrv = xstrlcpy(
+		proto + sizeof(min_hdr) - 1U,
+		srv, sizeof(proto) - sizeof(min_hdr));
+
+	off_ctyp = sizeof(min_hdr) + zrv - 1U;
+	memcpy(proto + off_ctyp, ct, sizeof(ct));
+	off_ctyp += sizeof(ct) - 1U;
+	return;
+}
+
 
 /* callbacks */
 static void
@@ -523,6 +570,9 @@ make_gand_httpd(const gand_httpd_param_t p)
 			res->param.port = ntohs(addr.s6.sin6_port);
 		}
 	}
+
+	/* get the proto buffer ready */
+	_build_proto(p.server);
 
 	/* initialise private bits */
 	ev_signal_init(&res->sigint, sigint_cb, SIGINT);

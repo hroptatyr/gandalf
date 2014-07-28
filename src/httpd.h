@@ -50,6 +50,8 @@ typedef struct {
 	unsigned int timeout;
 	/** directory from which to serve files */
 	const char *www_dir;
+	/** name of the server and version */
+	const char *server;
 } gand_httpd_param_t;
 
 typedef enum {
