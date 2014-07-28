@@ -272,6 +272,118 @@ free_conn(struct gand_conn_s *c)
 	return;
 }
 
+static inline __attribute__((const, pure)) struct gand_wrqi_s*
+_top_resp(struct gand_conn_s *c)
+{
+	if (UNLIKELY(c->nwr == 0U)) {
+		return NULL;
+	}
+	return c->queue + c->iwr;
+}
+
+static inline struct gand_wrqi_s*
+_bot_resp(struct gand_conn_s *restrict c)
+{
+	if (UNLIKELY(c->nwr >= MAX_QUEUE)) {
+		return NULL;
+	}
+	return c->queue + (c->iwr + c->nwr++) % MAX_QUEUE;
+}
+
+static int
+_enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
+{
+	struct gand_wrqi_s *x;
+
+	if (UNLIKELY((x = _bot_resp(c)) == NULL)) {
+		return -1;
+	}
+
+	switch (r.rd.dtyp) {
+		struct stat st;
+		int fd;
+
+	default:
+	case DTYP_NONE:
+		x->z = 0U;
+		x->o = 0U;
+		x->fd = -1;
+		break;
+
+	case DTYP_FILE:
+	case DTYP_TMPF:
+		if (stat(r.rd.file, &st) < 0) {
+			return -1;
+		} else if (st.st_size < 0) {
+			return -1;
+		} else if ((fd = open(r.rd.file, O_RDONLY)) < 0) {
+			return -1;
+		}
+		/* enqueue the request */
+		x->z = st.st_size;
+		x->o = 0U;
+		x->fd = fd;
+		break;
+	case DTYP_DATA:
+		x->z = r.clen;
+		x->o = 0U;
+		x->fd = -1;
+		break;
+	case DTYP_GBUF:
+		x->z = r.clen;
+		x->o = 0U;
+		x->fd = -1;
+		break;
+	}
+	/* assign */
+	x->res = r;
+	return 0;
+}
+
+static int
+_deq_resp(struct gand_conn_s *restrict c)
+{
+	const struct gand_wrqi_s *x;
+
+	if (UNLIKELY((x = _top_resp(c)) == NULL)) {
+		return -1;
+	}
+	switch (x->res.rd.dtyp) {
+	default:
+		break;
+
+	case DTYP_TMPF:
+		/* remove temporary files */
+		(void)unlink(x->res.rd.file);
+		/*@fallthrough@*/
+	case DTYP_FILE:
+		/* close the source descriptor in either case */
+		close(x->fd);
+		break;
+
+	case DTYP_GBUF:
+		/* free gand buffers */
+		;
+		break;
+	}
+
+	/* now actually dequeue */
+	if (UNLIKELY(++c->iwr >= MAX_QUEUE)) {
+		/* modulo */
+		c->iwr = 0U;
+	}
+	c->nwr--;
+	return 0;
+}
+
+static int
+_deq_conn(struct gand_conn_s *restrict c)
+{
+/* dequeue everything */
+	while (_deq_resp(c) >= 0);
+	return 0;
+}
+
 static void
 shut_conn(struct gand_conn_s *c)
 {
@@ -290,7 +402,7 @@ shut_conn(struct gand_conn_s *c)
 		/* read end is already shut */
 		shutdown(fd = c->w.fd, SHUT_WR);
 		/* dequeue everything */
-		;
+		_deq_conn(c);
 	} else {
 		/* all's shut down and closed already, bugger off */
 		return;
@@ -298,50 +410,6 @@ shut_conn(struct gand_conn_s *c)
 	close(fd);
 	free_conn(c);
 	return;
-}
-
-static int
-_enq_resp(struct gand_wrqi_s *restrict q, gand_httpd_res_t r)
-{
-	switch (r.rd.dtyp) {
-		struct stat st;
-		int fd;
-
-	default:
-	case DTYP_NONE:
-		q->z = 0U;
-		q->o = 0U;
-		q->fd = -1;
-		break;
-
-	case DTYP_FILE:
-	case DTYP_TMPF:
-		if (stat(r.rd.file, &st) < 0) {
-			return -1;
-		} else if (st.st_size < 0) {
-			return -1;
-		} else if ((fd = open(r.rd.file, O_RDONLY)) < 0) {
-			return -1;
-		}
-		/* enqueue the request */
-		q->z = st.st_size;
-		q->o = 0U;
-		q->fd = fd;
-		break;
-	case DTYP_DATA:
-		q->z = r.clen;
-		q->o = 0U;
-		q->fd = -1;
-		break;
-	case DTYP_GBUF:
-		q->z = r.clen;
-		q->o = 0U;
-		q->fd = -1;
-		break;
-	}
-	/* assign */
-	q->res = r;
-	return 0;
 }
 
 static int
@@ -591,28 +659,24 @@ static void
 sock_resp_cb(EV_P_ ev_io *w, int revents)
 {
 	struct gand_conn_s *c = (void*)(w - 1U);
+	struct gand_wrqi_s *x;
 
 	if (UNLIKELY(!(revents & EV_WRITE))) {
 		/* oh big cluster fuck */
-		return;
+		goto clo;
 	}
 
 	/* pop item from queue */
-	if (LIKELY(c->nwr)) {
-		struct gand_wrqi_s *x = c->queue + c->iwr;
-
+	if (LIKELY((x = _top_resp(c)) != NULL)) {
 		if (_tx_resp(c->w.fd, x)) {
 			/* -1 indicates error, 1 indicates complete
 			 * in either case dequeue the write queue item */
-			if (UNLIKELY(++c->iwr >= MAX_QUEUE)) {
-				/* modulo */
-				c->iwr = 0U;
-			}
-			c->nwr--;
+			_deq_resp(c);
 		}
 	}
 
-	if (!c->nwr) {
+	if (_top_resp(c) == NULL) {
+	clo:
 		/* finished writing */
 		ev_io_stop(EV_A_ w);
 	}
@@ -676,15 +740,10 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		}
 
 		/* enqueue the request */
-		with (unsigned int i = (c->iwr + c->nwr) % MAX_QUEUE) {
-			if (UNLIKELY(_enq_resp(c->queue + i, res) < 0)) {
-				/* fuck */
-				GAND_ERR_LOG("cannot enqueue response for %d",
-					     c->w.fd);
-				goto clo;
-			} else {
-				c->nwr++;
-			}
+		if (UNLIKELY(_enq_resp(c, res) < 0)) {
+			/* fuck */
+			GAND_ERR_LOG("cannot enqueue response for %d", c->w.fd);
+			goto clo;
 		}
 	}
 	return;
