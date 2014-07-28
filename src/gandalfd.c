@@ -385,6 +385,7 @@ yacka:;
 	const char *fn;
 	gandfn_t fb;
 	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln);
+	gand_gbuf_t gb;
 
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
@@ -396,19 +397,23 @@ yacka:;
 	switch (of) {
 	default:
 	case OF_CSV:
+		of = OF_CSV;
 		filter = filter_csv;
 		break;
 	case OF_JSON:
 		filter = filter_json;
 		break;
 	}
-	/* set response header now */
 
 	/* traverse the lines, filter and rewrite them */
 	const char *const buf = fb.fb.d;
 	const size_t bsz = fb.fb.z;
 	char proto[4096U];
 	size_t tot = 0U;
+
+	/* obtain the buffer we can send bytes to */
+	gb = make_gand_gbuf(bsz);
+
 	for (size_t i = 0U; i < bsz; i++) {
 		const char *const bol = buf + i;
 		const size_t max = bsz - i;
@@ -426,6 +431,7 @@ yacka:;
 		z = filter(proto + tot, sizeof(proto) - tot, ln);
 		if (UNLIKELY(z < 0)) {
 			/* flush buffer */
+			gand_gbuf_write(gb, proto, tot);
 			tot = 0U;
 			goto filt;
 		}
@@ -433,15 +439,21 @@ yacka:;
 		i += eol - bol;
 	}
 	/* flush */
-	//onion_response_write(res, proto, tot);
+	gand_gbuf_write(gb, proto, tot);
 
 	munmap_fn(fb);
-	return (gand_httpd_res_t){0U};
+	return (gand_httpd_res_t){
+		.rc = 200U/*OK*/,
+		.ctyp = ctypes[of],
+		.clen = CLEN_UNKNOWN,
+		.rd = {DTYP_GBUF, gb},
+	};
 
 interr:
 	return (gand_httpd_res_t){
 		.rc = 500U/*INTERNAL ERROR*/,
 		.ctyp = ctypes[OF_UNK],
+		.clen = 0U,
 		.rd = {DTYP_NONE},
 	};
 }
