@@ -40,6 +40,7 @@ AC_C_BIGENDIAN
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([sys/sendfile.h])
 
 ## check if yuck is globally available
 AX_CHECK_YUCK
