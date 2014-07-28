@@ -74,11 +74,25 @@ typedef struct {
 /* just an ordinary pointer but managed by ourselves. */
 typedef void *gand_buf_t;
 
+/* response data type */
+typedef enum gand_dtyp_e gand_dtyp_t;
+
 typedef struct {
-	enum {
+	enum gand_dtyp_e {
+		/* send a zero-length response
+		 * this can be used to transmit http error codes */
 		DTYP_NONE,
+		/* send contents of file FILE */
 		DTYP_FILE,
+		/* like DTYP_FILE but remove the file after transmission */
+		DTYP_TMPF,
+		/* send contents of buffer DATA,
+		 * this should be static or otherwise managed because
+		 * there will be no dtor calls or other forms of notification
+		 * that the buffer is no longer used
+		 * for dynamic one-off buffers use gand_buf_t objects */
 		DTYP_DATA,
+		/* send contents of buffer GBUF and free it afterwards */
 		DTYP_GBUF,
 	} dtyp;
 	union {

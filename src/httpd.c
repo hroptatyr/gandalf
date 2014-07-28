@@ -43,9 +43,14 @@
 #include <stdbool.h>
 #include <string.h>
 #include <strings.h>
+#include <stdio.h>
 #include <sys/signal.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#if defined HAVE_SYS_SENDFILE_H
+# include <sys/sendfile.h>
+#endif	/* HAVE_SYS_SENDFILE_H */
 #include <ev.h>
 #include "ud-sock.h"
 #include "httpd.h"
@@ -70,6 +75,10 @@ struct _httpd_s {
 /* massage the EV macroes a bit */
 #undef EV_P
 #define EV_P  struct ev_loop *loop __attribute__((unused))
+
+#if !defined assert
+# define assert(x)
+#endif	/* !assert */
 
 /* standard header */
 static const char min_hdr[] = "\
@@ -216,38 +225,193 @@ log_conn(int fd, ud_sockaddr_t sa)
 
 /* libev conn handling */
 #define MAX_CONNS	(sizeof(free_conns) * 8U)
-static uint_fast32_t free_conns = (uint_fast32_t)-1;
-static ev_io conns[MAX_CONNS];
+#define MAX_QUEUE	MAX_CONNS
+static uint64_t free_conns = -1;
+static struct gand_conn_s {
+	ev_io r;
+	ev_io w;
+	unsigned int nwr;
+	unsigned int iwr;
+	struct gand_wrqi_s {
+		gand_httpd_res_t res;
+		/* in case of sendfile this is the source socket */
+		int fd;
+		/* how much have we sent already */
+		off_t o;
+		/* what's left to transmit */
+		size_t z;
+	} queue[MAX_QUEUE];
+} conns[MAX_CONNS];
 
-static ev_io*
-make_io(void)
+static struct gand_conn_s*
+make_conn(void)
 {
-
-	int c = ffs(free_conns & 0xffffffffU)
+	int i = ffs(free_conns & 0xffffffffU)
 		?: ffs(free_conns >> 32U & 0xffffffffU);
 
-	if (LIKELY(c-- > 0)) {
+	if (LIKELY(i-- > 0)) {
 		/* toggle bit in free conns */
-		free_conns ^= 1UL << c;
-		return conns + c;
+		free_conns ^= 1ULL << i;
+		return conns + i;
 	}
-	GAND_ERR_LOG("connection pool exhausted");
 	return NULL;
 }
 
 static void
-free_io(ev_io *o)
+free_conn(struct gand_conn_s *c)
 {
-	size_t c = o - conns;
+	size_t i = c - conns;
 
-	if (UNLIKELY(c >= MAX_CONNS)) {
+	if (UNLIKELY(i >= MAX_CONNS)) {
 		/* huh? */
 		return;
 	}
 	/* toggle C-th bit */
-	free_conns ^= 1UL << c;
-	memset(o, 0, sizeof(*o));
+	free_conns ^= 1ULL << i;
+	memset(c, 0, sizeof(*c));
 	return;
+}
+
+static void
+shut_conn(struct gand_conn_s *c)
+{
+/* shuts a connection partially or fully down */
+	int fd;
+
+	if (c->r.fd > 0 && c->nwr) {
+		/* shut the receiving end but don't close the socket*/
+		shutdown(c->r.fd, SHUT_RD);
+		c->r.fd = -1;
+		return;
+	} else if (c->r.fd > 0) {
+		/* nothing on the write queue, just shutdown all */
+		shutdown(fd = c->r.fd, SHUT_RDWR);
+	} else if (c->w.fd > 0) {
+		/* read end is already shut */
+		shutdown(fd = c->w.fd, SHUT_WR);
+		/* dequeue everything */
+		;
+	} else {
+		/* all's shut down and closed already, bugger off */
+		return;
+	}
+	close(fd);
+	free_conn(c);
+	return;
+}
+
+static int
+_enq_resp(struct gand_wrqi_s *restrict q, gand_httpd_res_t r)
+{
+	switch (r.rd.dtyp) {
+		struct stat st;
+		int fd;
+
+	default:
+	case DTYP_NONE:
+		q->z = 0U;
+		q->o = 0U;
+		q->fd = -1;
+		break;
+
+	case DTYP_FILE:
+	case DTYP_TMPF:
+		if (stat(r.rd.file, &st) < 0) {
+			return -1;
+		} else if (st.st_size < 0) {
+			return -1;
+		} else if ((fd = open(r.rd.file, O_RDONLY)) < 0) {
+			return -1;
+		}
+		/* enqueue the request */
+		q->z = st.st_size;
+		q->o = 0U;
+		q->fd = fd;
+		break;
+	case DTYP_DATA:
+		q->z = r.clen;
+		q->o = 0U;
+		q->fd = -1;
+		break;
+	case DTYP_GBUF:
+		q->z = r.clen;
+		q->o = 0U;
+		q->fd = -1;
+		break;
+	}
+	/* assign */
+	q->res = r;
+	return 0;
+}
+
+static int
+_tx_resp(int fd, struct gand_wrqi_s *restrict q)
+{
+	if (LIKELY(!q->o)) {
+		/* cork and send header */
+		struct tm *t;
+		time_t now;
+		size_t z;
+
+		tcp_cork(fd);
+
+		/* fill in return code */
+		snprintf(proto + OFF_STATUS, 4U, "%3u", q->res.rc);
+		proto[OFF_STATUS + 3U] = ' ';
+
+		/* fill in Date */
+		time(&now);
+		t = gmtime(&now);
+		strftime(proto + OFF_DATE, 30U, "%b, %d %a %Y %H:%M:%S UTC", t);
+		proto[OFF_DATE + 29U] = '\r';
+
+		/* fill in content length */
+		snprintf(proto + OFF_CLEN, 9U, "%8zu", q->z);
+		proto[OFF_CLEN + 8U] = '\r';
+
+		/* fill in content type */
+		z = off_ctyp;
+		z += xstrlcpy(proto + z, q->res.ctyp, sizeof(proto) - z);
+		proto[z++] = '\r';
+		proto[z++] = '\n';
+		proto[z++] = '\r';
+		proto[z++] = '\n';
+
+		if (UNLIKELY(send(fd, proto, z, 0) < (ssize_t)z)) {
+			/* oh my god, lucky we didn't send this,
+			 * just ask to close the socket */
+			return -1;
+		}
+	}
+
+	switch (q->res.rd.dtyp) {
+		ssize_t z;
+
+	default:
+	case DTYP_NONE:
+		/* uncork and send nothing */
+		tcp_uncork(fd);
+		break;
+
+	case DTYP_FILE:
+	case DTYP_TMPF:
+		z = sendfile(fd, q->fd, &q->o, q->z);
+		tcp_uncork(fd);
+		if (UNLIKELY(z < 0)) {
+			return -1;
+		}
+		if ((q->z -= z) == 0U) {
+			return 1;
+		}
+		break;
+	case DTYP_DATA:
+		break;
+	case DTYP_GBUF:
+		break;
+	}
+
+	/* update q */
+	return 0;
 }
 
 
@@ -424,7 +588,39 @@ _build_proto(const char *srv)
 
 /* callbacks */
 static void
-sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
+sock_resp_cb(EV_P_ ev_io *w, int revents)
+{
+	struct gand_conn_s *c = (void*)(w - 1U);
+
+	if (UNLIKELY(!(revents & EV_WRITE))) {
+		/* oh big cluster fuck */
+		return;
+	}
+
+	/* pop item from queue */
+	if (LIKELY(c->nwr)) {
+		struct gand_wrqi_s *x = c->queue + c->iwr;
+
+		if (_tx_resp(c->w.fd, x)) {
+			/* -1 indicates error, 1 indicates complete
+			 * in either case dequeue the write queue item */
+			if (UNLIKELY(++c->iwr >= MAX_QUEUE)) {
+				/* modulo */
+				c->iwr = 0U;
+			}
+			c->nwr--;
+		}
+	}
+
+	if (!c->nwr) {
+		/* finished writing */
+		ev_io_stop(EV_A_ w);
+	}
+	return;
+}
+
+static void
+sock_data_cb(EV_P_ ev_io *w, int revents)
 {
 	char buf[4096U];
 	const int fd = w->fd;
@@ -432,7 +628,13 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	gand_httpd_req_t req;
 	char *eoh;
 
-	if (UNLIKELY((nrd = read(w->fd, buf, sizeof(buf))) <= 0)) {
+	if (UNLIKELY(!(revents & EV_READ))) {
+		/* huh? */
+		goto clo;
+	}
+
+	/* read some data into our tiny buffer */
+	if (UNLIKELY((nrd = read(fd, buf, sizeof(buf))) <= 0)) {
 		/* EOF or some other failure */
 		goto clo;
 	}
@@ -452,21 +654,44 @@ sock_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		goto clo;
 	}
 
-	with (const struct _httpd_s *h = w->data) {
-		gand_httpd_res_t res = h->workf(req);
+	with (gand_httpd_res_t(*workf)() = w->data) {
+		gand_httpd_res_t res = workf(req);
+		struct gand_conn_s *c = (void*)w;
 
-		switch (res.rd.dtyp) {
-		default:
+		if (c->w.fd <= 0) {
+			/* initialise write watcher */
+			ev_io_init(&c->w, sock_resp_cb, fd, EV_WRITE);
+			assert(c->nwr == 0U);
+		}
+		if (LIKELY(!c->nwr)) {
+			/* restart the write watcher */
+			ev_io_start(EV_A_ &c->w);
+		} else if (UNLIKELY(c->nwr >= MAX_QUEUE)) {
+			GAND_ERR_LOG("transmission queue for socket %d full",
+				     c->w.fd);
 			goto clo;
+		} else {
+			/* already started it seems */
+			assert(c->w.fd > 0);
+		}
+
+		/* enqueue the request */
+		with (unsigned int i = (c->iwr + c->nwr) % MAX_QUEUE) {
+			if (UNLIKELY(_enq_resp(c->queue + i, res) < 0)) {
+				/* fuck */
+				GAND_ERR_LOG("cannot enqueue response for %d",
+					     c->w.fd);
+				goto clo;
+			} else {
+				c->nwr++;
+			}
 		}
 	}
 	return;
 
 clo:
 	ev_io_stop(EV_A_ w);
-	shutdown(fd, SHUT_RDWR);
-	close(fd);
-	free_io(w);
+	shut_conn((struct gand_conn_s*)w);
 	return;
 }
 
@@ -475,7 +700,7 @@ sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ud_sockaddr_t sa;
 	socklen_t z = sizeof(sa);
-	ev_io *nio;
+	struct gand_conn_s *nio;
 	int s;
 
 	if ((s = accept(w->fd, &sa.sa, &z)) < 0) {
@@ -484,14 +709,18 @@ sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	}
 	log_conn(s, sa);
 
-	if (UNLIKELY((nio = make_io()) == NULL)) {
+	if (UNLIKELY((nio = make_conn()) == NULL)) {
 		GAND_ERR_LOG("too many concurrent connections");
 		close(s);
 		return;
 	}
-	nio->data = w->data;
-	ev_io_init(nio, sock_data_cb, s, EV_READ);
-	ev_io_start(EV_A_ nio);
+	with (const struct _httpd_s *h = w->data) {
+		/* we want a constant callback for the duration
+		 * of this connection, or don't we? */
+		nio->r.data = h->workf;
+	}
+	ev_io_init(&nio->r, sock_data_cb, s, EV_READ);
+	ev_io_start(EV_A_ &nio->r);
 	return;
 }
 
