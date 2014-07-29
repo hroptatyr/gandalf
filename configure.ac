@@ -40,6 +40,7 @@ AC_C_BIGENDIAN
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([sys/sendfile.h])
 
 ## check if yuck is globally available
 AX_CHECK_YUCK
@@ -49,6 +50,10 @@ if test -z "${GPERF}"; then
 	GPERF="gperf"
 fi
 AC_ARG_VAR([GPERF], [full path to the gperf tool])
+
+## event loop
+SXE_CHECK_LIBEV
+AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
