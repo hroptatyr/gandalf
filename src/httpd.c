@@ -279,6 +279,7 @@ free_gand_gbuf(gand_gbuf_t gb)
 
 	if (UNLIKELY(k >= countof(gbufs))) {
 		/* that's not our buffer */
+		GAND_CRIT_LOG("unknown gbuf passed to free_gand_gbuf()");
 		return;
 	}
 
