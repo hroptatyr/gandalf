@@ -321,8 +321,10 @@ gand_gbuf_write(gand_gbuf_t gb, const void *p, size_t z)
 		}
 	}
 	/* and copy we go */
-	memcpy(gb->data + gb->ibuf, p, z);
-	gb->ibuf += z;
+	if (LIKELY(z > 0U)) {
+		memcpy(gb->data + gb->ibuf, p, z);
+		gb->ibuf += z;
+	}
 	return z;
 }
 
