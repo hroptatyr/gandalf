@@ -72,7 +72,7 @@ typedef struct {
 } gand_word_t;
 
 /* just an ordinary pointer but managed by ourselves. */
-typedef void *gand_buf_t;
+typedef struct gand_gbuf_s *gand_gbuf_t;
 
 /* response data type */
 typedef enum gand_dtyp_e gand_dtyp_t;
@@ -90,7 +90,7 @@ typedef struct {
 		 * this should be static or otherwise managed because
 		 * there will be no dtor calls or other forms of notification
 		 * that the buffer is no longer used
-		 * for dynamic one-off buffers use gand_buf_t objects */
+		 * for dynamic one-off buffers use gand_gbuf_t objects */
 		DTYP_DATA,
 		/* send contents of buffer GBUF and free it afterwards */
 		DTYP_GBUF,
@@ -99,7 +99,7 @@ typedef struct {
 		const void *ptr;
 		const char *file;
 		const char *data;
-		gand_buf_t gbuf;
+		gand_gbuf_t gbuf;
 	};
 } gand_res_data_t;
 
@@ -152,5 +152,23 @@ extern gand_word_t gand_req_get_xhdr(gand_httpd_req_t req, const char *hdr);
 /**
  * Helper getter for gand requests. */
 extern gand_word_t gand_req_get_xqry(gand_httpd_req_t req, const char *fld);
+
+
+/* buffer goodness */
+/**
+ * Obtain a buffer `socket' data can be written to.
+ * ESTIMATE may specify a rough estimate on the size of the buffer, just
+ * to avoid frequent resizings.  This is in no way binding, buffers can
+ * be underfilled or overfilled. */
+extern gand_gbuf_t make_gand_gbuf(size_t estimate);
+
+/**
+ * Return the gbuf object to the buffer pool.
+ * This will give up all the bytes written to it. */
+extern void free_gand_gbuf(gand_gbuf_t);
+
+/**
+ * Write (i.e. copy) Z bytes from P to the internal buffer GB. */
+extern ssize_t gand_gbuf_write(gand_gbuf_t, const void *p, size_t z);
 
 #endif	/* INCLUDED_httpd_h_ */

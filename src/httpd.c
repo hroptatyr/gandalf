@@ -223,6 +223,110 @@ log_conn(int fd, ud_sockaddr_t sa)
 }
 
 
+/* gbuf buffers, at the moment this is just a wrapper around malloc() */
+#define MAX_GBUFS	(256U)
+#define _X_GBUFS	(32U)
+/* roughly a tcp packet minus http header */
+#define GBUF_MINZ	(1024U)
+static uint32_t used_gbufs[MAX_GBUFS / _X_GBUFS];
+static struct gand_gbuf_s {
+	unsigned int zbuf;
+	unsigned int ibuf;
+	uint8_t *data;
+} gbufs[MAX_GBUFS];
+
+gand_gbuf_t
+make_gand_gbuf(size_t estz)
+{
+	unsigned int i;
+	int k = 0;
+	gand_gbuf_t res;
+
+	/* just find us any buffer really */
+	for (i = 0U; i < countof(gbufs); i++) {
+		if ((k = ffs(~used_gbufs[i]))) {
+			goto found;
+		}
+	}
+	return NULL;
+
+found:
+	/* toggle bit in used_gbufs */
+	k--;
+	used_gbufs[i] ^= 1UL << k;
+	res = gbufs + (i * _X_GBUFS) + k;
+
+	/* now check if we fulfill the size requirements */
+	if (UNLIKELY(estz < GBUF_MINZ)) {
+		/* grrr, our users are too indecisive */
+		estz = GBUF_MINZ;
+	}
+	if (res->zbuf < estz) {
+		/* realloc to shape */
+		res->data = realloc(res->data, res->zbuf = estz);
+		if (UNLIKELY(res->data == NULL)) {
+			res->zbuf = 0U;
+			return NULL;
+		}
+	}
+	return res;
+}
+
+void
+free_gand_gbuf(gand_gbuf_t gb)
+{
+	const size_t k = gb - gbufs;
+
+	if (UNLIKELY(k >= countof(gbufs))) {
+		/* that's not our buffer */
+		return;
+	}
+
+	/* reshape buffer */
+	if (gb->zbuf == GBUF_MINZ) {
+		/* don't worry, keep it at that */
+		;
+	} else if (gb->zbuf / 2U > gb->ibuf) {
+		/* half the size again */
+		if (gb->zbuf /= 2U < GBUF_MINZ) {
+			gb->zbuf = GBUF_MINZ;
+		}
+		/* downsize and check */
+		gb->data = realloc(gb->data, gb->zbuf);
+		if (UNLIKELY(gb->data == NULL)) {
+			gb->zbuf = 0U;
+		}
+	}
+	/* reset buffer */
+	gb->ibuf = 0U;
+	/* toggle used bit again */
+	used_gbufs[k / _X_GBUFS] ^= 1UL << (k % _X_GBUFS);
+	return;
+}
+
+ssize_t
+gand_gbuf_write(gand_gbuf_t gb, const void *p, size_t z)
+{
+/* just like write(3) but to a resizable gbuf */
+	if (gb->ibuf + z > gb->zbuf) {
+		/* calculate the new size
+		 * along with the halving upon free() this
+		 * will eventually result in 2-power buffers */
+		for (; gb->ibuf + z > gb->zbuf; gb->zbuf *= 2U);
+		/* upsize and check */
+		gb->data = realloc(gb->data, gb->zbuf);
+		if (UNLIKELY(gb->data == NULL)) {
+			gb->zbuf = 0U;
+			return -1;
+		}
+	}
+	/* and copy we go */
+	memcpy(gb->data + gb->ibuf, p, z);
+	gb->ibuf += z;
+	return z;
+}
+
+
 /* libev conn handling */
 #define MAX_CONNS	(sizeof(free_conns) * 8U)
 #define MAX_QUEUE	MAX_CONNS
@@ -363,7 +467,7 @@ _deq_resp(struct gand_conn_s *restrict c)
 
 	case DTYP_GBUF:
 		/* free gand buffers */
-		;
+		free_gand_gbuf(x->res.rd.gbuf);
 		break;
 	}
 
@@ -477,10 +581,12 @@ _tx_resp(int fd, struct gand_wrqi_s *restrict x)
 		z = sendfile(fd, x->fd, &x->o, x->z);
 		break;
 	case DTYP_DATA:
-		z = send(fd, x->res.rd.data, x->z, 0);
+		z = send(fd, x->res.rd.data + x->o, x->z, 0);
+		x->o += z;
 		break;
 	case DTYP_GBUF:
-		z = send(fd, "", x->z, 0);
+		z = send(fd, x->res.rd.gbuf->data + x->o, x->z, 0);
+		x->o += z;
 		break;
 	}
 
