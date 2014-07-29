@@ -321,8 +321,10 @@ gand_gbuf_write(gand_gbuf_t gb, const void *p, size_t z)
 		}
 	}
 	/* and copy we go */
-	memcpy(gb->data + gb->ibuf, p, z);
-	gb->ibuf += z;
+	if (LIKELY(z > 0U)) {
+		memcpy(gb->data + gb->ibuf, p, z);
+		gb->ibuf += z;
+	}
 	return z;
 }
 
@@ -434,7 +436,10 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		x->fd = -1;
 		break;
 	case DTYP_GBUF:
-		x->z = r.clen;
+		if (LIKELY((x->z = r.clen) == CLEN_UNKNOWN)) {
+			/* calculate the size from what's in the gbuf */
+			x->z = r.rd.gbuf->ibuf;
+		}
 		x->o = 0U;
 		x->fd = -1;
 		break;

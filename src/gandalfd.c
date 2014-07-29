@@ -412,7 +412,10 @@ yacka:;
 	size_t tot = 0U;
 
 	/* obtain the buffer we can send bytes to */
-	gb = make_gand_gbuf(bsz);
+	if (UNLIKELY((gb = make_gand_gbuf(bsz)) == NULL)) {
+		GAND_ERR_LOG("cannot obtain gbuf");
+		goto interr_unmap;
+	}
 
 	for (size_t i = 0U; i < bsz; i++) {
 		const char *const bol = buf + i;
@@ -431,7 +434,10 @@ yacka:;
 		z = filter(proto + tot, sizeof(proto) - tot, ln);
 		if (UNLIKELY(z < 0)) {
 			/* flush buffer */
-			gand_gbuf_write(gb, proto, tot);
+			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+				GAND_ERR_LOG("cannot write to gbuf");
+				goto interr_unmap;
+			}
 			tot = 0U;
 			goto filt;
 		}
@@ -439,7 +445,9 @@ yacka:;
 		i += eol - bol;
 	}
 	/* flush */
-	gand_gbuf_write(gb, proto, tot);
+	if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+		goto interr_unmap;
+	}
 
 	munmap_fn(fb);
 	return (gand_httpd_res_t){
@@ -449,6 +457,8 @@ yacka:;
 		.rd = {DTYP_GBUF, gb},
 	};
 
+interr_unmap:
+	munmap_fn(fb);
 interr:
 	return (gand_httpd_res_t){
 		.rc = 500U/*INTERNAL ERROR*/,
