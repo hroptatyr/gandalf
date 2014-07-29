@@ -370,6 +370,7 @@ free_conn(struct gand_conn_s *c)
 
 	if (UNLIKELY(i >= MAX_CONNS)) {
 		/* huh? */
+		GAND_CRIT_LOG("unknown connection passed to free_conn()");
 		return;
 	}
 	/* toggle C-th bit */
