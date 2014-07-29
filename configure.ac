@@ -103,11 +103,6 @@ PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
 AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
 with_database="tcbdb"
 
-SXE_CHECK_ONION
-if test "${sxe_cv_feat_onion}" != "yes"; then
-	enable_server="no"
-fi
-
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 
