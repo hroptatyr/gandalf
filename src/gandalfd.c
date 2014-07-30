@@ -361,6 +361,7 @@ work_ser(gand_httpd_req_t req)
 	if ((sym = gand_req_get_xqry(req, "sym=")).str == NULL) {
 		static const char errmsg[] = "Bad Request";
 
+		GAND_INFO_LOG(":rsp [400 Bad request]");
 		return (gand_httpd_res_t){
 			.rc = 400U/*BAD REQUEST*/,
 			.ctyp = ctypes[OF_UNK],
@@ -373,6 +374,7 @@ work_ser(gand_httpd_req_t req)
 	} else if (!(rid = dict_sym2oid(gsymdb, sym.str, sym.len))) {
 		static const char errmsg[] = "Symbol not found";
 
+		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
 		return (gand_httpd_res_t){
 			.rc = 409U/*CONFLICT*/,
 			.ctyp = ctypes[OF_UNK],
@@ -450,6 +452,7 @@ yacka:;
 	}
 
 	munmap_fn(fb);
+	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = ctypes[of],
@@ -460,6 +463,7 @@ yacka:;
 interr_unmap:
 	munmap_fn(fb);
 interr:
+	GAND_INFO_LOG(":rsp [500 Internal Error]");
 	return (gand_httpd_res_t){
 		.rc = 500U/*INTERNAL ERROR*/,
 		.ctyp = ctypes[OF_UNK],
@@ -471,11 +475,24 @@ interr:
 static gand_httpd_res_t
 work(gand_httpd_req_t req)
 {
+	static const char *const v[NVERBS] = {
+		[VERB_GET] = "GET",
+		[VERB_POST] = "POST",
+		[VERB_PUT] = "PUT",
+		[VERB_DELETE] = "DELETE",
+	};
+	GAND_INFO_LOG(":req [%s http://%s%s?%s]",
+		      v[req.verb] ?: "UNK",
+		      req.host ?: "",
+		      req.path ?: "/",
+		      req.query ?: "");
+
 	/* split by endpoint */
 	switch (req_get_endpoint(req)) {
 	case EP_V0_SERIES:
 		return work_ser(req);
 	case EP_V0_MAIN:
+		GAND_INFO_LOG(":rsp [200 OK]");
 		return (gand_httpd_res_t){
 			.rc = 200U/*OK*/,
 			.ctyp = "text/html",
@@ -490,6 +507,7 @@ work(gand_httpd_req_t req)
 	}
 
 	/* unsure what to do */
+	GAND_INFO_LOG(":rsp [404 Not Found]");
 	return (gand_httpd_res_t){
 		.rc = 404U/*NOT FOUND*/,
 		.ctyp = "text/html",
