@@ -787,6 +787,8 @@ sock_resp_cb(EV_P_ ev_io *w, int revents)
 
 	if (UNLIKELY(!(revents & EV_WRITE))) {
 		/* oh big cluster fuck */
+		GAND_CRIT_LOG("responder can't write to socket");
+		shut_conn(c);
 		goto clo;
 	}
 
@@ -925,7 +927,20 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 static void
 sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	GAND_NOTI_LOG("SIGPIPE caught, doing nothing");
+	GAND_NOTI_LOG("SIGPIPE caught, checking connections ...");
+
+	/* check for half-open shit */
+	for (size_t i = 0U; i < countof(conns); i++) {
+		if (conns[i].r.fd < 0 && conns[i].w.fd > 0 &&
+		    conns[i].iwr > conns[i].nwr) {
+			GAND_INFO_LOG("connection %zu seems buggered", i);
+			ev_io_stop(EV_A_ &conns[i].w);
+			shut_conn(conns + i);
+		} else if (conns[i].r.fd < 0 && conns[i].w.fd < 0) {
+			/* is this possible? */
+			;
+		}
+	}
 	return;
 }
 
