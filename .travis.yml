@@ -13,7 +13,7 @@ before_script:
 
 script:
   - ./configure || { cat config.log; false; }
-  - make clean all check || { cat test/test-suite.log; /bin/false }
+  - make clean all check || { cat test/test-suite.log; /bin/false; }
   - make distcheck
 
 ## whitelist
