@@ -47,6 +47,9 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <errno.h>
+#if defined HAVE_EV_H
+# include <ev.h>
+#endif	/* HAVE_EV_H */
 #include "httpd.h"
 #include "gand-dict.h"
 #include "gand-cfg.h"
@@ -57,6 +60,9 @@
 #if defined __INTEL_COMPILER
 # define auto	static
 #endif	/* __INTEL_COMPILER */
+
+#undef EV_P
+#define EV_P  struct ev_loop *loop __attribute__((unused))
 
 typedef struct {
 	const char *s;
@@ -577,6 +583,20 @@ write_pidfile(const char *pidfile)
 	return res;
 }
 
+static void
+stat_cb(EV_P_ ev_stat *e, int UNUSED(revents))
+{
+	GAND_NOTI_LOG("symbol index file `%s' changed ...", e->path);
+	close_dict(gsymdb);
+	if ((gsymdb = open_dict(e->path, O_RDONLY)) == NULL) {
+		GAND_ERR_LOG("cannot open symbol index file `%s': %s",
+			     e->path, strerror(errno));
+	} else {
+		GAND_INFO_LOG(":inot symbol index file reloaded");
+	}
+	return;
+}
+
 
 #include "gandalfd.yucc"
 
@@ -588,8 +608,12 @@ main(int argc, char *argv[])
 	gand_httpd_t h;
 	int daemonisep = 0;
 	short unsigned int port;
+	/* paths and files */
 	const char *pidf;
 	const char *wwwd;
+	const char dictf[] = "gand_idx2sym.tcb";
+	/* inotify watcher */
+	ev_stat dict_watcher;
 	cfg_t cfg;
 	int rc = 0;
 
@@ -632,7 +656,7 @@ main(int argc, char *argv[])
 	/* start them log files */
 	gand_openlog();
 
-	if ((gsymdb = open_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
+	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
 		GAND_ERR_LOG("cannot open symbol index file");
 		rc = 1;
 		goto out0;
@@ -699,6 +723,12 @@ main(int argc, char *argv[])
 	/* set our work function */
 	h->workf = work;
 
+	/* we need an inotify on the dict file */
+	with (void *loop = ev_default_loop(EVFLAG_AUTO)) {
+		ev_stat_init(&dict_watcher, stat_cb, dictf, 0);
+		ev_stat_start(EV_A_ &dict_watcher);
+	}
+
 outd:
 	/* free cmdline parser goodness */
 	yuck_free(argi);
@@ -713,6 +743,11 @@ outd:
 		gand_httpd_run(h);
 		/* not reached */
 		block_sigs();
+	}
+
+	/* also we need an inotify on this guy */
+	with (void *loop = ev_default_loop(EVFLAG_AUTO)) {
+		ev_stat_stop(EV_A_ &dict_watcher);
 	}
 
 	/* away with the http */
