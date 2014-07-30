@@ -395,7 +395,7 @@ _bot_resp(struct gand_conn_s *restrict c)
 	if (UNLIKELY(c->nwr >= MAX_QUEUE)) {
 		return NULL;
 	}
-	return c->queue + (c->iwr + c->nwr++) % MAX_QUEUE;
+	return c->queue + (c->iwr + c->nwr) % MAX_QUEUE;
 }
 
 static int
@@ -448,6 +448,8 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	}
 	/* assign */
 	x->res = r;
+	/* and enqueue */
+	c->nwr++;
 	return 0;
 }
 
