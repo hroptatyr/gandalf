@@ -94,6 +94,9 @@ Server: ";
 static off_t off_ctyp;
 static char proto[256U];
 
+static char *wwwd;
+static size_t wwwz;
+
 
 /* our take on memmem() */
 static char*
@@ -279,6 +282,7 @@ free_gand_gbuf(gand_gbuf_t gb)
 
 	if (UNLIKELY(k >= countof(gbufs))) {
 		/* that's not our buffer */
+		GAND_CRIT_LOG("unknown gbuf passed to free_gand_gbuf()");
 		return;
 	}
 
@@ -370,6 +374,7 @@ free_conn(struct gand_conn_s *c)
 
 	if (UNLIKELY(i >= MAX_CONNS)) {
 		/* huh? */
+		GAND_CRIT_LOG("unknown connection passed to free_conn()");
 		return;
 	}
 	/* toggle C-th bit */
@@ -393,7 +398,7 @@ _bot_resp(struct gand_conn_s *restrict c)
 	if (UNLIKELY(c->nwr >= MAX_QUEUE)) {
 		return NULL;
 	}
-	return c->queue + (c->iwr + c->nwr++) % MAX_QUEUE;
+	return c->queue + (c->iwr + c->nwr) % MAX_QUEUE;
 }
 
 static int
@@ -406,6 +411,9 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	}
 
 	switch (r.rd.dtyp) {
+		static char *absfn;
+		static size_t absfz;
+		const char *fn;
 		struct stat st;
 		int fd;
 
@@ -418,11 +426,30 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 
 	case DTYP_FILE:
 	case DTYP_TMPF:
-		if (stat(r.rd.file, &st) < 0) {
+		if (UNLIKELY((fn = r.rd.file) == NULL)) {
+			return -1;
+		}
+		if (LIKELY(*fn != '/' && wwwd != NULL)) {
+			/* rewrite the filename into something absolute */
+			size_t fz = strlen(fn);
+
+			if (UNLIKELY(wwwz + fz >= absfz)) {
+				/* resize */
+				size_t nu = wwwz + fz + 32U;
+				absfn = realloc(absfn, nu);
+				absfz = nu;
+			}
+			memcpy(absfn, wwwd, wwwz);
+			memcpy(absfn + wwwz, fn, fz);
+			absfn[wwwz + fz] = '\0';
+			/* propagate this one as the file name then */
+			fn = absfn;
+		}
+		if (stat(fn, &st) < 0) {
 			return -1;
 		} else if (st.st_size < 0) {
 			return -1;
-		} else if ((fd = open(r.rd.file, O_RDONLY)) < 0) {
+		} else if ((fd = open(fn, O_RDONLY)) < 0) {
 			return -1;
 		}
 		/* enqueue the request */
@@ -446,6 +473,8 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	}
 	/* assign */
 	x->res = r;
+	/* and enqueue */
+	c->nwr++;
 	return 0;
 }
 
@@ -785,6 +814,8 @@ sock_resp_cb(EV_P_ ev_io *w, int revents)
 
 	if (UNLIKELY(!(revents & EV_WRITE))) {
 		/* oh big cluster fuck */
+		GAND_CRIT_LOG("responder can't write to socket");
+		shut_conn(c);
 		goto clo;
 	}
 
@@ -923,7 +954,20 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 static void
 sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	GAND_NOTI_LOG("SIGPIPE caught, doing nothing");
+	GAND_NOTI_LOG("SIGPIPE caught, checking connections ...");
+
+	/* check for half-open shit */
+	for (size_t i = 0U; i < countof(conns); i++) {
+		if (conns[i].r.fd < 0 && conns[i].w.fd > 0 &&
+		    conns[i].iwr > conns[i].nwr) {
+			GAND_INFO_LOG("connection %zu seems buggered", i);
+			ev_io_stop(EV_A_ &conns[i].w);
+			shut_conn(conns + i);
+		} else if (conns[i].r.fd < 0 && conns[i].w.fd < 0) {
+			/* is this possible? */
+			;
+		}
+	}
 	return;
 }
 
@@ -938,11 +982,14 @@ make_gand_httpd(const gand_httpd_param_t p)
 	/* populate public bit */
 	res->param = p;
 
-	/* try changing directories */
-	if (p.www_dir && chdir(p.www_dir) < 0) {
-		GAND_ERR_LOG("cannot change to www directory `%s': %s",
-			     p.www_dir, strerror(errno));
-		goto foul;
+	/* track www directory */
+	if (p.www_dir && (wwwz = strlen(p.www_dir)) > 0U) {
+		wwwd = malloc(wwwz + 1U/*for slash*/ + 1U/*\nul*/);
+		memcpy(wwwd, p.www_dir, wwwz);
+		if (wwwd[wwwz - 1] != '/') {
+			wwwd[wwwz++] = '/';
+		}
+		wwwd[wwwz] = '\0';
 	}
 
 	/* get the socket on the way */
@@ -1006,6 +1053,11 @@ free_gand_httpd(gand_httpd_t s)
 {
 	if (UNLIKELY(s == NULL)) {
 		return;
+	}
+	if (wwwd != NULL) {
+		free(wwwd);
+		wwwd = NULL;
+		wwwz = 0U;
 	}
 	ev_default_destroy();
 	free(s);

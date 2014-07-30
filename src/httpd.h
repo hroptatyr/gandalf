@@ -64,6 +64,7 @@ typedef enum {
 	VERB_CONNECT,
 	VERB_OPTIONS,
 	VERB_TRACE,
+	NVERBS
 } gand_httpd_verb_t;
 
 typedef struct {
