@@ -589,6 +589,7 @@ main(int argc, char *argv[])
 	int daemonisep = 0;
 	short unsigned int port;
 	const char *pidf;
+	const char *wwwd;
 	cfg_t cfg;
 	int rc = 0;
 
@@ -649,6 +650,35 @@ main(int argc, char *argv[])
 		}
 	}
 
+	/* www dir? */
+	if ((wwwd = argi->www_dir_arg) ||
+	    (cfg && cfg_glob_lookup_s(&wwwd, cfg, "wwwdir") > 0)) {
+		/* command line has precedence */
+		;
+	}
+	/* quick check here just before we go live */
+	with (struct stat st) {
+		if (wwwd == NULL) {
+			GAND_ERR_LOG("www-dir not specified");
+			rc = 1;
+			goto out1;
+		} else if (stat(wwwd, &st) < 0) {
+			GAND_ERR_LOG("cannot access www-dir `%s': %s",
+				     wwwd, strerror(errno));
+			rc = 1;
+			goto out1;
+		} else if (!S_ISDIR(st.st_mode)) {
+			GAND_ERR_LOG("www-dir `%s' not a directory", wwwd);
+			rc = 1;
+			goto out1;
+		} else if (access(wwwd, X_OK) < 0) {
+			GAND_ERR_LOG("cannot access www-dir `%s': %s",
+				     wwwd, strerror(errno));
+			rc = 1;
+			goto out1;
+		}
+	}
+
 	/* get the trolf dir */
 	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
 	nfo_fname = gand_get_nfo_file(cfg);
@@ -658,7 +688,7 @@ main(int argc, char *argv[])
 	/* configure the gand server */
 	h = make_gand_httpd(
 		.port = port, .timeout = 500000U,
-		.www_dir = argi->www_dir_arg);
+		.www_dir = wwwd);
 #undef make_gand_httpd
 
 	if (UNLIKELY(h == NULL)) {
