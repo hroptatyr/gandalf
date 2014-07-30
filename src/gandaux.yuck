@@ -9,7 +9,7 @@ Usage: gandaux add
 Add a symbol to the symbol index.
 
 
-Usage: gandaux build
+Usage: gandaux build IDX2SYM-FILE
 
 Generate the symbol index.
 
