@@ -57,6 +57,18 @@
 #include "logger.h"
 #include "nifty.h"
 
+/* all the good things we need as context */
+struct _httpd_ctx_s {
+	/* this is the header with the server line appended */
+	off_t off_ctyp;
+	char proto[256U];
+
+	/* the www directory to serve from */
+	char *wwwd;
+	size_t wwwz;
+};
+typedef struct _httpd_ctx_s *restrict _httpd_ctx_t;
+
 /* private version of struct gand_httpd_s */
 struct _httpd_s {
 	gand_httpd_param_t param;
@@ -70,6 +82,8 @@ struct _httpd_s {
 	struct ev_loop *loop;
 
 	ev_io sock;
+
+	struct _httpd_ctx_s ctx[1U];
 };
 
 /* massage the EV macroes a bit */
@@ -90,12 +104,6 @@ Server: ";
 #define OFF_STATUS	sizeof("HTTP/1.1")
 #define OFF_DATE	32U
 #define OFF_CLEN	103U
-/* this is the header with the server line appended */
-static off_t off_ctyp;
-static char proto[256U];
-
-static char *wwwd;
-static size_t wwwz;
 
 
 /* our take on memmem() */
@@ -402,7 +410,7 @@ _bot_resp(struct gand_conn_s *restrict c)
 }
 
 static int
-_enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
+_enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 {
 	struct gand_wrqi_s *x;
 
@@ -429,19 +437,19 @@ _enq_resp(struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		if (UNLIKELY((fn = r.rd.file) == NULL)) {
 			return -1;
 		}
-		if (LIKELY(*fn != '/' && wwwd != NULL)) {
+		if (LIKELY(*fn != '/' && ctx->wwwd != NULL)) {
 			/* rewrite the filename into something absolute */
 			size_t fz = strlen(fn);
 
-			if (UNLIKELY(wwwz + fz >= absfz)) {
+			if (UNLIKELY(ctx->wwwz + fz >= absfz)) {
 				/* resize */
-				size_t nu = wwwz + fz + 32U;
+				size_t nu = ctx->wwwz + fz + 32U;
 				absfn = realloc(absfn, nu);
 				absfz = nu;
 			}
-			memcpy(absfn, wwwd, wwwz);
-			memcpy(absfn + wwwz, fn, fz);
-			absfn[wwwz + fz] = '\0';
+			memcpy(absfn, ctx->wwwd, ctx->wwwz);
+			memcpy(absfn + ctx->wwwz, fn, fz);
+			absfn[ctx->wwwz + fz] = '\0';
 			/* propagate this one as the file name then */
 			fn = absfn;
 		}
@@ -551,35 +559,35 @@ shut_conn(struct gand_conn_s *c)
 }
 
 static int
-_tx_hdr(int fd, const struct gand_wrqi_s *x)
+_tx_hdr(int fd, _httpd_ctx_t ctx, const struct gand_wrqi_s *x)
 {
 	struct tm *t;
 	time_t now;
 	size_t z;
 
 	/* fill in return code */
-	snprintf(proto + OFF_STATUS, 4U, "%3u", x->res.rc);
-	proto[OFF_STATUS + 3U] = ' ';
+	snprintf(ctx->proto + OFF_STATUS, 4U, "%3u", x->res.rc);
+	ctx->proto[OFF_STATUS + 3U] = ' ';
 
 	/* fill in Date */
 	time(&now);
 	t = gmtime(&now);
-	strftime(proto + OFF_DATE, 30U, "%b, %d %a %Y %H:%M:%S UTC", t);
-	proto[OFF_DATE + 29U] = '\r';
+	strftime(ctx->proto + OFF_DATE, 30U, "%b, %d %a %Y %H:%M:%S UTC", t);
+	ctx->proto[OFF_DATE + 29U] = '\r';
 
 	/* fill in content length */
-	snprintf(proto + OFF_CLEN, 9U, "%8zu", x->z);
-	proto[OFF_CLEN + 8U] = '\r';
+	snprintf(ctx->proto + OFF_CLEN, 9U, "%8zu", x->z);
+	ctx->proto[OFF_CLEN + 8U] = '\r';
 
 	/* fill in content type */
-	z = off_ctyp;
-	z += xstrlcpy(proto + z, x->res.ctyp, sizeof(proto) - z);
-	proto[z++] = '\r';
-	proto[z++] = '\n';
-	proto[z++] = '\r';
-	proto[z++] = '\n';
+	z = ctx->off_ctyp;
+	z += xstrlcpy(ctx->proto + z, x->res.ctyp, sizeof(ctx->proto) - z);
+	ctx->proto[z++] = '\r';
+	ctx->proto[z++] = '\n';
+	ctx->proto[z++] = '\r';
+	ctx->proto[z++] = '\n';
 
-	if (UNLIKELY(send(fd, proto, z, 0) < (ssize_t)z)) {
+	if (UNLIKELY(send(fd, ctx->proto, z, 0) < (ssize_t)z)) {
 		/* oh my god, lucky we didn't send this,
 		 * just ask to close the socket */
 		return -1;
@@ -588,7 +596,7 @@ _tx_hdr(int fd, const struct gand_wrqi_s *x)
 }
 
 static int
-_tx_resp(int fd, struct gand_wrqi_s *restrict x)
+_tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 {
 	ssize_t z;
 
@@ -597,7 +605,7 @@ _tx_resp(int fd, struct gand_wrqi_s *restrict x)
 		tcp_cork(fd);
 
 		/* ... and send header */
-		if (UNLIKELY(_tx_hdr(fd, x))) {
+		if (UNLIKELY(_tx_hdr(fd, ctx, x))) {
 			/* keep him corked? */
 			return -1;
 		}
@@ -784,7 +792,7 @@ nul:
 }
 
 static void
-_build_proto(const char *srv)
+_build_proto(_httpd_ctx_t ctx, const char *srv)
 {
 	static const char ct[] = "\r\nContent-Type: ";
 	size_t zrv;
@@ -793,14 +801,33 @@ _build_proto(const char *srv)
 		srv = PACKAGE_STRING;
 	}
 
-	memcpy(proto, min_hdr, sizeof(min_hdr));
+	memcpy(ctx->proto, min_hdr, sizeof(min_hdr));
 	zrv = xstrlcpy(
-		proto + sizeof(min_hdr) - 1U,
-		srv, sizeof(proto) - sizeof(min_hdr));
+		ctx->proto + sizeof(min_hdr) - 1U,
+		srv, sizeof(ctx->proto) - sizeof(min_hdr));
 
-	off_ctyp = sizeof(min_hdr) + zrv - 1U;
-	memcpy(proto + off_ctyp, ct, sizeof(ct));
-	off_ctyp += sizeof(ct) - 1U;
+	ctx->off_ctyp = sizeof(min_hdr) + zrv - 1U;
+	memcpy(ctx->proto + ctx->off_ctyp, ct, sizeof(ct));
+	ctx->off_ctyp += sizeof(ct) - 1U;
+	return;
+}
+
+static void
+_build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
+{
+/* track www directory */
+	if (wwwd == NULL) {
+		return;
+	} else if ((ctx->wwwz = strlen(wwwd)) == 0U) {
+		return;
+	}
+	/* otherwise bang ... */
+	ctx->wwwd = malloc(ctx->wwwz + 1U/*for slash*/ + 1U/*\nul*/);
+	memcpy(ctx->wwwd, wwwd, ctx->wwwz);
+	if (ctx->wwwd[ctx->wwwz - 1] != '/') {
+		ctx->wwwd[ctx->wwwz++] = '/';
+	}
+	ctx->wwwd[ctx->wwwz] = '\0';
 	return;
 }
 
@@ -810,6 +837,7 @@ static void
 sock_resp_cb(EV_P_ ev_io *w, int revents)
 {
 	struct gand_conn_s *c = (void*)(w - 1U);
+	_httpd_ctx_t ctx = w->data;
 	struct gand_wrqi_s *x;
 
 	if (UNLIKELY(!(revents & EV_WRITE))) {
@@ -821,7 +849,7 @@ sock_resp_cb(EV_P_ ev_io *w, int revents)
 
 	/* pop item from queue */
 	if (LIKELY((x = _top_resp(c)) != NULL)) {
-		if (_tx_resp(c->w.fd, x)) {
+		if (_tx_resp(c->w.fd, ctx, x)) {
 			/* -1 indicates error, 1 indicates complete
 			 * in either case dequeue the write queue item */
 			_deq_resp(c);
@@ -841,6 +869,7 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 {
 	char buf[4096U];
 	const int fd = w->fd;
+	struct _httpd_s *h = w->data;
 	ssize_t nrd;
 	gand_httpd_req_t req;
 	char *eoh;
@@ -871,12 +900,14 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		goto clo;
 	}
 
-	with (gand_httpd_res_t(*workf)() = w->data) {
+	with (gand_httpd_res_t(*workf)() = h->workf) {
 		gand_httpd_res_t res = workf(req);
 		struct gand_conn_s *c = (void*)w;
+		_httpd_ctx_t ctx = h->ctx;
 
 		if (c->w.fd <= 0) {
 			/* initialise write watcher */
+			c->w.data = ctx;
 			ev_io_init(&c->w, sock_resp_cb, fd, EV_WRITE);
 			assert(c->nwr == 0U);
 		}
@@ -893,7 +924,7 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		}
 
 		/* enqueue the request */
-		if (UNLIKELY(_enq_resp(c, res) < 0)) {
+		if (UNLIKELY(_enq_resp(ctx, c, res) < 0)) {
 			/* fuck */
 			GAND_ERR_LOG("cannot enqueue response for %d", c->w.fd);
 			goto clo;
@@ -926,10 +957,10 @@ sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		close(s);
 		return;
 	}
-	with (const struct _httpd_s *h = w->data) {
+	with (struct _httpd_s *h = w->data) {
 		/* we want a constant callback for the duration
 		 * of this connection, or don't we? */
-		nio->r.data = h->workf;
+		nio->r.data = h;
 	}
 	ev_io_init(&nio->r, sock_data_cb, s, EV_READ);
 	ev_io_start(EV_A_ &nio->r);
@@ -982,16 +1013,6 @@ make_gand_httpd(const gand_httpd_param_t p)
 	/* populate public bit */
 	res->param = p;
 
-	/* track www directory */
-	if (p.www_dir && (wwwz = strlen(p.www_dir)) > 0U) {
-		wwwd = malloc(wwwz + 1U/*for slash*/ + 1U/*\nul*/);
-		memcpy(wwwd, p.www_dir, wwwz);
-		if (wwwd[wwwz - 1] != '/') {
-			wwwd[wwwz++] = '/';
-		}
-		wwwd[wwwz] = '\0';
-	}
-
 	/* get the socket on the way */
 	{
 		ud_sockaddr_t addr = {
@@ -1029,7 +1050,8 @@ make_gand_httpd(const gand_httpd_param_t p)
 	}
 
 	/* get the proto buffer ready */
-	_build_proto(p.server);
+	_build_proto(res->ctx, p.server);
+	_build_wwwd(res->ctx, p.www_dir);
 
 	/* initialise private bits */
 	ev_signal_init(&res->sigint, sigint_cb, SIGINT);
@@ -1054,10 +1076,10 @@ free_gand_httpd(gand_httpd_t s)
 	if (UNLIKELY(s == NULL)) {
 		return;
 	}
-	if (wwwd != NULL) {
-		free(wwwd);
-		wwwd = NULL;
-		wwwz = 0U;
+	with (struct _httpd_s *_ = (void*)s) {
+		if (_->ctx->wwwd != NULL) {
+			free(_->ctx->wwwd);
+		}
 	}
 	ev_default_destroy();
 	free(s);
