@@ -651,7 +651,7 @@ main(int argc, char *argv[])
 	}
 
 	/* www dir? */
-	if ((wwwd = argi->www_dir_arg) ||
+	if ((wwwd = argi->wwwdir_arg) ||
 	    (cfg && cfg_glob_lookup_s(&wwwd, cfg, "wwwdir") > 0)) {
 		/* command line has precedence */
 		;
@@ -659,20 +659,20 @@ main(int argc, char *argv[])
 	/* quick check here just before we go live */
 	with (struct stat st) {
 		if (wwwd == NULL) {
-			GAND_ERR_LOG("www-dir not specified");
+			GAND_ERR_LOG("wwwdir not specified");
 			rc = 1;
 			goto out1;
 		} else if (stat(wwwd, &st) < 0) {
-			GAND_ERR_LOG("cannot access www-dir `%s': %s",
+			GAND_ERR_LOG("cannot access wwwdir `%s': %s",
 				     wwwd, strerror(errno));
 			rc = 1;
 			goto out1;
 		} else if (!S_ISDIR(st.st_mode)) {
-			GAND_ERR_LOG("www-dir `%s' not a directory", wwwd);
+			GAND_ERR_LOG("wwwdir `%s' not a directory", wwwd);
 			rc = 1;
 			goto out1;
 		} else if (access(wwwd, X_OK) < 0) {
-			GAND_ERR_LOG("cannot access www-dir `%s': %s",
+			GAND_ERR_LOG("cannot access wwwdir `%s': %s",
 				     wwwd, strerror(errno));
 			rc = 1;
 			goto out1;
