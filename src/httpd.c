@@ -72,7 +72,6 @@ typedef struct _httpd_ctx_s *restrict _httpd_ctx_t;
 /* private version of struct gand_httpd_s */
 struct _httpd_s {
 	gand_httpd_param_t param;
-	gand_httpd_res_t(*workf)(gand_httpd_req_t);
 
 	ev_signal sigint;
 	ev_signal sighup;
@@ -900,7 +899,7 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		goto clo;
 	}
 
-	with (gand_httpd_res_t(*workf)() = h->workf) {
+	with (gand_httpd_res_t(*workf)() = h->param.workf) {
 		gand_httpd_res_t res = workf(req);
 		struct gand_conn_s *c = (void*)w;
 		_httpd_ctx_t ctx = h->ctx;
