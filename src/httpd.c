@@ -798,7 +798,7 @@ _build_proto(_httpd_ctx_t ctx, const char *srv)
 	size_t zrv;
 
 	if (srv == NULL) {
-		srv = PACKAGE_STRING;
+		ctx->param.server = srv = PACKAGE_STRING;
 	}
 
 	memcpy(ctx->proto, min_hdr, sizeof(min_hdr));
@@ -817,8 +817,11 @@ _build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
 {
 /* track www directory */
 	if (wwwd == NULL) {
-		return;
+		ctx->wwwz = 0U;
+		goto out;
 	} else if ((ctx->wwwz = strlen(wwwd)) == 0U) {
+	out:
+		ctx->param.www_dir = "./";
 		return;
 	}
 	/* otherwise bang ... */
@@ -828,6 +831,9 @@ _build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
 		ctx->wwwd[ctx->wwwz++] = '/';
 	}
 	ctx->wwwd[ctx->wwwz] = '\0';
+
+	/* pass back our version of the directory */
+	ctx->param.www_dir = ctx->wwwd;
 	return;
 }
 
