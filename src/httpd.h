@@ -43,17 +43,6 @@
 
 typedef struct gand_httpd_s *gand_httpd_t;
 
-typedef struct {
-	/** port to listen on */
-	short unsigned int port;
-	/** timeout in useconds, 0 to disable */
-	unsigned int timeout;
-	/** directory from which to serve files */
-	const char *www_dir;
-	/** name of the server and version */
-	const char *server;
-} gand_httpd_param_t;
-
 typedef enum {
 	VERB_UNSUPP = 0U,
 	VERB_GET,
@@ -126,10 +115,23 @@ typedef struct {
 	gand_res_data_t rd;
 } gand_httpd_res_t;
 
+/* parameter struct for make_gand_httpd() */
+typedef struct {
+	/** port to listen on */
+	short unsigned int port;
+	/** timeout in useconds, 0 to disable */
+	unsigned int timeout;
+	/** directory from which to serve files */
+	const char *www_dir;
+	/** name of the server and version */
+	const char *server;
+	/** routine to respond to a request. */
+	gand_httpd_res_t(*workf)(gand_httpd_req_t);
+} gand_httpd_param_t;
+
 /* public part of gand_httpd_s */
 struct gand_httpd_s {
 	const gand_httpd_param_t param;
-	gand_httpd_res_t(*workf)(gand_httpd_req_t);
 };
 
 

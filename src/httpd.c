@@ -59,6 +59,8 @@
 
 /* all the good things we need as context */
 struct _httpd_ctx_s {
+	gand_httpd_param_t param;
+
 	/* this is the header with the server line appended */
 	off_t off_ctyp;
 	char proto[256U];
@@ -71,8 +73,8 @@ typedef struct _httpd_ctx_s *restrict _httpd_ctx_t;
 
 /* private version of struct gand_httpd_s */
 struct _httpd_s {
-	gand_httpd_param_t param;
-	gand_httpd_res_t(*workf)(gand_httpd_req_t);
+	/* the context is the bit we pass around */
+	struct _httpd_ctx_s ctx[1U];
 
 	ev_signal sigint;
 	ev_signal sighup;
@@ -82,8 +84,6 @@ struct _httpd_s {
 	struct ev_loop *loop;
 
 	ev_io sock;
-
-	struct _httpd_ctx_s ctx[1U];
 };
 
 /* massage the EV macroes a bit */
@@ -798,7 +798,7 @@ _build_proto(_httpd_ctx_t ctx, const char *srv)
 	size_t zrv;
 
 	if (srv == NULL) {
-		srv = PACKAGE_STRING;
+		ctx->param.server = srv = PACKAGE_STRING;
 	}
 
 	memcpy(ctx->proto, min_hdr, sizeof(min_hdr));
@@ -817,8 +817,11 @@ _build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
 {
 /* track www directory */
 	if (wwwd == NULL) {
-		return;
+		ctx->wwwz = 0U;
+		goto out;
 	} else if ((ctx->wwwz = strlen(wwwd)) == 0U) {
+	out:
+		ctx->param.www_dir = "./";
 		return;
 	}
 	/* otherwise bang ... */
@@ -828,6 +831,9 @@ _build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
 		ctx->wwwd[ctx->wwwz++] = '/';
 	}
 	ctx->wwwd[ctx->wwwz] = '\0';
+
+	/* pass back our version of the directory */
+	ctx->param.www_dir = ctx->wwwd;
 	return;
 }
 
@@ -869,7 +875,7 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 {
 	char buf[4096U];
 	const int fd = w->fd;
-	struct _httpd_s *h = w->data;
+	_httpd_ctx_t ctx = w->data;
 	ssize_t nrd;
 	gand_httpd_req_t req;
 	char *eoh;
@@ -900,10 +906,9 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		goto clo;
 	}
 
-	with (gand_httpd_res_t(*workf)() = h->workf) {
+	with (gand_httpd_res_t(*workf)() = ctx->param.workf) {
 		gand_httpd_res_t res = workf(req);
 		struct gand_conn_s *c = (void*)w;
-		_httpd_ctx_t ctx = h->ctx;
 
 		if (c->w.fd <= 0) {
 			/* initialise write watcher */
@@ -957,10 +962,9 @@ sock_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		close(s);
 		return;
 	}
-	with (struct _httpd_s *h = w->data) {
-		/* we want a constant callback for the duration
-		 * of this connection, or don't we? */
-		nio->r.data = h;
+	with (_httpd_ctx_t ctx = w->data) {
+		/* pass on the httpd context then */
+		nio->r.data = ctx;
 	}
 	ev_io_init(&nio->r, sock_data_cb, s, EV_READ);
 	ev_io_start(EV_A_ &nio->r);
@@ -1011,7 +1015,7 @@ make_gand_httpd(const gand_httpd_param_t p)
 	struct _httpd_s *res = calloc(1, sizeof(*res));
 
 	/* populate public bit */
-	res->param = p;
+	res->ctx->param = p;
 
 	/* get the socket on the way */
 	{
@@ -1039,13 +1043,13 @@ make_gand_httpd(const gand_httpd_param_t p)
 			socklen_t z = sizeof(addr);
 
 			/* yay */
-			res->sock.data = res;
+			res->sock.data = res->ctx;
 			ev_io_init(&res->sock, sock_cb, s, EV_READ);
 			ev_io_start(EV_A_ &res->sock);
 
 			/* make sure we post back the port number */
                         getsockname(s, &addr.sa, &z);
-			res->param.port = ntohs(addr.s6.sin6_port);
+			res->ctx->param.port = ntohs(addr.s6.sin6_port);
 		}
 	}
 
@@ -1081,7 +1085,6 @@ free_gand_httpd(gand_httpd_t s)
 			free(_->ctx->wwwd);
 		}
 	}
-	ev_default_destroy();
 	free(s);
 	return;
 }

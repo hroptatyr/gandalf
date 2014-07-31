@@ -712,7 +712,8 @@ main(int argc, char *argv[])
 	/* configure the gand server */
 	h = make_gand_httpd(
 		.port = port, .timeout = 500000U,
-		.www_dir = wwwd);
+		.www_dir = wwwd,
+		.workf = work);
 #undef make_gand_httpd
 
 	if (UNLIKELY(h == NULL)) {
@@ -720,8 +721,6 @@ main(int argc, char *argv[])
 		rc = 1;
 		goto out2;
 	}
-	/* set our work function */
-	h->workf = work;
 
 	/* we need an inotify on the dict file */
 	with (void *loop = ev_default_loop(EVFLAG_AUTO)) {
