@@ -1085,7 +1085,6 @@ free_gand_httpd(gand_httpd_t s)
 			free(_->ctx->wwwd);
 		}
 	}
-	ev_default_destroy();
 	free(s);
 	return;
 }
