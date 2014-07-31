@@ -62,6 +62,8 @@ struct dict_si_s {
 	const char *sym;
 };
 
+static char *idxf = "gand_idx2sym.tcb";
+
 
 static __attribute__((format(printf, 1, 2))) void
 serror(const char *fmt, ...)
@@ -275,7 +277,7 @@ cmd_addget(const struct yuck_cmd_get_s argi[static 1U], bool addp)
 		oflags = O_RDONLY;
 	}
 
-	if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
+	if ((d = make_dict(idxf, oflags)) == NULL) {
 		fputs("cannot open symbol index file\n", stderr);
 		rc = 1;
 		goto out;
@@ -379,7 +381,7 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 
 	if (rc == 0) {
 		/* rename (atomically) to actual file name */
-		rc = rename(tmpf, "gand_idx2sym.tcb");
+		rc = rename(tmpf, idxf);
 	} else {
 		(void)unlink(tmpf);
 	}
@@ -393,7 +395,7 @@ cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi[static 1U]))
 	dict_t d;
 	int rc = 0;
 
-	if ((d = make_dict("gand_idx2sym.tcb", O_RDONLY)) == NULL) {
+	if ((d = make_dict(idxf, O_RDONLY)) == NULL) {
 		fputs("cannot open symbol index file\n", stderr);
 		rc = 1;
 		goto out;
@@ -421,6 +423,10 @@ main(int argc, char *argv[])
 	if (yuck_parse(argi, argc, argv)) {
 		rc = 1;
 		goto out;
+	}
+
+	if (argi->index_file_arg) {
+		idxf = argi->index_file_arg;
 	}
 
 	switch (argi->cmd) {
