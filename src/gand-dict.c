@@ -52,6 +52,9 @@ open_dict(const char *fn, int oflags)
 	if (oflags & O_RDWR) {
 		omode |= BDBOWRITER;
 	}
+	if (oflags & O_TRUNC) {
+		omode |= BDBOTRUNC;
+	}
 	if (oflags & O_CREAT) {
 		omode |= BDBOCREAT;
 	}
