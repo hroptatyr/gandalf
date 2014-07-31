@@ -35,13 +35,17 @@
  *
  ***/
 #if !defined _GNU_SOURCE
+/* for getline() innit */
 # define _GNU_SOURCE
 #endif	/* _GNU_SOURCE */
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include <stdio.h>
 #include <tcbdb.h>
 #include <fcntl.h>
@@ -57,6 +61,23 @@ struct dict_si_s {
 	dict_id_t sid;
 	const char *sym;
 };
+
+
+static __attribute__((format(printf, 1, 2))) void
+serror(const char *fmt, ...)
+{
+	va_list vap;
+	va_start(vap, fmt);
+	vfprintf(stderr, fmt, vap);
+	va_end(vap);
+	if (errno) {
+		fputc(':', stderr);
+		fputc(' ', stderr);
+		fputs(strerror(errno), stderr);
+	}
+	fputc('\n', stderr);
+	return;
+}
 
 
 static dict_si_t
@@ -307,7 +328,9 @@ out:
 static int
 cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 {
-	const int oflags = O_RDWR | O_CREAT;
+	char tmpf[] = ".gand_idx2sym.XXXXXXXX";
+	const int oflags = O_RDWR | O_TRUNC | O_CREAT;
+	int fd;
 	dict_t d;
 	int rc = 0;
 
@@ -315,12 +338,18 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		yuck_auto_help((const void*)argi);
 		rc = 1;
 		goto out;
-	} else if ((d = make_dict("gand_idx2sym.tcb", oflags)) == NULL) {
-		fputs("cannot create symbol index file\n", stderr);
+	} else if ((fd = mkstemp(tmpf)) < 0) {
+		serror("cannot creat temporary index file `%s'", tmpf);
+		rc = 1;
+		goto out;
+	} else if ((d = make_dict(tmpf, oflags)) == NULL) {
+		serror("cannot create temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
 	}
 
+	/* close mkstemp's descriptor */
+	close(fd);
 	with (const char *fn = argi->args[0U]) {
 		dict_id_t max = 0U;
 		FILE *f;
@@ -347,6 +376,13 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 
 	/* get ready to bugger off */
 	free_dict(d);
+
+	if (rc == 0) {
+		/* rename (atomically) to actual file name */
+		rc = rename(tmpf, "gand_idx2sym.tcb");
+	} else {
+		(void)unlink(tmpf);
+	}
 out:
 	return rc;
 }
