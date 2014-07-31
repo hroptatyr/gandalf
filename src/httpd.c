@@ -61,13 +61,12 @@
 struct _httpd_ctx_s {
 	gand_httpd_param_t param;
 
+	/* the www directory to serve from */
+	int www_dirfd;
+
 	/* this is the header with the server line appended */
 	off_t off_ctyp;
 	char proto[256U];
-
-	/* the www directory to serve from */
-	char *wwwd;
-	size_t wwwz;
 };
 typedef struct _httpd_ctx_s *restrict _httpd_ctx_t;
 
@@ -419,8 +418,6 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	}
 
 	switch (r.rd.dtyp) {
-		static char *absfn;
-		static size_t absfz;
 		const char *fn;
 		struct stat st;
 		int fd;
@@ -437,34 +434,28 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		if (UNLIKELY((fn = r.rd.file) == NULL)) {
 			return -1;
 		}
-		if (LIKELY(*fn != '/' && ctx->wwwd != NULL)) {
-			/* rewrite the filename into something absolute */
-			size_t fz = strlen(fn);
-
-			if (UNLIKELY(ctx->wwwz + fz >= absfz)) {
-				/* resize */
-				size_t nu = ctx->wwwz + fz + 32U;
-				absfn = realloc(absfn, nu);
-				absfz = nu;
-			}
-			memcpy(absfn, ctx->wwwd, ctx->wwwz);
-			memcpy(absfn + ctx->wwwz, fn, fz);
-			absfn[ctx->wwwz + fz] = '\0';
-			/* propagate this one as the file name then */
-			fn = absfn;
+		if (LIKELY(*fn != '/' && !(ctx->www_dirfd < 0))) {
+			/* ah well then, use openat() */
+			fd = openat(ctx->www_dirfd, fn, O_RDONLY);
+		} else {
+			fd = open(fn, O_RDONLY);
 		}
-		if (stat(fn, &st) < 0) {
+		if (fd < 0) {
 			return -1;
+		} else if (fstat(fd, &st) < 0) {
+			goto fail;
 		} else if (st.st_size < 0) {
-			return -1;
-		} else if ((fd = open(fn, O_RDONLY)) < 0) {
-			return -1;
+			goto fail;
 		}
 		/* enqueue the request */
 		x->z = st.st_size;
 		x->o = 0U;
 		x->fd = fd;
 		break;
+	fail:
+		/* no leakage */
+		close(fd);
+		return -1;
 	case DTYP_DATA:
 		x->z = r.clen;
 		x->o = 0U;
@@ -816,24 +807,17 @@ static void
 _build_wwwd(_httpd_ctx_t ctx, const char *wwwd)
 {
 /* track www directory */
-	if (wwwd == NULL) {
-		ctx->wwwz = 0U;
-		goto out;
-	} else if ((ctx->wwwz = strlen(wwwd)) == 0U) {
-	out:
+	if (wwwd == NULL || strlen(wwwd) == 0) {
+		wwwd = ".";
 		ctx->param.www_dir = "./";
-		return;
 	}
-	/* otherwise bang ... */
-	ctx->wwwd = malloc(ctx->wwwz + 1U/*for slash*/ + 1U/*\nul*/);
-	memcpy(ctx->wwwd, wwwd, ctx->wwwz);
-	if (ctx->wwwd[ctx->wwwz - 1] != '/') {
-		ctx->wwwd[ctx->wwwz++] = '/';
+	/* open that guy so we get a dirfd that can be used with openat()
+	 * and which remains insusceptible to renaming
+	 * and hopefully provides lower latency */
+	if (UNLIKELY((ctx->www_dirfd = open(wwwd, O_RDONLY)) < 0)) {
+		/* oh nos, well fuck it then */
+		ctx->param.www_dir = NULL;
 	}
-	ctx->wwwd[ctx->wwwz] = '\0';
-
-	/* pass back our version of the directory */
-	ctx->param.www_dir = ctx->wwwd;
 	return;
 }
 
@@ -1081,8 +1065,8 @@ free_gand_httpd(gand_httpd_t s)
 		return;
 	}
 	with (struct _httpd_s *_ = (void*)s) {
-		if (_->ctx->wwwd != NULL) {
-			free(_->ctx->wwwd);
+		if (!(_->ctx->www_dirfd < 0)) {
+			close(_->ctx->www_dirfd);
 		}
 	}
 	free(s);
