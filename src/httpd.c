@@ -748,7 +748,9 @@ gand_req_get_xhdr(gand_httpd_req_t req, const char *hdr)
 		hz = _ - _hdr;
 	}
 
-	if (UNLIKELY((h = strstr(r.str, _hdr)) == NULL)) {
+	if (UNLIKELY(r.str == NULL)) {
+		goto nul;
+	} else if (UNLIKELY((h = strstr(r.str, _hdr)) == NULL)) {
 		goto nul;
 	} else if (UNLIKELY((eoh = memchr(
 				     h, '\n', r.len - (h - r.str))) == NULL)) {
@@ -772,7 +774,9 @@ gand_req_get_xqry(gand_httpd_req_t req, const char *fld)
 	const char *f;
 	const char *eof;
 
-	if (UNLIKELY((f = strstr(req.query, fld)) == NULL)) {
+	if (UNLIKELY(req.query == NULL)) {
+		goto nul;
+	} else if (UNLIKELY((f = strstr(req.query, fld)) == NULL)) {
 		goto nul;
 	} else if ((eof = strchr(f, '&')) == NULL) {
 		eof = f + strlen(f);
