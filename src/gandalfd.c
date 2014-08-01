@@ -292,8 +292,13 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 
 
 /* rolf <-> onion glue */
-#include "gand-endpoints-gp.c"
 #include "gand-outfmts-gp.c"
+
+typedef enum {
+	EP_UNK,
+	EP_V0_SERIES,
+	EP_V0_MAIN,
+} gand_ep_t;
 
 static const char *const ctypes[] = {
 	[OF_UNK] = "text/plain",
@@ -302,10 +307,23 @@ static const char *const ctypes[] = {
 	[OF_HTML] = "text/html",
 };
 
+static gand_ep_t
+__gand_ep(const char *s, size_t z)
+{
+/* perform a prefix match */
+	static const char _ep[] = "/v0/series";
+
+	if (z < sizeof(_ep) - 1U) {
+		;
+	} else if (!memcmp(_ep, s, sizeof(_ep) - 1U)) {
+		return EP_V0_SERIES;
+	}
+	return EP_UNK;
+}
+
 static __attribute__((const, pure)) gand_ep_t
 req_get_endpoint(gand_httpd_req_t req)
 {
-	const struct gand_ep_cell_s *epc;
 	const char *cmd;
 	size_t cmz;
 
@@ -315,10 +333,8 @@ req_get_endpoint(gand_httpd_req_t req)
 		return EP_UNK;
 	} else if (UNLIKELY(cmz == 1U && *cmd == '/')) {
 		return EP_V0_MAIN;
-	} else if (UNLIKELY((epc = __gand_ep(cmd, cmz)) == NULL)) {
-		return EP_UNK;
 	}
-	return epc->ep;
+	return __gand_ep(cmd, cmz);
 }
 
 static gand_of_t
@@ -508,7 +524,6 @@ work(gand_httpd_req_t req)
 
 	default:
 	case EP_UNK:
-	case EP_V0_INFO:
 		break;
 	}
 
