@@ -305,22 +305,30 @@ typedef enum {
 	OF_HTML,
 } gand_of_t;
 
-static const char *const ctypes[] = {
-	[OF_UNK] = "text/plain",
-	[OF_JSON] = "application/json",
-	[OF_CSV] = "text/csv",
-	[OF_HTML] = "text/html",
+static const char _ofs_UNK[] = "text/plain";
+static const char _ofs_JSON[] = "application/json";
+static const char _ofs_CSV[] = "text/csv";
+static const char _ofs_HTML[] = "text/html";
+#define OF(_x_)		(_ofs_ ## _x_)
+
+static const char *const _ofs[] = {
+	[OF_UNK] = OF(UNK),
+	[OF_JSON] = OF(JSON),
+	[OF_CSV] = OF(CSV),
+	[OF_HTML] = OF(HTML),
 };
+
+static const char _eps_V0_SERIES[] = "/v0/series";
+#define EP(_x_)		(_eps_ ## _x_)
 
 static gand_ep_t
 __gand_ep(const char *s, size_t z)
 {
 /* perform a prefix match */
-	static const char _ep[] = "/v0/series";
 
-	if (z < sizeof(_ep) - 1U) {
+	if (z < sizeof(EP(V0_SERIES)) - 1U) {
 		;
-	} else if (!memcmp(_ep, s, sizeof(_ep) - 1U)) {
+	} else if (!memcmp(EP(V0_SERIES), s, sizeof(EP(V0_SERIES)) - 1U)) {
 		return EP_V0_SERIES;
 	}
 	return EP_UNK;
@@ -329,13 +337,13 @@ __gand_ep(const char *s, size_t z)
 static gand_of_t
 __gand_of(const char *s, size_t z)
 {
-	if (z < sizeof(ctypes[OF_CSV]) - 1U) {
+	if (z < sizeof(OF(CSV)) - 1U) {
 		;
-	} else if (!memcmp(ctypes[OF_CSV], s, sizeof(ctypes[OF_CSV]) - 1U)) {
+	} else if (!memcmp(OF(CSV), s, sizeof(OF(CSV)) - 1U)) {
 		return OF_CSV;
-	} else if (z < sizeof(ctypes[OF_JSON]) - 1U) {
+	} else if (z < sizeof(OF(JSON)) - 1U) {
 		;
-	} else if (!memcmp(ctypes[OF_JSON], s, sizeof(ctypes[OF_JSON]) - 1U)) {
+	} else if (!memcmp(OF(JSON), s, sizeof(OF(JSON)) - 1U)) {
 		return OF_JSON;
 	}
 	return OF_UNK;
@@ -403,7 +411,7 @@ work_ser(gand_httpd_req_t req)
 		GAND_INFO_LOG(":rsp [400 Bad request]");
 		return (gand_httpd_res_t){
 			.rc = 400U/*BAD REQUEST*/,
-			.ctyp = ctypes[OF_UNK],
+			.ctyp = OF(UNK),
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
@@ -416,7 +424,7 @@ work_ser(gand_httpd_req_t req)
 		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
 		return (gand_httpd_res_t){
 			.rc = 409U/*CONFLICT*/,
-			.ctyp = ctypes[OF_UNK],
+			.ctyp = OF(UNK),
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
@@ -494,7 +502,7 @@ yacka:;
 	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
-		.ctyp = ctypes[of],
+		.ctyp = _ofs[of],
 		.clen = CLEN_UNKNOWN,
 		.rd = {DTYP_GBUF, gb},
 	};
@@ -505,7 +513,7 @@ interr:
 	GAND_INFO_LOG(":rsp [500 Internal Error]");
 	return (gand_httpd_res_t){
 		.rc = 500U/*INTERNAL ERROR*/,
-		.ctyp = ctypes[OF_UNK],
+		.ctyp = OF(UNK),
 		.clen = 0U,
 		.rd = {DTYP_NONE},
 	};
