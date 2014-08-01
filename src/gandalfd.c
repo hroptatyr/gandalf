@@ -398,14 +398,14 @@ req_get_outfmt(gand_httpd_req_t req)
 static gand_httpd_res_t
 work_ser(gand_httpd_req_t req)
 {
-	gand_word_t sym;
+	const char *sym;
 	dict_oid_t rid;
 	gand_of_t of;
 
 	if ((of = req_get_outfmt(req)) == OF_UNK) {
 		of = OF_CSV;
 	}
-	if ((sym = gand_req_get_xqry(req, "sym=")).str == NULL) {
+	if ((sym = req.path + sizeof(EP(V0_SERIES)))[-1] != '/') {
 		static const char errmsg[] = "Bad Request\n";
 
 		GAND_INFO_LOG(":rsp [400 Bad request]");
@@ -415,10 +415,7 @@ work_ser(gand_httpd_req_t req)
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
-	} else if ((sym.str += 4U, sym.len -= 4U, false)) {
-		/* not reached */
-		;
-	} else if (!(rid = dict_sym2oid(gsymdb, sym.str, sym.len))) {
+	} else if (!(rid = dict_sym2oid(gsymdb, sym, strlen(sym)))) {
 		static const char errmsg[] = "Symbol not found\n";
 
 		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
