@@ -292,8 +292,18 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 
 
 /* rolf <-> onion glue */
-#include "gand-endpoints-gp.c"
-#include "gand-outfmts-gp.c"
+typedef enum {
+	EP_UNK,
+	EP_V0_SERIES,
+	EP_V0_MAIN,
+} gand_ep_t;
+
+typedef enum {
+	OF_UNK,
+	OF_CSV,
+	OF_JSON,
+	OF_HTML,
+} gand_of_t;
 
 static const char *const ctypes[] = {
 	[OF_UNK] = "text/plain",
@@ -302,10 +312,38 @@ static const char *const ctypes[] = {
 	[OF_HTML] = "text/html",
 };
 
+static gand_ep_t
+__gand_ep(const char *s, size_t z)
+{
+/* perform a prefix match */
+	static const char _ep[] = "/v0/series";
+
+	if (z < sizeof(_ep) - 1U) {
+		;
+	} else if (!memcmp(_ep, s, sizeof(_ep) - 1U)) {
+		return EP_V0_SERIES;
+	}
+	return EP_UNK;
+}
+
+static gand_of_t
+__gand_of(const char *s, size_t z)
+{
+	if (z < sizeof(ctypes[OF_CSV]) - 1U) {
+		;
+	} else if (!memcmp(ctypes[OF_CSV], s, sizeof(ctypes[OF_CSV]) - 1U)) {
+		return OF_CSV;
+	} else if (z < sizeof(ctypes[OF_JSON]) - 1U) {
+		;
+	} else if (!memcmp(ctypes[OF_JSON], s, sizeof(ctypes[OF_JSON]) - 1U)) {
+		return OF_JSON;
+	}
+	return OF_UNK;
+}
+
 static __attribute__((const, pure)) gand_ep_t
 req_get_endpoint(gand_httpd_req_t req)
 {
-	const struct gand_ep_cell_s *epc;
 	const char *cmd;
 	size_t cmz;
 
@@ -315,10 +353,8 @@ req_get_endpoint(gand_httpd_req_t req)
 		return EP_UNK;
 	} else if (UNLIKELY(cmz == 1U && *cmd == '/')) {
 		return EP_V0_MAIN;
-	} else if (UNLIKELY((epc = __gand_ep(cmd, cmz)) == NULL)) {
-		return EP_UNK;
 	}
-	return epc->ep;
+	return __gand_ep(cmd, cmz);
 }
 
 static gand_of_t
@@ -333,8 +369,6 @@ req_get_outfmt(gand_httpd_req_t req)
 	}
 	/* otherwise */
 	do {
-		const struct gand_of_cell_s *ofc;
-
 		if ((on = strchr(acc.str, ',')) != NULL) {
 			acc.len = on++ - acc.str;
 		}
@@ -345,9 +379,8 @@ req_get_outfmt(gand_httpd_req_t req)
 			}
 		}
 
-		if (LIKELY((ofc = __gand_of(acc.str, acc.len)) != NULL)) {
+		if (LIKELY((of = __gand_of(acc.str, acc.len)) != OF_UNK)) {
 			/* first one wins */
-			of = ofc->of;
 			break;
 		}
 	} while ((acc.str = on));
@@ -365,7 +398,7 @@ work_ser(gand_httpd_req_t req)
 		of = OF_CSV;
 	}
 	if ((sym = gand_req_get_xqry(req, "sym=")).str == NULL) {
-		static const char errmsg[] = "Bad Request";
+		static const char errmsg[] = "Bad Request\n";
 
 		GAND_INFO_LOG(":rsp [400 Bad request]");
 		return (gand_httpd_res_t){
@@ -378,7 +411,7 @@ work_ser(gand_httpd_req_t req)
 		/* not reached */
 		;
 	} else if (!(rid = dict_sym2oid(gsymdb, sym.str, sym.len))) {
-		static const char errmsg[] = "Symbol not found";
+		static const char errmsg[] = "Symbol not found\n";
 
 		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
 		return (gand_httpd_res_t){
@@ -508,7 +541,6 @@ work(gand_httpd_req_t req)
 
 	default:
 	case EP_UNK:
-	case EP_V0_INFO:
 		break;
 	}
 
