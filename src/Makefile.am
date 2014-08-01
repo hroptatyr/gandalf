@@ -76,7 +76,6 @@ sbin_PROGRAMS += gandalfd
 gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
 EXTRA_gandalfd_SOURCES =
-EXTRA_gandalfd_SOURCES += gand-outfmts-gp.erf
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += $(dict_CFLAGS)
 gandalfd_CPPFLAGS += $(cfg_CFLAGS)
@@ -87,7 +86,6 @@ gandalfd_LDADD = libgand.la
 gandalfd_LDADD += libbeef.la
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
-BUILT_SOURCES += gand-outfmts-gp.c
 pkgdata_DATA += $(top_srcdir)/www/index.html
 pkgdata_DATA += $(top_srcdir)/www/404.html
 

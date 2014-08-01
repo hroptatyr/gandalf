@@ -292,13 +292,18 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 
 
 /* rolf <-> onion glue */
-#include "gand-outfmts-gp.c"
-
 typedef enum {
 	EP_UNK,
 	EP_V0_SERIES,
 	EP_V0_MAIN,
 } gand_ep_t;
+
+typedef enum {
+	OF_UNK,
+	OF_CSV,
+	OF_JSON,
+	OF_HTML,
+} gand_of_t;
 
 static const char *const ctypes[] = {
 	[OF_UNK] = "text/plain",
@@ -319,6 +324,21 @@ __gand_ep(const char *s, size_t z)
 		return EP_V0_SERIES;
 	}
 	return EP_UNK;
+}
+
+static gand_of_t
+__gand_of(const char *s, size_t z)
+{
+	if (z < sizeof(ctypes[OF_CSV]) - 1U) {
+		;
+	} else if (!memcmp(ctypes[OF_CSV], s, sizeof(ctypes[OF_CSV]) - 1U)) {
+		return OF_CSV;
+	} else if (z < sizeof(ctypes[OF_JSON]) - 1U) {
+		;
+	} else if (!memcmp(ctypes[OF_JSON], s, sizeof(ctypes[OF_JSON]) - 1U)) {
+		return OF_JSON;
+	}
+	return OF_UNK;
 }
 
 static __attribute__((const, pure)) gand_ep_t
@@ -349,8 +369,6 @@ req_get_outfmt(gand_httpd_req_t req)
 	}
 	/* otherwise */
 	do {
-		const struct gand_of_cell_s *ofc;
-
 		if ((on = strchr(acc.str, ',')) != NULL) {
 			acc.len = on++ - acc.str;
 		}
@@ -361,9 +379,8 @@ req_get_outfmt(gand_httpd_req_t req)
 			}
 		}
 
-		if (LIKELY((ofc = __gand_of(acc.str, acc.len)) != NULL)) {
+		if (LIKELY((of = __gand_of(acc.str, acc.len)) != OF_UNK)) {
 			/* first one wins */
-			of = ofc->of;
 			break;
 		}
 	} while ((acc.str = on));
