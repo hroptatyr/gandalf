@@ -394,7 +394,7 @@ User-Agent: gandapi\r\n\
 
 	gqlen = snprintf(
 		g->buf, g->bsz,
-		"GET /series?sym=%s&select=sym,d,vf,v&igncase&filter=", sym);
+		"GET /v0/series/%s?select=sym,d,vf,v&igncase&filter=", sym);
 
 	if (valflav == NULL || nvalflav == 0) {
 		memcpy(g->buf + gqlen, dflt, countof(dflt));
