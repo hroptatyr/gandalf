@@ -79,6 +79,7 @@ struct rln_s {
 static dict_t gsymdb;
 static char *trolfdir;
 static size_t ntrolfdir;
+static int trolf_dirfd;
 static char *nfo_fname;
 
 
@@ -295,6 +296,7 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 typedef enum {
 	EP_UNK,
 	EP_V0_SERIES,
+	EP_V0_SOURCES,
 	EP_V0_MAIN,
 } gand_ep_t;
 
@@ -319,6 +321,7 @@ static const char *const _ofs[] = {
 };
 
 static const char _eps_V0_SERIES[] = "/v0/series";
+static const char _eps_V0_SOURCES[] = "/v0/sources";
 #define EP(_x_)		(_eps_ ## _x_)
 
 static gand_ep_t
@@ -330,6 +333,10 @@ __gand_ep(const char *s, size_t z)
 		;
 	} else if (!memcmp(EP(V0_SERIES), s, sizeof(EP(V0_SERIES)) - 1U)) {
 		return EP_V0_SERIES;
+	} else if (z < sizeof(EP(V0_SOURCES)) - 1U) {
+		;
+	} else if (!memcmp(EP(V0_SOURCES), s, sizeof(EP(V0_SOURCES)) - 1U)) {
+		return EP_V0_SOURCES;
 	}
 	return EP_UNK;
 }
@@ -517,6 +524,101 @@ interr:
 }
 
 static gand_httpd_res_t
+work_src(gand_httpd_req_t req)
+{
+	gandfn_t fb;
+	const char *sym;
+	dict_oid_t rid;
+	gand_of_t of;
+
+	if ((of = req_get_outfmt(req)) == OF_UNK) {
+		of = OF_CSV;
+	}
+	if ((sym = req.path + sizeof(EP(V0_SOURCES)))[-1] == '\0') {
+		/* they just want all sources listed */
+		;
+	} else if (sym[-1] != '/') {
+		static const char errmsg[] = "Bad Request\n";
+
+		GAND_INFO_LOG(":rsp [400 Bad request]");
+		return (gand_httpd_res_t){
+			.rc = 400U/*BAD REQUEST*/,
+			.ctyp = OF(UNK),
+			.clen = sizeof(errmsg)- 1U,
+			.rd = {DTYP_DATA, errmsg},
+		};
+	}
+
+	static const char _s[] = "rolf_source";
+	if (UNLIKELY((fb = mmapat_fn(trolf_dirfd, _s, O_RDONLY)).fd < 0)) {
+		/* big fuck */
+		goto interr;
+	}
+
+	/* traverse the lines, filter and rewrite them */
+	const char *const buf = fb.fb.d;
+	const size_t bsz = fb.fb.z;
+	char proto[4096U];
+	size_t tot = 0U;
+	gand_gbuf_t gb;
+
+	/* obtain the buffer we can send bytes to */
+	if (UNLIKELY((gb = make_gand_gbuf(bsz)) == NULL)) {
+		GAND_ERR_LOG("cannot obtain gbuf");
+		goto interr_unmap;
+	}
+
+	for (size_t i = 0U; i < bsz; i++) {
+		const char *const bol = buf + i;
+		const size_t max = bsz - i;
+		const char *eol;
+		const char *ln;
+
+		if (UNLIKELY((eol = memchr(bol, '\n', max)) == NULL)) {
+			eol = bol + max;
+		}
+		if (LIKELY((ln = memchr(bol, '\t', eol - bol)) != NULL)) {
+			/* step behind the tab separator */
+			ln++;
+
+			if (UNLIKELY(tot + (eol - ln) > sizeof(proto))) {
+				gand_gbuf_write(gb, proto, tot);
+				tot = 0U;
+			}
+
+			memcpy(proto + tot, ln, eol - ln);
+			tot += eol - ln;
+			proto[tot++] = '\n';
+			i += eol - bol;
+		}
+	}
+	/* flush */
+	if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+		goto interr_unmap;
+	}
+
+	munmap_fn(fb);
+	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
+	return (gand_httpd_res_t){
+		.rc = 200U/*OK*/,
+		.ctyp = _ofs[of],
+		.clen = CLEN_UNKNOWN,
+		.rd = {DTYP_GBUF, gb},
+	};
+
+interr_unmap:
+	munmap_fn(fb);
+interr:
+	GAND_INFO_LOG(":rsp [500 Internal Error]");
+	return (gand_httpd_res_t){
+		.rc = 500U/*INTERNAL ERROR*/,
+		.ctyp = OF(UNK),
+		.clen = 0U,
+		.rd = {DTYP_NONE},
+	};
+}
+
+static gand_httpd_res_t
 work(gand_httpd_req_t req)
 {
 	static const char *const v[NVERBS] = {
@@ -535,6 +637,8 @@ work(gand_httpd_req_t req)
 	switch (req_get_endpoint(req)) {
 	case EP_V0_SERIES:
 		return work_ser(req);
+	case EP_V0_SOURCES:
+		return work_src(req);
 	case EP_V0_MAIN:
 		GAND_INFO_LOG(":rsp [200 OK]");
 		return (gand_httpd_res_t){
@@ -745,6 +849,14 @@ main(int argc, char *argv[])
 	nfo_fname = gand_get_nfo_file(cfg);
 	port = gand_get_port(cfg);
 
+	/* create trolf's dirfd */
+	if ((trolf_dirfd = open(trolfdir, O_RDONLY)) < 0) {
+		GAND_ERR_LOG("cannot access trolf directory: %s",
+			     strerror(errno));
+		rc = 1;
+		goto out2;
+	}
+
 #define make_gand_httpd(p...)	make_gand_httpd((gand_httpd_param_t){p})
 	/* configure the gand server */
 	h = make_gand_httpd(
@@ -788,6 +900,11 @@ outd:
 
 	/* away with the http */
 	free_gand_httpd(h);
+
+	/* close trolf_dirfd */
+	if (LIKELY(trolf_dirfd > 0)) {
+		close(trolf_dirfd);
+	}
 out2:
 	/* free trolfdir and nfo_fname */
 	if (LIKELY(trolfdir != NULL)) {

@@ -135,22 +135,13 @@ out:
 	return m;
 }
 
-
-/* public api */
-gandfn_t
-mmap_fn(const char *fn, int flags)
+static gandfn_t
+mmap_fd(int fd)
 {
 	struct stat st;
-	gandfn_t res;
+	gandfn_t res = {.fd = fd};
 
-	if (UNLIKELY(fn == NULL || fn[0U] == '-' && fn[1U] == '\0')) {
-		/* read from stdin fifo */
-		res.fd = STDIN_FILENO;
-		goto fifo;
-	}
-	if ((res.fd = open(fn, flags)) < 0) {
-		goto out;
-	} else if (fstat(res.fd, &st) < 0) {
+	if (fstat(res.fd, &st) < 0) {
 		res.fb = (gandf_t){.z = 0U, .d = NULL};
 		goto clo;
 	} else if (!S_ISREG(st.st_mode)) {
@@ -162,8 +153,7 @@ mmap_fn(const char *fn, int flags)
 			res.fb = (gandf_t){.z = 0U, .d = NULL};
 			goto clo;
 		}
-	fifo:
-		if ((res.fb = mmap_fifo(res.fd, flags)).d == NULL) {
+		if ((res.fb = mmap_fifo(res.fd, O_RDONLY)).d == NULL) {
 			/* and again, fucked, *sigh* */
 			goto clo;
 		}
@@ -176,6 +166,44 @@ mmap_fn(const char *fn, int flags)
 	posix_fadvise(res.fd, 0, 0, POSIX_FADV_SEQUENTIAL);
 out:
 	return res;
+}
+
+
+/* public api */
+gandfn_t
+mmap_fn(const char *fn, int flags)
+{
+	int fd;
+
+	if (UNLIKELY(fn == NULL || fn[0U] == '-' && fn[1U] == '\0')) {
+		/* read from stdin fifo */
+		gandfn_t res = {.fd = STDIN_FILENO};
+		res.fb = mmap_fifo(res.fd, flags);
+		return res;
+	} else if ((fd = open(fn, flags)) < 0) {
+		goto out;
+	}
+	return mmap_fd(fd);
+out:
+	return (gandfn_t){.fd = -1};
+}
+
+gandfn_t
+mmapat_fn(int dirfd, const char *fn, int flags)
+{
+	int fd;
+
+	if (UNLIKELY(fn == NULL || fn[0U] == '-' && fn[1U] == '\0')) {
+		/* read from stdin fifo */
+		gandfn_t res = {.fd = STDIN_FILENO};
+		res.fb = mmap_fifo(res.fd, flags);
+		return res;
+	} else if ((fd = openat(dirfd, fn, flags)) < 0) {
+		goto out;
+	}
+	return mmap_fd(fd);
+out:
+	return (gandfn_t){.fd = -1};
 }
 
 int
