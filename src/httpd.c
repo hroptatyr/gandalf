@@ -750,7 +750,17 @@ gand_req_get_xhdr(gand_httpd_req_t req, const char *hdr)
 
 	if (UNLIKELY(r.str == NULL)) {
 		goto nul;
-	} else if (UNLIKELY((h = strstr(r.str, _hdr)) == NULL)) {
+	}
+
+	/* now iterate over the buffer */
+	for (const char *sp = r.str, *const ep = sp + r.len;
+	     (h = xmemmem(sp, ep - sp, _hdr, hz)) != NULL; sp = h + 1U) {
+		if (UNLIKELY(h == r.str) || LIKELY(h[-1] == '\n')) {
+			break;
+		}
+	}
+
+	if (h == NULL) {
 		goto nul;
 	} else if (UNLIKELY((eoh = memchr(
 				     h, '\n', r.len - (h - r.str))) == NULL)) {
