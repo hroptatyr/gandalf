@@ -59,6 +59,7 @@ struct gandfn_s {
 
 /* public api */
 extern gandfn_t mmap_fn(const char *fn, int flags);
+extern gandfn_t mmapat_fn(int dirfd, const char *fn, int flags);
 extern int munmap_fn(gandfn_t);
 
 #endif	/* INCLUDED_fops_h_ */
