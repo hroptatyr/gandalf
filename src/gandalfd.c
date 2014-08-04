@@ -240,19 +240,35 @@ b0rk:
 	return (struct rln_s){NULL};
 }
 
+#define FILTER_LAST_INDICATOR	((const void*)0xdeadU)
+static const struct rln_s FILTER_LAST = {
+	.sym = {.s = FILTER_LAST_INDICATOR},
+};
+
 static ssize_t
 filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 {
 	char *sp = scratch;
 
+	if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
+		return 0;
+	}
+
 	/* quick sanity check, should also warm up caches */
 	if (UNLIKELY(r.sym.s == NULL)) {
-		return 0;
+		return -1;
+	} else if (UNLIKELY(r.dat.s == NULL)) {
+		return -1;
+	} else if (UNLIKELY(r.vrb.s == NULL)) {
+		return -1;
+	} else if (UNLIKELY(r.val.s == NULL)) {
+		return -1;
 	} else if (UNLIKELY(r.sym.z + 1U/*\t*/ +
 			    r.dat.z + 1U/*\t*/ +
 			    r.vrb.z + 1U/*\t*/ +
 			    r.val.z + 1U/*\n*/ >= z)) {
-		return -1;
+		/* request a bigger buffer */
+		return -2;
 	}
 
 	/* normally we'd do some filtering here as well */
@@ -281,14 +297,131 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 static ssize_t
 filter_json(char *restrict scratch, size_t z, struct rln_s r)
 {
+	static struct rln_s prev;
+	char *restrict sp = scratch;
+	size_t spc_needed = 0U;
+	unsigned int flags = 0U;
+
+	if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
+		if (UNLIKELY(prev.sym.s == NULL)) {
+			return 0;
+		} else if (UNLIKELY(z < 10U)) {
+			return -2;
+		}
+		/* clear out prev */
+		memset(&prev, 0, sizeof(prev));
+		/* finalise dat indentation */
+		*sp++ = '\n';
+		*sp++ = ' ';
+		*sp++ = ' ';
+		*sp++ = ']';
+		*sp++ = '}';
+		*sp++ = '\n';
+		/* finalise sym */
+		*sp++ = ']';
+		*sp++ = '}';
+		*sp++ = ']';
+		*sp++ = '\n';
+		return sp - scratch;
+	}
+
 	if (UNLIKELY(r.sym.s == NULL)) {
 		return -1;
+	} else if (UNLIKELY(r.dat.s == NULL)) {
+		return -1;
+	} else if (UNLIKELY(r.vrb.s == NULL)) {
+		return -1;
+	} else if (UNLIKELY(r.val.s == NULL)) {
+		return -1;
+	}
+
+	if (prev.sym.s == NULL || memcmp(prev.sym.s, r.sym.s, r.sym.z)) {
+		spc_needed += r.sym.z + 2U/*quot*/ + sizeof("[{\"sym\":}]") +
+			sizeof("[\"data:]\"");
+		flags |= 0b01U;
+	}
+
+	if (prev.dat.s == NULL || memcmp(prev.dat.s, r.dat.s, r.dat.z)) {
+		spc_needed += r.dat.z + 2U/*quot*/ + sizeof("  {\"dat\":[]}") +
+			sizeof("[\"data:]\"");
+		flags |= 0b10U;
+	}
+
+	/* definitely need the verb and value space */
+	spc_needed += r.vrb.z + 2U/*quot*/ + sizeof("    {\"vrb\":}");
+	spc_needed += r.val.z + 2U/*quot*/ + sizeof("    {\"val\":}");
+
+	if (UNLIKELY(spc_needed + 3U/*separators*/ >= z)) {
+		/* request a bigger buffer */
+		return -2;
 	}
 
 	/* normally we'd do some filtering here as well */
 	;
 
-	return -1;
+#define LITCPY(x, lit)	(memcpy(x, lit, sizeof(lit) - 1U), sizeof(lit) - 1U)
+#define BUFCPY(x, d, z)	(memcpy(x, d, z), z)
+	if (flags & 0b01U) {
+		/* start dummy array */
+		*sp++ = '[';
+		/* copy symbol */
+		*sp++ = '{';
+		sp += LITCPY(sp, "\"sym\":");
+		*sp++ = '"';
+		sp += BUFCPY(sp, r.sym.s, r.sym.z);
+		*sp++ = '"';
+		*sp++ = ',';
+		sp += LITCPY(sp, "\"data\":[\n");
+	}
+
+	if (flags & 0b10U) {
+		if (prev.dat.s) {
+			*sp++ = '\n';
+			*sp++ = ' ';
+			*sp++ = ' ';
+			*sp++ = ']';
+			*sp++ = '}';
+			*sp++ = ',';
+			*sp++ = '\n';
+		}
+		/* copy date */
+		*sp++ = ' ';
+		*sp++ = ' ';
+		*sp++ = '{';
+		sp += LITCPY(sp, "\"dat\":");
+		*sp++ = '"';
+		sp += BUFCPY(sp, r.dat.s, r.dat.z);
+		*sp++ = '"';
+		*sp++ = ',';
+		sp += LITCPY(sp, "\"data\":[");
+	}
+
+	/* now copy over vrb/val pairs */
+	if (!(flags & 0b10U)) {
+		*sp++ = ',';
+	}	*sp++ = '\n';
+
+	*sp++ = ' ';
+	*sp++ = ' ';
+	*sp++ = ' ';
+	*sp++ = ' ';
+	*sp++ = '{';
+	sp += LITCPY(sp, "\"vrb\":");
+	*sp++ = '"';
+	sp += BUFCPY(sp, r.vrb.s, r.vrb.z);
+	*sp++ = '"';
+	*sp++ = '}';
+	*sp++ = ',';
+	*sp++ = '{';
+	sp += LITCPY(sp, "\"value\":");
+	*sp++ = '"';
+	sp += BUFCPY(sp, r.val.s, r.val.z);
+	*sp++ = '"';
+	*sp++ = '}';
+
+	/* keep a note about this line */
+	prev = r;
+	return sp - scratch;
 }
 
 
@@ -485,7 +618,7 @@ yacka:;
 	filt:
 		/* filter, maybe */
 		z = filter(proto + tot, sizeof(proto) - tot, ln);
-		if (UNLIKELY(z < 0)) {
+		if (UNLIKELY(z < -1)) {
 			/* flush buffer */
 			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
@@ -493,12 +626,33 @@ yacka:;
 			}
 			tot = 0U;
 			goto filt;
+		} else if (UNLIKELY(z < 0)) {
+			/* `just' an error */
+			goto filt;
 		}
 		tot += z;
 		i += eol - bol;
 	}
+	/* flush filter */
+	with (ssize_t z) {
+	xfilt:
+		z = filter(proto + tot, sizeof(proto) - tot, FILTER_LAST);
+
+		if (z < -1) {
+			/* flush buffer */
+			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+				GAND_ERR_LOG("cannot write to gbuf");
+				goto interr_unmap;
+			}
+			tot = 0U;
+			goto xfilt;
+		} else if (z >= 0) {
+			tot += z;
+		}
+	}
 	/* flush */
 	if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+		GAND_ERR_LOG("cannot write to gbuf");
 		goto interr_unmap;
 	}
 
