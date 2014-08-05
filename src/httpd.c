@@ -248,6 +248,12 @@ static struct gand_gbuf_s {
 	uint8_t *data;
 } gbufs[MAX_GBUFS];
 
+enum gand_cmpr_e {
+	CMPR_NONE,
+	CMPR_DEFLATE,
+	CMPR_GZIP,
+};
+
 gand_gbuf_t
 make_gand_gbuf(size_t estz)
 {
@@ -345,8 +351,8 @@ gand_gbuf_write(gand_gbuf_t gb, const void *p, size_t z)
 }
 
 #if defined HAVE_ZLIB_H
-static ssize_t
-cmpr_gbuf(gand_gbuf_t gb, int gzipp)
+static int
+cmpr_gbuf(gand_gbuf_t gb, enum gand_cmpr_e cl)
 {
 	z_stream zstr = {
 		.next_in = gb->data,
@@ -362,26 +368,28 @@ cmpr_gbuf(gand_gbuf_t gb, int gzipp)
 
 		.data_type = Z_TEXT,
 	};
-	size_t res;
 	int rc;
 
+	if (cl == CMPR_NONE) {
+		/* nothing to do, is there */
+		return 0;
+	}
+
 	rc = deflateInit2(
-		&zstr, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
-		(gzipp ? 16 : 0) + 15, 9, Z_DEFAULT_STRATEGY);
+		&zstr, Z_BEST_SPEED, Z_DEFLATED,
+		(cl == CMPR_GZIP ? 16 : 0) + 15, 9, Z_DEFAULT_STRATEGY);
 	if (UNLIKELY(rc != Z_OK)) {
-		GAND_ERR_LOG("cannot initialise compression");
 		return -1;
 	}
 	/* here's the actual compression, do it all in one go */
 	if ((rc = deflate(&zstr, Z_FINISH)) < 0) {
-		GAND_ERR_LOG("compression failed: %d", rc);
 		return -1;
 	}
-	res = zstr.total_out;
+	gb->ibuf = zstr.total_out;
 
 	/* finalise, return code doesn't matter */
 	(void)deflateEnd(&zstr);
-	return res;
+	return 0;
 }
 #endif	/* HAVE_ZLIB_H */
 
@@ -405,6 +413,10 @@ static struct gand_conn_s {
 		size_t z;
 	} queue[MAX_QUEUE];
 } conns[MAX_CONNS];
+
+/* compression support hack */
+#define DTYP_GBUF_DEFLATE	(enum gand_dtyp_e)(DTYP_GBUF + CMPR_DEFLATE)
+#define DTYP_GBUF_GZIP		(enum gand_dtyp_e)(DTYP_GBUF + CMPR_GZIP)
 
 static struct gand_conn_s*
 make_conn(void)
@@ -507,22 +519,29 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		x->o = 0U;
 		x->fd = -1;
 		break;
+
 	case DTYP_GBUF:
-#if defined HAVE_ZLIB_H
-		with (ssize_t z) {
-			if (UNLIKELY((z = cmpr_gbuf(r.rd.gbuf, 1)) < 0)) {
-				/* best to send him uncompressed then aye? */
-				x->z = r.rd.gbuf->ibuf;
-			} else {
-				x->z = z;
-			}
-		}
-#else  /* !HAVE_ZLIB_H */
 		if (LIKELY((x->z = r.clen) == CLEN_UNKNOWN)) {
 			/* calculate the size from what's in the gbuf */
 			x->z = r.rd.gbuf->ibuf;
 		}
+		x->o = 0U;
+		x->fd = -1;
+		break;
+
+	case DTYP_GBUF_DEFLATE:
+	case DTYP_GBUF_GZIP:
+#if defined HAVE_ZLIB_H
+	{
+		enum gand_cmpr_e cl = (enum gand_cmpr_e)(r.rd.dtyp - DTYP_GBUF);
+
+		if (UNLIKELY(cmpr_gbuf(r.rd.gbuf, cl) < 0)) {
+			/* best to send the buffer uncompressed then aye? */
+			GAND_ERR_LOG("cannot compress response");
+		}
+	}
 #endif	/* HAVE_ZLIB_H */
+		x->z = r.rd.gbuf->ibuf;
 		x->o = 0U;
 		x->fd = -1;
 		break;
@@ -632,6 +651,18 @@ _tx_hdr(int fd, _httpd_ctx_t ctx, const struct gand_wrqi_s *x)
 	z += xstrlcpy(ctx->proto + z, x->res.ctyp, sizeof(ctx->proto) - z);
 	ctx->proto[z++] = '\r';
 	ctx->proto[z++] = '\n';
+
+	/* (maybe) fill in content encoding */
+	if (x->res.rd.dtyp > DTYP_GBUF) {
+		static const char *const _encs[] = {
+			[CMPR_DEFLATE] = "Content-Encoding: deflate\r\n",
+			[CMPR_GZIP] = "Content-Encoding: gzip\r\n",
+		};
+		const unsigned int e = x->res.rd.dtyp - DTYP_GBUF;
+
+		z += xstrlcpy(ctx->proto + z, _encs[e], sizeof(ctx->proto) - z);
+	}
+
 	ctx->proto[z++] = '\r';
 	ctx->proto[z++] = '\n';
 
@@ -675,6 +706,8 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 		x->o += z;
 		break;
 	case DTYP_GBUF:
+	case DTYP_GBUF_DEFLATE:
+	case DTYP_GBUF_GZIP:
 		z = send(fd, x->res.rd.gbuf->data + x->o, x->z, 0);
 		x->o += z;
 		break;
@@ -934,6 +967,7 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 	ssize_t nrd;
 	gand_httpd_req_t req;
 	char *eoh;
+	enum gand_cmpr_e cmpr = CMPR_NONE;
 
 	if (UNLIKELY(!(revents & EV_READ))) {
 		/* huh? */
@@ -964,7 +998,11 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 	/* check for encoding header */
 	with (gand_word_t x) {
 		if ((x = gand_req_get_xhdr(req, "Accept-Encoding")).str) {
-			;
+			if (xmemmem(x.str, x.len, "gzip", 4U)) {
+				cmpr = CMPR_GZIP;
+			} else if (xmemmem(x.str, x.len, "deflate", 7U)) {
+				cmpr = CMPR_DEFLATE;
+			}
 		}
 	}
 
@@ -988,6 +1026,12 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		} else {
 			/* already started it seems */
 			assert(c->w.fd > 0);
+		}
+
+		/* check if compression was requested and data is gbuf */
+		if (res.rd.dtyp == DTYP_GBUF) {
+			/* add the compression level */
+			res.rd.dtyp = (enum gand_dtyp_e)(res.rd.dtyp + cmpr);
 		}
 
 		/* enqueue the request */
