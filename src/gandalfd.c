@@ -241,6 +241,10 @@ b0rk:
 }
 
 #define FILTER_LAST_INDICATOR	((const void*)0xdeadU)
+#define FILTER_FRST_INDICATOR	((const void*)0xcafeU)
+static const struct rln_s FILTER_FRST = {
+	.sym = {.s = FILTER_FRST_INDICATOR},
+};
 static const struct rln_s FILTER_LAST = {
 	.sym = {.s = FILTER_LAST_INDICATOR},
 };
@@ -250,7 +254,11 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 {
 	char *sp = scratch;
 
-	if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
+	if (0) {
+		;
+	} else if (UNLIKELY(r.sym.s == FILTER_FRST_INDICATOR)) {
+		return 0;
+	} else if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
 		return 0;
 	}
 
@@ -302,24 +310,33 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 	size_t spc_needed = 0U;
 	unsigned int flags = 0U;
 
-	if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
-		if (UNLIKELY(prev.sym.s == NULL)) {
-			return 0;
-		} else if (UNLIKELY(z < 10U)) {
+	if (0) {
+		;
+	} else if (UNLIKELY(r.sym.s == FILTER_FRST_INDICATOR)) {
+		*sp++ = '[';
+		return sp - scratch;
+	} else if (UNLIKELY(r.sym.s == FILTER_LAST_INDICATOR)) {
+		if (LIKELY(prev.sym.s != NULL)) {
+			if (UNLIKELY(z < 10U)) {
+				return -2;
+			}
+			/* clear out prev */
+			memset(&prev, 0, sizeof(prev));
+			/* finalise dat indentation */
+			*sp++ = '\n';
+			*sp++ = ' ';
+			*sp++ = ' ';
+			*sp++ = ']';
+			*sp++ = '}';
+			*sp++ = '\n';
+			/* finalise sym */
+			*sp++ = ']';
+			*sp++ = '}';
+		}
+		if (UNLIKELY(z < 2U)) {
 			return -2;
 		}
-		/* clear out prev */
-		memset(&prev, 0, sizeof(prev));
-		/* finalise dat indentation */
-		*sp++ = '\n';
-		*sp++ = ' ';
-		*sp++ = ' ';
-		*sp++ = ']';
-		*sp++ = '}';
-		*sp++ = '\n';
-		/* finalise sym */
-		*sp++ = ']';
-		*sp++ = '}';
+		/* display this in either case */
 		*sp++ = ']';
 		*sp++ = '\n';
 		return sp - scratch;
@@ -362,8 +379,6 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 #define LITCPY(x, lit)	(memcpy(x, lit, sizeof(lit) - 1U), sizeof(lit) - 1U)
 #define BUFCPY(x, d, z)	(memcpy(x, d, z), z)
 	if (flags & 0b01U) {
-		/* start dummy array */
-		*sp++ = '[';
 		/* copy symbol */
 		*sp++ = '{';
 		sp += LITCPY(sp, "\"sym\":");
@@ -603,6 +618,22 @@ yacka:;
 		goto interr_unmap;
 	}
 
+	with (ssize_t z) {
+	bfilt:
+		z = filter(proto + tot, sizeof(proto) - tot, FILTER_FRST);
+
+		if (z < -1) {
+			/* flush buffer */
+			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+				GAND_ERR_LOG("cannot write to gbuf");
+				goto interr_unmap;
+			}
+			tot = 0U;
+			goto bfilt;
+		} else if (z >= 0) {
+			tot += z;
+		}
+	}
 	for (size_t i = 0U; i < bsz; i++) {
 		const char *const bol = buf + i;
 		const size_t max = bsz - i;
@@ -635,7 +666,7 @@ yacka:;
 	}
 	/* flush filter */
 	with (ssize_t z) {
-	xfilt:
+	efilt:
 		z = filter(proto + tot, sizeof(proto) - tot, FILTER_LAST);
 
 		if (z < -1) {
@@ -645,7 +676,7 @@ yacka:;
 				goto interr_unmap;
 			}
 			tot = 0U;
-			goto xfilt;
+			goto efilt;
 		} else if (z >= 0) {
 			tot += z;
 		}
