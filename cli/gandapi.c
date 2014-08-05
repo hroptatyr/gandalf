@@ -381,7 +381,7 @@ gand_get_series(
 	const char *sym, char *const valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
-	static const char dflt[] = "fix/stl/close/unknown";
+	static const char dflt[] = "fix,stl,close,unknown";
 	static const char rhdr[] = " HTTP/1.1\r\n\
 Connection: keep-alive\r\n\
 User-Agent: gandapi\r\n\
