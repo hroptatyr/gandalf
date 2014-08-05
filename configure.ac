@@ -51,6 +51,9 @@ if test -z "${GPERF}"; then
 fi
 AC_ARG_VAR([GPERF], [full path to the gperf tool])
 
+AC_CHECK_HEADERS([zlib.h])
+AM_CONDITIONAL([HAVE_ZLIB], [test "${ac_cv_header_zlib_h}" = "yes"])
+
 ## event loop
 SXE_CHECK_LIBEV
 AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
