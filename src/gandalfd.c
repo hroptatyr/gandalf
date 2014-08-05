@@ -109,6 +109,63 @@ unblock_sigs(void)
 	return;
 }
 
+static char*
+xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
+{
+	const char *const eoh = hay + hz;
+	const char *const eon = ndl + nz;
+	const char *hp;
+	const char *np;
+	const char *cand;
+	unsigned int hsum;
+	unsigned int nsum;
+	unsigned int eqp;
+
+	/* trivial checks first
+	 * a 0-sized needle is defined to be found anywhere in haystack
+	 * then run strchr() to find a candidate in HAYSTACK (i.e. a portion
+	 * that happens to begin with *NEEDLE) */
+	if (nz == 0UL) {
+		return deconst(hay);
+	} else if ((hay = memchr(hay, *ndl, hz)) == NULL) {
+		/* trivial */
+		return NULL;
+	}
+
+	/* First characters of haystack and needle are the same now. Both are
+	 * guaranteed to be at least one character long.  Now computes the sum
+	 * of characters values of needle together with the sum of the first
+	 * needle_len characters of haystack. */
+	for (hp = hay + 1U, np = ndl + 1U, hsum = *hay, nsum = *hay, eqp = 1U;
+	     hp < eoh && np < eon;
+	     hsum ^= *hp, nsum ^= *np, eqp &= *hp == *np, hp++, np++);
+
+	/* HP now references the (NZ + 1)-th character. */
+	if (np < eon) {
+		/* haystack is smaller than needle, :O */
+		return NULL;
+	} else if (eqp) {
+		/* found a match */
+		return deconst(hay);
+	}
+
+	/* now loop through the rest of haystack,
+	 * updating the sum iteratively */
+	for (cand = hay; hp < eoh; hp++) {
+		hsum ^= *cand++;
+		hsum ^= *hp;
+
+		/* Since the sum of the characters is already known to be
+		 * equal at that point, it is enough to check just NZ - 1
+		 * characters for equality,
+		 * also CAND is by design < HP, so no need for range checks */
+		if (hsum == nsum && memcmp(cand, ndl, nz - 1U) == 0) {
+			return deconst(cand);
+		}
+	}
+	return NULL;
+}
+
 
 static char*
 gand_get_nfo_file(cfg_t ctx)
@@ -240,6 +297,11 @@ b0rk:
 	return (struct rln_s){NULL};
 }
 
+
+/* filter routines */
+typedef word_t flt_t;
+static const flt_t nul_flt;
+
 #define FILTER_LAST_INDICATOR	((const void*)0xdeadU)
 #define FILTER_FRST_INDICATOR	((const void*)0xcafeU)
 static const struct rln_s FILTER_FRST = {
@@ -249,8 +311,30 @@ static const struct rln_s FILTER_LAST = {
 	.sym = {.s = FILTER_LAST_INDICATOR},
 };
 
+static bool
+flt_matches_p(flt_t f, word_t w)
+{
+	if (f.s == NULL) {
+		/* everything matches the trivial filter */
+		return true;
+	} else if (f.z == 0U) {
+		/* nothing matches the other trivial filter */
+		return false;
+	}
+	/* otherwise it's a non-trivial filter  */
+	for (const char *fp = f.s, *const ef = f.s + f.z;
+	     fp < ef && (fp = xmemmem(fp, ef - fp, w.s, w.z)) != NULL; fp++) {
+		/* check word boundary */
+		if (fp[-1] == '\0' && fp[w.z] == '\0') {
+			/* perfick */
+			return true;
+		}
+	}
+	return false;
+}
+
 static ssize_t
-filter_csv(char *restrict scratch, size_t z, struct rln_s r)
+filter_csv(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 {
 	char *sp = scratch;
 
@@ -279,8 +363,12 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 		return -2;
 	}
 
-	/* normally we'd do some filtering here as well */
-	;
+	/* do some filtering here as well,
+	 * this could be split off into the filtering coroutine really */
+	if (!flt_matches_p(f, r.vrb)) {
+		/* bugger off before anything else */
+		return 0;
+	}
 
 	/* now copy over sym, dat, vrb and val */
 	memcpy(sp, r.sym.s, r.sym.z);
@@ -303,7 +391,7 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r)
 }
 
 static ssize_t
-filter_json(char *restrict scratch, size_t z, struct rln_s r)
+filter_json(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 {
 	static struct rln_s prev;
 	char *restrict sp = scratch;
@@ -352,6 +440,13 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 		return -1;
 	}
 
+	/* do some filtering here as well,
+	 * this could be split off into the filtering coroutine really */
+	if (!flt_matches_p(f, r.vrb)) {
+		/* bugger off before anything else */
+		return 0;
+	}
+
 	if (prev.sym.s == NULL || memcmp(prev.sym.s, r.sym.s, r.sym.z)) {
 		spc_needed += r.sym.z + 2U/*quot*/ + sizeof("[{\"sym\":}]") +
 			sizeof("[\"data:]\"");
@@ -372,9 +467,6 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r)
 		/* request a bigger buffer */
 		return -2;
 	}
-
-	/* normally we'd do some filtering here as well */
-	;
 
 #define LITCPY(x, lit)	(memcpy(x, lit, sizeof(lit) - 1U), sizeof(lit) - 1U)
 #define BUFCPY(x, d, z)	(memcpy(x, d, z), z)
@@ -550,6 +642,35 @@ req_get_outfmt(gand_httpd_req_t req)
 	return of;
 }
 
+static flt_t
+ser_get_filter(gand_httpd_req_t r)
+{
+	static const char Qf[] = "filter";
+	static char _f[256U];
+	gand_word_t w;
+
+	if ((w = gand_req_get_xqry(r, Qf)).str == NULL) {
+		/* just go with the flow */
+		return (flt_t){NULL};
+	} else if ((w.str += sizeof(Qf), w.len -= sizeof(Qf), false)) {
+		/* not reached */
+		;
+	} else if (w.len > sizeof(_f) - 2U) {
+		GAND_ERR_LOG("filter string too long, truncating?");
+		w.len = sizeof(_f) - 2U;
+	}
+	_f[0U] = '\0';
+	memcpy(_f + 1U, w.str, w.len);
+	_f[1U + w.len] = '\0';
+	/* massage the filter string a little */
+	for (char *fp = _f + 1U, *const ef = fp + w.len; fp < ef; fp++) {
+		if (*fp == ',') {
+			*fp = '\0';
+		}
+	}
+	return (flt_t){_f, w.len + 2U};
+}
+
 static gand_httpd_res_t
 work_ser(gand_httpd_req_t req)
 {
@@ -580,20 +701,24 @@ work_ser(gand_httpd_req_t req)
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
-	} else goto yacka;
+	}
 
-yacka:;
+/* yacka */
 	const char *fn;
-	gandfn_t fb;
-	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln);
+	gandfn_t fx;
+	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln, flt_t f);
 	gand_gbuf_t gb;
+	flt_t f;
 
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
 		goto interr;
-	} else if (UNLIKELY((fb = mmap_fn(fn, O_RDONLY)).fd < 0)) {
+	} else if (UNLIKELY((fx = mmap_fn(fn, O_RDONLY)).fd < 0)) {
 		goto interr;
 	}
+
+	/* obtain the filter */
+	f = ser_get_filter(req);
 
 	switch (of) {
 	default:
@@ -607,24 +732,23 @@ yacka:;
 	}
 
 	/* traverse the lines, filter and rewrite them */
-	const char *const buf = fb.fb.d;
-	const size_t bsz = fb.fb.z;
-	char proto[4096U];
+	const gandf_t fb = fx.fb;
+	char buf[4096U];
 	size_t tot = 0U;
 
 	/* obtain the buffer we can send bytes to */
-	if (UNLIKELY((gb = make_gand_gbuf(bsz)) == NULL)) {
+	if (UNLIKELY((gb = make_gand_gbuf(fb.z)) == NULL)) {
 		GAND_ERR_LOG("cannot obtain gbuf");
 		goto interr_unmap;
 	}
 
 	with (ssize_t z) {
 	bfilt:
-		z = filter(proto + tot, sizeof(proto) - tot, FILTER_FRST);
+		z = filter(buf + tot, sizeof(buf) - tot, FILTER_FRST, nul_flt);
 
 		if (z < -1) {
 			/* flush buffer */
-			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
 				goto interr_unmap;
 			}
@@ -634,9 +758,9 @@ yacka:;
 			tot += z;
 		}
 	}
-	for (size_t i = 0U; i < bsz; i++) {
-		const char *const bol = buf + i;
-		const size_t max = bsz - i;
+	for (size_t i = 0U; i < fb.z; i++) {
+		const char *const bol = (const char*)fb.d + i;
+		const size_t max = fb.z - i;
 		const char *eol;
 		struct rln_s ln;
 		ssize_t z;
@@ -648,10 +772,10 @@ yacka:;
 		ln = snarf_rln(bol, eol - bol);
 	filt:
 		/* filter, maybe */
-		z = filter(proto + tot, sizeof(proto) - tot, ln);
+		z = filter(buf + tot, sizeof(buf) - tot, ln, f);
 		if (UNLIKELY(z < -1)) {
 			/* flush buffer */
-			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
 				goto interr_unmap;
 			}
@@ -667,11 +791,11 @@ yacka:;
 	/* flush filter */
 	with (ssize_t z) {
 	efilt:
-		z = filter(proto + tot, sizeof(proto) - tot, FILTER_LAST);
+		z = filter(buf + tot, sizeof(buf) - tot, FILTER_LAST, nul_flt);
 
 		if (z < -1) {
 			/* flush buffer */
-			if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
 				goto interr_unmap;
 			}
@@ -682,12 +806,12 @@ yacka:;
 		}
 	}
 	/* flush */
-	if (UNLIKELY(gand_gbuf_write(gb, proto, tot) < 0)) {
+	if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 		GAND_ERR_LOG("cannot write to gbuf");
 		goto interr_unmap;
 	}
 
-	munmap_fn(fb);
+	munmap_fn(fx);
 	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
@@ -697,7 +821,7 @@ yacka:;
 	};
 
 interr_unmap:
-	munmap_fn(fb);
+	munmap_fn(fx);
 interr:
 	GAND_INFO_LOG(":rsp [500 Internal Error]");
 	return (gand_httpd_res_t){
