@@ -381,7 +381,6 @@ gand_get_series(
 	const char *sym, char *const valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
-	static const char dflt[] = "fix/stl/close/unknown";
 	static const char rhdr[] = " HTTP/1.1\r\n\
 Connection: keep-alive\r\n\
 User-Agent: gandapi\r\n\
@@ -394,12 +393,13 @@ User-Agent: gandapi\r\n\
 
 	gqlen = snprintf(
 		g->buf, g->bsz,
-		"GET /v0/series/%s?select=sym,d,vf,v&igncase&filter=", sym);
+		"GET /v0/series/%s?select=sym,d,vf,v&igncase", sym);
 
 	if (valflav == NULL || nvalflav == 0) {
-		memcpy(g->buf + gqlen, dflt, countof(dflt));
-		gqlen += countof(dflt) - 1;
 	} else {
+		static const char flt[] = "filter=";
+		memcpy(g->buf + gqlen, flt, sizeof(flt));
+		gqlen += countof(flt) - 1;
 		for (size_t i = 0; i < nvalflav; i++) {
 			const char *vf = valflav[i];
 			size_t vflen = strlen(vf);
