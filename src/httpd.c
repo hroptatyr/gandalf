@@ -52,6 +52,9 @@
 # include <sys/sendfile.h>
 #endif	/* HAVE_SYS_SENDFILE_H */
 #include <ev.h>
+#if defined HAVE_ZLIB_H
+# include <zlib.h>
+#endif	/* HAVE_ZLIB_H */
 #include "ud-sock.h"
 #include "httpd.h"
 #include "logger.h"
@@ -334,10 +337,53 @@ gand_gbuf_write(gand_gbuf_t gb, const void *p, size_t z)
 	/* and copy we go */
 	if (LIKELY(z > 0U)) {
 		memcpy(gb->data + gb->ibuf, p, z);
+
+		/* advance ptrs */
 		gb->ibuf += z;
 	}
 	return z;
 }
+
+#if defined HAVE_ZLIB_H
+static ssize_t
+cmpr_gbuf(gand_gbuf_t gb, int gzipp)
+{
+	z_stream zstr = {
+		.next_in = gb->data,
+		.avail_in = gb->ibuf,
+		.total_in = 0UL,
+
+		.next_out = gb->data,
+		.avail_out = gb->zbuf,
+		.total_out = 0UL,
+
+		.zalloc = Z_NULL,
+		.zfree = Z_NULL,
+
+		.data_type = Z_TEXT,
+	};
+	size_t res;
+	int rc;
+
+	rc = deflateInit2(
+		&zstr, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+		(gzipp ? 16 : 0) + 15, 9, Z_DEFAULT_STRATEGY);
+	if (UNLIKELY(rc != Z_OK)) {
+		GAND_ERR_LOG("cannot initialise compression");
+		return -1;
+	}
+	/* here's the actual compression, do it all in one go */
+	if ((rc = deflate(&zstr, Z_FINISH)) < 0) {
+		GAND_ERR_LOG("compression failed: %d", rc);
+		return -1;
+	}
+	res = zstr.total_out;
+
+	/* finalise, return code doesn't matter */
+	(void)deflateEnd(&zstr);
+	return res;
+}
+#endif	/* HAVE_ZLIB_H */
 
 
 /* libev conn handling */
@@ -462,10 +508,21 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		x->fd = -1;
 		break;
 	case DTYP_GBUF:
+#if defined HAVE_ZLIB_H
+		with (ssize_t z) {
+			if (UNLIKELY((z = cmpr_gbuf(r.rd.gbuf, 1)) < 0)) {
+				/* best to send him uncompressed then aye? */
+				x->z = r.rd.gbuf->ibuf;
+			} else {
+				x->z = z;
+			}
+		}
+#else  /* !HAVE_ZLIB_H */
 		if (LIKELY((x->z = r.clen) == CLEN_UNKNOWN)) {
 			/* calculate the size from what's in the gbuf */
 			x->z = r.rd.gbuf->ibuf;
 		}
+#endif	/* HAVE_ZLIB_H */
 		x->o = 0U;
 		x->fd = -1;
 		break;
@@ -902,6 +959,13 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
 		/* don't deal with deliquents, we speak HTTP/1.1 only */
 		goto clo;
+	}
+
+	/* check for encoding header */
+	with (gand_word_t x) {
+		if ((x = gand_req_get_xhdr(req, "Accept-Encoding")).str) {
+			;
+		}
 	}
 
 	with (gand_httpd_res_t(*workf)() = ctx->param.workf) {

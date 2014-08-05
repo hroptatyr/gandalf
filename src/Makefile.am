@@ -54,6 +54,9 @@ libbeef_la_CPPFLAGS = $(AM_CPPFLAGS)
 libbeef_la_CPPFLAGS += $(libev_CFLAGS)
 libbeef_la_LDFLAGS = $(AM_LDFLAGS)
 libbeef_la_LDFLAGS += $(libev_LIBS)
+if HAVE_ZLIB
+libbeef_la_LDFLAGS += -lz
+endif  HAVE_ZLIB
 BUILT_SOURCES += httpd-verb-gp.c
 
 
