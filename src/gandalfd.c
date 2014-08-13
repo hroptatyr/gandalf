@@ -80,7 +80,6 @@ static dict_t gsymdb;
 static char *trolfdir;
 static size_t ntrolfdir;
 static int trolf_dirfd;
-static char *nfo_fname;
 
 
 static void
@@ -167,58 +166,41 @@ xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
 }
 
 
-static char*
-gand_get_nfo_file(cfg_t ctx)
+static const char*
+gand_make_trolf_filename(const char *fn)
 {
-	static const char rinf[] = "rolft_info";
-	static char f[PATH_MAX];
-	cfgset_t *cs;
-	size_t rsz;
-	const char *res = NULL;
+	size_t fz;
 	size_t idx;
+	char *res;
 
-	if (UNLIKELY(ctx == NULL)) {
-		goto dflt;
-	}
-
-	/* start out with an empty target */
-	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "nfo_file"))) {
-			struct stat st = {0};
-
-			if (stat(res, &st) == 0) {
-				goto out;
-			}
-		}
-	}
-
-	/* otherwise try the root domain */
-	if ((rsz = cfg_glob_lookup_s(&res, ctx, "nfo_file"))) {
-		struct stat st = {0};
-
-		if (stat(res, &st) == 0) {
-			goto out;
-		}
-	}
-
-	/* otherwise we'll construct it from the trolfdir */
-dflt:
 	if (UNLIKELY(trolfdir == NULL)) {
 		return NULL;
 	}
 
-	/* construct the path */
-	memcpy(f, trolfdir, (idx = ntrolfdir));
-	if (f[idx - 1] != '/') {
-		f[idx++] = '/';
+	fz = strlen(fn);
+	res = malloc(ntrolfdir + fz + 1U/*slash*/ + 1U/*\nul*/);
+	if (UNLIKELY(res == NULL)) {
+		return NULL;
 	}
-	memcpy(f + idx, rinf, sizeof(rinf) - 1);
-	res = f;
-	rsz = idx + sizeof(rinf) - 1;
 
-out:
-	/* make sure the return value is freeable */
-	return strndup(res, rsz);
+	/* construct the path */
+	memcpy(res, trolfdir, (idx = ntrolfdir));
+	if (res[idx - 1] != '/') {
+		res[idx++] = '/';
+	}
+	memcpy(res + idx, fn, fz);
+	res[idx + fz] = '\0';
+	return res;
+}
+
+static void
+gand_free_trolf_filename(const char *fn)
+{
+	if (UNLIKELY(fn == NULL)) {
+		return;
+	}
+	free(deconst(fn));
+	return;
 }
 
 static const char*
@@ -1061,7 +1043,8 @@ main(int argc, char *argv[])
 	/* paths and files */
 	const char *pidf;
 	const char *wwwd;
-	const char dictf[] = "gand_idx2sym.tcb";
+	const char _dictf[] = "gand_idx2sym.tcb";
+	const char *dictf = _dictf;
 	/* inotify watcher */
 	ev_stat dict_watcher;
 	cfg_t cfg;
@@ -1106,12 +1089,6 @@ main(int argc, char *argv[])
 	/* start them log files */
 	gand_openlog();
 
-	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-		GAND_ERR_LOG("cannot open symbol index file");
-		rc = 1;
-		goto out0;
-	}
-
 	/* write a pid file? */
 	if ((pidf = argi->pidfile_arg) ||
 	    (cfg && cfg_glob_lookup_s(&pidf, cfg, "pidfile") > 0)) {
@@ -1155,8 +1132,6 @@ main(int argc, char *argv[])
 
 	/* get the trolf dir */
 	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
-	nfo_fname = gand_get_nfo_file(cfg);
-	port = gand_get_port(cfg);
 
 	/* create trolf's dirfd */
 	if ((trolf_dirfd = open(trolfdir, O_RDONLY)) < 0) {
@@ -1166,6 +1141,19 @@ main(int argc, char *argv[])
 		goto out2;
 	}
 
+	/* try and find the dictionary */
+	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
+		dictf = gand_make_trolf_filename(_dictf);
+
+		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
+			GAND_ERR_LOG("cannot open symbol index file");
+			rc = 1;
+			goto out2;
+		}
+	}
+
+	/* server config */
+	port = gand_get_port(cfg);
 #define make_gand_httpd(p...)	make_gand_httpd((gand_httpd_param_t){p})
 	/* configure the gand server */
 	h = make_gand_httpd(
@@ -1219,8 +1207,8 @@ out2:
 	if (LIKELY(trolfdir != NULL)) {
 		free(trolfdir);
 	}
-	if (LIKELY(nfo_fname != NULL)) {
-		free(nfo_fname);
+	if (dictf != _dictf) {
+		gand_free_trolf_filename(dictf);
 	}
 
 out1:
