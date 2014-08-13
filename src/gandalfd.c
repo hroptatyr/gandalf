@@ -1043,8 +1043,9 @@ main(int argc, char *argv[])
 	/* paths and files */
 	const char *pidf;
 	const char *wwwd;
-	const char _dictf[] = "gand_idx2sym.tcb";
-	const char *dictf = _dictf;
+	static const char _dictf[] = "gand_idx2sym.tcb";
+	const char *dictf;
+	bool free_dictf_p = false;
 	/* inotify watcher */
 	ev_stat dict_watcher;
 	cfg_t cfg;
@@ -1142,11 +1143,21 @@ main(int argc, char *argv[])
 	}
 
 	/* try and find the dictionary */
+	if ((dictf = argi->index_file_arg) ||
+	    (cfg && cfg_glob_lookup_s(&dictf, cfg, "index_file") > 0)) {
+		/* command line has precedence */
+		;
+	} else {
+		/* preset with default */
+		dictf = _dictf;
+	}
 	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-		dictf = gand_make_trolf_filename(_dictf);
+		dictf = gand_make_trolf_filename(dictf);
+		free_dictf_p = true;
 
 		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-			GAND_ERR_LOG("cannot open symbol index file");
+			GAND_ERR_LOG("cannot open symbol index file `%s'",
+				     dictf);
 			rc = 1;
 			goto out2;
 		}
@@ -1207,7 +1218,7 @@ out2:
 	if (LIKELY(trolfdir != NULL)) {
 		free(trolfdir);
 	}
-	if (dictf != _dictf) {
+	if (free_dictf_p) {
 		gand_free_trolf_filename(dictf);
 	}
 

@@ -6,3 +6,4 @@ gandalf service
   -d, --daemon        Detach from tty and run as daemon  (default=off)
   -p, --pidfile=FILE  Output pid of server process into this file
   --wwwdir=PATH       Serve static files from directory PATH
+  --index-file=FILE   Name of the index file, default gand_idx2sym.tcb
