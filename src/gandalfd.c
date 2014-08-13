@@ -1223,7 +1223,9 @@ out2:
 	}
 
 out1:
-	close_dict(gsymdb);
+	if (gsymdb != NULL) {
+		close_dict(gsymdb);
+	}
 	if (pidf != NULL) {
 		(void)unlink(pidf);
 	}
