@@ -989,6 +989,7 @@ static void
 sock_data_cb(EV_P_ ev_io *w, int revents)
 {
 	char buf[4096U];
+	char *bp = buf;
 	const int fd = w->fd;
 	_httpd_ctx_t ctx = w->data;
 	ssize_t nrd;
@@ -1006,15 +1007,16 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		goto clo;
 	}
 
+again:
 	/* now get all them headers parsed */
-	req = parse_hdr(buf, nrd);
+	req = parse_hdr(bp, nrd);
 
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
 		/* don't deal with deliquents, we speak HTTP/1.1 only */
 		goto clo;
 	} else if (UNLIKELY(req.hdr.str == NULL)) {
 		/* wait for more data then? */
-		goto clo;
+		return;
 	}
 
 	/* check for encoding header */
@@ -1062,6 +1064,16 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 			GAND_ERR_LOG("cannot enqueue response for %d", c->w.fd);
 			goto clo;
 		}
+	}
+	if (UNLIKELY(req.data.str != NULL)) {
+		bp += req.data.str + req.data.len - buf;
+		nrd -= bp - buf;
+	} else {
+		bp += req.hdr.str + req.hdr.len + 2U - buf;
+		nrd -= bp - buf;
+	}
+	if (UNLIKELY(nrd > 0)) {
+		goto again;
 	}
 	return;
 
