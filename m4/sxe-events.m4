@@ -35,28 +35,36 @@ dnl This file is part of SXEmacs.
 
 AC_DEFUN([SXE_CHECK_LIBEV], [
 	## defines sxe_cv_feat_libev
-	PKG_CHECK_MODULES([libev], [libev >= 4.0], [have_libev="yes"],
-		[have_libev="no"; libev_LIBS="-lev"])
+	PKG_CHECK_MODULES([libev], [libev >= 4.0],
+		[have_libev="yes"], [have_libev="no"])
 	save_CPPFLAGS="${CPPFLAGS}"
 	save_LDFLAGS="${LDFLAGS}"
+	save_LIBS="${LIBS}"
 	CPPFLAGS="${CPPFLAGS} ${libev_CFLAGS}"
 	LDFLAGS="${LDFLAGS} ${libev_LIBS}"
 	AC_CHECK_HEADERS([ev.h])
 	AC_CHECK_LIB([ev], [ev_loop_new])
-	CPPFLAGS="${save_CPPFLAGS}"
-	LDFLAGS="${save_LDFLAGS}"
 
 	if test "$ac_cv_header_ev_h" = "yes" -a \
-		"$ac_cv_lib_ev___ev_loop_new" = "yes"; then
-		AC_DEFINE([HAVE_libev], [1], [Whether libev is fully functional])
+		"$ac_cv_lib_ev_ev_loop_new" = "yes"; then
+		AC_DEFINE([HAVE_LIBEV], [1], [Whether libev is fully functional])
 		sxe_cv_feat_libev="yes"
 		have_libev="yes"
+		if test -z "${libev_LIBS}"; then
+			libev_LIBS="${LIBS}"
+		fi
 	else
+		AC_MSG_WARN([libev is needed for the server component
+but could not be found.  Expect things to break.])
 		sxe_cv_feat_libev="no"
 		have_libev="no"
 		libev_CFLAGS=
 		libev_LIBS=
 	fi
+
+	CPPFLAGS="${save_CPPFLAGS}"
+	LDFLAGS="${save_LDFLAGS}"
+	LIBS="${save_LIBS}"
 
 	AC_SUBST([libev_CFLAGS])
 	AC_SUBST([libev_LIBS])

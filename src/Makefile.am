@@ -82,9 +82,11 @@ EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
 gandalfd_CPPFLAGS += $(dict_CFLAGS)
 gandalfd_CPPFLAGS += $(cfg_CFLAGS)
+gandalfd_CPPFLAGS += $(libev_CFLAGS)
 gandalfd_LDFLAGS = $(AM_LDFLAGS)
 gandalfd_LDFLAGS += $(dict_LIBS)
 gandalfd_LDFLAGS += $(cfg_LIBS)
+gandalfd_LDFLAGS += $(libev_LIBS)
 gandalfd_LDADD = libgand.la
 gandalfd_LDADD += libbeef.la
 endif  BUILD_SERVER
