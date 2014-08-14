@@ -44,21 +44,25 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 	LDFLAGS="${LDFLAGS} ${libev_LIBS}"
 	AC_CHECK_HEADERS([ev.h])
 	AC_CHECK_LIB([ev], [ev_loop_new])
-	CPPFLAGS="${save_CPPFLAGS}"
-	LDFLAGS="${save_LDFLAGS}"
-	LIBS="${save_LIBS}"
 
 	if test "$ac_cv_header_ev_h" = "yes" -a \
 		"$ac_cv_lib_ev___ev_loop_new" = "yes"; then
 		AC_DEFINE([HAVE_libev], [1], [Whether libev is fully functional])
 		sxe_cv_feat_libev="yes"
 		have_libev="yes"
+		if test -z "${libev_LIBS}"; then
+			libev_LIBS="${LIBS}"
+		fi
 	else
 		sxe_cv_feat_libev="no"
 		have_libev="no"
 		libev_CFLAGS=
 		libev_LIBS=
 	fi
+
+	CPPFLAGS="${save_CPPFLAGS}"
+	LDFLAGS="${save_LDFLAGS}"
+	LIBS="${save_LIBS}"
 
 	AC_SUBST([libev_CFLAGS])
 	AC_SUBST([libev_LIBS])
