@@ -47,7 +47,7 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 
 	if test "$ac_cv_header_ev_h" = "yes" -a \
 		"$ac_cv_lib_ev_ev_loop_new" = "yes"; then
-		AC_DEFINE([HAVE_libev], [1], [Whether libev is fully functional])
+		AC_DEFINE([HAVE_LIBEV], [1], [Whether libev is fully functional])
 		sxe_cv_feat_libev="yes"
 		have_libev="yes"
 		if test -z "${libev_LIBS}"; then
