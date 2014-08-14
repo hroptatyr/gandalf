@@ -35,8 +35,8 @@ dnl This file is part of SXEmacs.
 
 AC_DEFUN([SXE_CHECK_LIBEV], [
 	## defines sxe_cv_feat_libev
-	PKG_CHECK_MODULES([libev], [libev >= 4.0], [have_libev="yes"],
-		[have_libev="no"; libev_LIBS="-lev"])
+	PKG_CHECK_MODULES([libev], [libev >= 4.0],
+		[have_libev="yes"], [have_libev="no"])
 	save_CPPFLAGS="${CPPFLAGS}"
 	save_LDFLAGS="${LDFLAGS}"
 	save_LIBS="${LIBS}"
