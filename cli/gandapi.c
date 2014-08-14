@@ -29,6 +29,15 @@
 
 #define countof(x)	(sizeof(x) / sizeof(*x))
 #define assert(args...)
+#define _paste(x, y)	x ## y
+#define paste(x, y)	_paste(x, y)
+
+#if !defined with
+# define with(args...)							\
+	for (args, *paste(__ep, __LINE__) = (void*)1;			\
+	     paste(__ep, __LINE__); paste(__ep, __LINE__)= 0)
+#endif	/* !with */
+
 
 typedef struct __ctx_s *__ctx_t;
 
@@ -37,6 +46,9 @@ struct __ctx_s {
 	int eps;
 	/* gand sock */
 	int gs;
+	/* host name pointer */
+	char *host;
+	size_t hlen;
 	/* generic index */
 	uint32_t idx;
 	uint32_t nrd;
@@ -244,6 +256,11 @@ gand_open(const char *srv, int timeout)
 	res->gs = ns;
 	res->nev = countof(res->ev);
 
+	with (size_t zrv = strlen(srv)) {
+		res->host = strndup(srv, zrv);
+		res->hlen = zrv;
+	}
+
 	res->bsz = 16 * 4096;
 	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
 
@@ -267,6 +284,7 @@ gand_close(gand_ctx_t ug)
 	shut_sock(g->gs);
 	shut_sock(g->eps);
 	munmap(g->buf, g->bsz);
+	free(g->host);
 	free(g);
 	return;
 }
@@ -381,7 +399,9 @@ gand_get_series(
 	const char *sym, char *const valflav[], size_t nvalflav,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
-	static const char rhdr[] = " HTTP/1.1\r\n\
+	static const char hhdr[] = " HTTP/1.1\r\n\
+Host: ";
+	static const char rhdr[] = "\r\n\
 Connection: keep-alive\r\n\
 User-Agent: gandapi\r\n\
 \r\n";
@@ -413,6 +433,12 @@ User-Agent: gandapi\r\n\
 		}
 		--gqlen;
 	}
+
+	/* insert the host header */
+	memcpy(g->buf + gqlen, hhdr, sizeof(hhdr) - 1);
+	gqlen += sizeof(hhdr) - 1;
+	memcpy(g->buf + gqlen, g->host, g->hlen);
+	gqlen += g->hlen;
 
 	/* copy the rest of the header */
 	memcpy(g->buf + gqlen, rhdr, sizeof(rhdr) - 1);
