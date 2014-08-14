@@ -96,6 +96,7 @@ typedef struct {
 typedef struct {
 	gand_httpd_verb_t verb;
 	gand_word_t hdr;
+	gand_word_t data;
 	const char *host;
 	const char *path;
 	const char *query;

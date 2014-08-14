@@ -806,9 +806,36 @@ parse_hdr(const char *str, size_t len)
 
 	/* and finally find beginning of actual headers */
 	if (LIKELY((eox = memchr(eox, '\n', ep - eox)) != NULL)) {
+		static const char _cl[] = "\nContent-Length:";
+		long unsigned int z;
+		const char *cl;
+		char *eoh;
+
 		/* overread trailing/leading whitespace */
 		for (eox++; xisspace(*eox); eox++);
-		res.hdr = (gand_word_t){eox, ep - eox};
+		/* also find a proper header ending */
+		eoh = xmemmem(eox, ep - eox, "\r\n\r\n", 4U);
+		if (UNLIKELY(eoh == NULL)) {
+			return res;
+		}
+		/* finalise this string then */
+		eoh[2U] = '\0';
+		res.hdr = (gand_word_t){eox, eoh + 2U - eox};
+
+		/* now then, how about a Content-Length line? */
+		cl = xmemmem(res.hdr.str, res.hdr.len, _cl, sizeof(_cl) - 1U);
+		if (LIKELY(cl == NULL)) {
+			return res;
+		}
+
+		/* otherwise big oooh, data has been posted then innit */
+		z = strtoul(cl + sizeof(_cl) - 1U, NULL, 10U);
+		res.data = (gand_word_t){res.hdr.str + res.hdr.len + 2U, z};
+		if (res.data.str + res.data.len > ep) {
+			/* don't trick them into accessing data beyond
+			 * our own buffer boundary */
+			res.data.len = ep - res.data.str;
+		}
 	}
 	return res;
 }
@@ -962,11 +989,11 @@ static void
 sock_data_cb(EV_P_ ev_io *w, int revents)
 {
 	char buf[4096U];
+	char *bp = buf;
 	const int fd = w->fd;
 	_httpd_ctx_t ctx = w->data;
 	ssize_t nrd;
 	gand_httpd_req_t req;
-	char *eoh;
 	enum gand_cmpr_e cmpr = CMPR_NONE;
 
 	if (UNLIKELY(!(revents & EV_READ))) {
@@ -980,19 +1007,16 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 		goto clo;
 	}
 
-	/* parse at least http header boundaries */
-	if (UNLIKELY((eoh = xmemmem(buf, nrd, "\r\n\r\n", 4U)) == NULL)) {
-		/* header boundary not found, fuck right off */
-		goto clo;
-	}
-
+again:
 	/* now get all them headers parsed */
-	eoh[2U] = '\0';
-	req = parse_hdr(buf, eoh + 2U - buf);
+	req = parse_hdr(bp, nrd);
 
 	if (UNLIKELY(req.verb == VERB_UNSUPP)) {
 		/* don't deal with deliquents, we speak HTTP/1.1 only */
 		goto clo;
+	} else if (UNLIKELY(req.hdr.str == NULL)) {
+		/* wait for more data then? */
+		return;
 	}
 
 	/* check for encoding header */
@@ -1040,6 +1064,16 @@ sock_data_cb(EV_P_ ev_io *w, int revents)
 			GAND_ERR_LOG("cannot enqueue response for %d", c->w.fd);
 			goto clo;
 		}
+	}
+	if (UNLIKELY(req.data.str != NULL)) {
+		bp += req.data.str + req.data.len - buf;
+		nrd -= bp - buf;
+	} else {
+		bp += req.hdr.str + req.hdr.len + 2U - buf;
+		nrd -= bp - buf;
+	}
+	if (UNLIKELY(nrd > 0)) {
+		goto again;
 	}
 	return;
 
