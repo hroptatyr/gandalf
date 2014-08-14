@@ -54,6 +54,8 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 			libev_LIBS="${LIBS}"
 		fi
 	else
+		AC_MSG_WARN([libev is needed for the server component
+but could not be found.  Expect things to break.])
 		sxe_cv_feat_libev="no"
 		have_libev="no"
 		libev_CFLAGS=
