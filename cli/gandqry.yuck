@@ -2,7 +2,6 @@ Usage: gandqry [OPTIONS]... SYMBOL...
 
 Query a gandalf server
 
-  -f, --valflav=STRING...  Valflav to filter on
   -s, --service=HOST:PORT  Speak to Round positions to integer values
   -w, --timeout=INT        Timeout in milliseconds to wait before a connection
                            is considered dead  (default=`2000')

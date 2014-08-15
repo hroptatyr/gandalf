@@ -11,15 +11,18 @@ mod_DATA =
 
 mod_LTLIBRARIES += gand_get_series.la
 mod_DATA += gand_get_series.m
+gand_get_series_la_SOURCES = gand_get_series.c
+gand_get_series_la_SOURCES += gand_handle.h
+gand_get_series_la_SOURCES += intern.c intern.h
 gand_get_series_la_LDFLAGS = $(AM_LDFLAGS)
 gand_get_series_la_LDFLAGS += $(MOD_LDFLAGS)
 gand_get_series_la_LDFLAGS += $(XCCLDFLAGS)
 gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS) -DMATLAB_MEX_FILE
 gand_get_series_la_CPPFLAGS += -I$(top_srcdir)/cli
 gand_get_series_la_CPPFLAGS += $(matlab_CFLAGS)
+gand_get_series_la_CPPFLAGS += -I$(top_srcdir)/src
+gand_get_series_la_CPPFLAGS += -DENUM_INTERNS
 gand_get_series_la_LIBADD = $(top_builddir)/cli/libgandapi.la
-gand_get_series_la_SOURCES = gand_get_series.c
-gand_get_series_la_SOURCES += gand_handle.h
 EXTRA_DIST += $(mod_DATA)
 
 mod_LTLIBRARIES += gand_open.la
