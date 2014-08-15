@@ -297,6 +297,7 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 
 	do {
 #define EV	(g->ev[TX].events)
+#define SF	(MSG_NOSIGNAL)
 		int fd = g->ev[TX].data.fd;
 
 		/* we've only asked for one, so it would be peculiar */
@@ -307,7 +308,7 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 			size_t tot = 0;
 
 			while (tot < qsz &&
-			       (nwr = write(fd, qry + tot, qsz - tot)) > 0) {
+			       (nwr = send(fd, qry + tot, qsz - tot, SF)) > 0) {
 				tot += nwr;
 			}
 			if (tot >= qsz) {
@@ -325,6 +326,7 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 		} else {
 			break;
 		}
+#undef SF
 #undef EV
 	} while ((nfds = ep_wait(g, g->timeo)) > 0);
 	return -1;
@@ -416,6 +418,7 @@ User-Agent: gandapi\r\n\
 		"GET /v0/series/%s?select=sym,d,vf,v&igncase", sym);
 
 	if (valflav == NULL || nvalflav == 0) {
+		;
 	} else {
 		static const char flt[] = "filter=";
 		memcpy(g->buf + gqlen, flt, sizeof(flt));
