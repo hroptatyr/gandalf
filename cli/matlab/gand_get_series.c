@@ -43,22 +43,27 @@
 /* our stuff */
 #include "gandapi.h"
 #include "gand_handle.h"
+#include "intern.h"
+#include "nifty.h"
 
 /* see gand_get_series.m for details */
 #define assert(args...)
 
 typedef uint32_t daysi_t;
 
-struct __recv_st_s {
-	idate_t ldat;
-	uint32_t lidx;
+struct __recv_clo_s {
+	obarray_t obsym;
+	obarray_t obfld;
+
+	/* filled by qcb */
+	obint_t osym;
+	size_t n;
+	/* vector of dates */
 	double *d;
+	/* vector of indices into fields obarray */
+	double *f;
+	/* vector of values */
 	double *v;
-	char **raw;
-	char **vf;
-	char **res_vf;
-	uint32_t nvf;
-	uint32_t ncol;
 };
 
 
@@ -93,95 +98,57 @@ idate_to_daysi(idate_t dt)
 
 #define RESIZE_STEP	(1024)
 
-static int
-find_valflav(const char *vf, struct __recv_st_s *st)
-{
-	size_t vflen = strlen(vf);
-
-	for (size_t i = 0; i < st->nvf; i++) {
-		const char *p = st->vf[i];
-		const char *tmp;
-
-		if ((tmp = strstr(p, vf)) &&
-		    (tmp == p || tmp[-1] == '/') &&
-		    (tmp[vflen] == '\0' || tmp[vflen] == '/')) {
-			return i;
-		}
-	}
-	return st->nvf ? -1 : 0;
-}
-
 static void
-check_resize(struct __recv_st_s *st)
+check_resize(struct __recv_clo_s *st)
 {
 	/* check for resize */
-	if (st->lidx % RESIZE_STEP) {
+	if (st->n % RESIZE_STEP) {
 		return;
 	}
 	/* yep, resize */
-	st->d = mxRealloc(st->d, (st->lidx + RESIZE_STEP) * sizeof(double));
-	memset(st->d + st->lidx, -1, RESIZE_STEP * sizeof(double));
+	st->d = mxRealloc(st->d, (st->n + RESIZE_STEP) * sizeof(double));
+	memset(st->d + st->n, -1, RESIZE_STEP * sizeof(double));
 
-	if (st->ncol) {
-		union foo {double d; char *s;};
-		size_t row_sz = st->ncol * sizeof(union foo);
-		size_t new_sz = (st->lidx + RESIZE_STEP) * row_sz;
+	st->f = mxRealloc(st->f, (st->n + RESIZE_STEP) * sizeof(double));
+	memset(st->f + st->n, -1, RESIZE_STEP * sizeof(double));
 
-		st->v = mxRealloc(st->v, new_sz);
-		memset(st->v + st->lidx * st->ncol, -1, RESIZE_STEP * row_sz);
-
-		/* also resize the raw array */
-		if (st->raw && st->raw != (void*)0xdeadU) {
-			st->raw = mxRealloc(st->raw, new_sz);
-			memset(st->raw + st->lidx * st->ncol,
-			       0, RESIZE_STEP * row_sz);
-		} else if (st->raw) {
-			st->raw = mxCalloc(new_sz, 1U);
-		}
-	}
+	st->v = mxRealloc(st->v, (st->n + RESIZE_STEP) * sizeof(double));
+	memset(st->v + st->n, -1, RESIZE_STEP * sizeof(double));
 	return;
 }
 
 static int
 qcb(gand_res_t res, void *clo)
 {
-	struct __recv_st_s *st = clo;
-	int this_vf;
+	struct __recv_clo_s *st = clo;
 
-	if (res->date > st->ldat) {
-		st->lidx++;
-		check_resize(st);
-		/* set the date */
-		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
+	if (UNLIKELY(!st->osym)) {
+		st->osym = intern(st->obsym, res->symbol, strlen(res->symbol));
 	}
 
-	if ((st->v || st->raw) &&
-	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
-		/* we demand res->strval to be a double atm */
-		double tmp = strtod(res->strval, NULL);
-
-		/* also fill the second matrix */
-		st->v[st->lidx * st->ncol + this_vf] = tmp;
-		if (st->res_vf && st->res_vf[this_vf] == NULL) {
-			st->res_vf[this_vf] = strdup(res->valflav);
-		}
-
-		if (st->raw) {
-			st->raw[st->lidx * st->ncol + this_vf] =
-				(char*)mxCreateString(res->strval);
-		}
-	}
+	check_resize(st);
+	st->d[st->n] = idate_to_daysi(res->date);
+	st->f[st->n] = (double)intern(
+		st->obfld, res->valflav, strlen(res->valflav));
+	st->v[st->n] = strtod(res->strval, NULL);
+	/* more yum please */
+	st->n++;
 	return 0;
 }
 
 
 void
-mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-	gand_ctx_t hdl;
-	char *sym;
+	static const char *_slots[] = {
+		"syms", "data", "flds",
+	};
 	/* state for retrieval */
-	struct __recv_st_s rst = {0};
+	struct __recv_clo_s rst;
+	gand_ctx_t hdl;
+	obarray_t obsym;
+	mxArray *slots[3U];
+	size_t nsym;
 
 	if (nrhs <= 0) {
 		mexErrMsgTxt("invalid usage, see `help gand_get_series'");
@@ -189,100 +156,74 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	} else if ((hdl = gmx_get_handle(prhs[0])) == NULL) {
 		mexErrMsgTxt("gandalf handle seems buggered");
 		return;
-	} else if (nrhs == 1 || (sym = mxArrayToString(prhs[1])) == NULL) {
+	} else if (nrhs == 1) {
 		mexErrMsgTxt("no symbol given\n");
 		return;
-	} else if (nlhs == 0) {
-		return;
-	} else if (nrhs > 2) {
-		rst.vf = mxCalloc(rst.nvf = nrhs - 2, sizeof(*rst.vf));
 	}
 
-	for (int i = 0; i < nrhs - 2; i++) {
-		char *vf = mxArrayToString(prhs[i + 2]);
-		rst.vf[i] = vf;
-	}
+	/* prep sym obarray */
+	obsym = make_obarray();
+	for (size_t i = 0U, _nsym = nrhs - 1; i < _nsym; i++) {
+		char *sym;
 
-	/* set up the closure */
-	if (nlhs > 1) {
-		rst.ncol = nrhs - 2 ?: 1;
-	}
-	if (nlhs > 2) {
-		rst.res_vf = mxCalloc(rst.nvf, sizeof(*rst.res_vf));
-	}
-	/* start with a negative index */
-	rst.lidx = -1;
+		if (LIKELY((sym = mxArrayToString(prhs[i + 1U])) != NULL)) {
+			size_t ssz = strlen(sym);
 
-	/* and off we go */
-	if (nlhs <= 3) {
-		rst.raw = NULL;
-		gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
-	} else {
-		rst.raw = (void*)0xdeadU;
-		gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
-	}
-
-	/* now reset the matrices to their true dimensions */
-	rst.lidx = rst.ldat > 0 ? rst.lidx + 1 : 0;
-
-	plhs[0] = mxCreateDoubleMatrix(0, 1, mxREAL);
-	mxSetPr(plhs[0], rst.d);
-	mxSetM(plhs[0], rst.lidx);
-	if (nlhs > 1 && rst.ncol == 1) {
-		plhs[1] = mxCreateDoubleMatrix(0, rst.ncol, mxREAL);
-		mxSetPr(plhs[1], rst.v);
-		mxSetM(plhs[1], rst.lidx);
-	} else if (nlhs > 1) {
-		/* since matlab is col oriented, transpose the matrix */
-		double *pr;
-		plhs[1] = mxCreateDoubleMatrix(rst.lidx, rst.ncol, mxREAL);
-		pr = mxGetPr(plhs[1]);
-		for (size_t c = 0; c < rst.ncol; c++) {
-			for (size_t r = 0; r < rst.lidx; r++) {
-				size_t old_pos = r * rst.ncol + c;
-				size_t new_pos = c * rst.lidx + r;
-				pr[new_pos] = rst.v[old_pos];
+			if (LIKELY(ssz > 0U)) {
+				(void)intern(obsym, sym, ssz);
 			}
+			mxFree(sym);
 		}
-		mxFree(rst.v);
 	}
-	if (nlhs > 2) {
-		/* also bang the fields */
-		mwSize dim = rst.nvf;
-		mxArray *ca = plhs[2] = mxCreateCellArray(1, &dim);
 
-		if (rst.res_vf) {
-			for (size_t i = 0; i < rst.nvf; i++) {
-				mxArray *s = mxCreateString(rst.res_vf[i]);
-				mxSetCell(ca, i, s);
-				free(rst.res_vf[i]);
-			}
-			mxFree(rst.res_vf);
-		}
-	}
-	if (nlhs > 3) {
-		/* since matlab is col oriented, transpose the matrix */
-		mwSize dim[2] = {rst.lidx, rst.ncol};
-		mxArray *ap = plhs[3] = mxCreateCellArray(2, dim);
+	/* now create the result */
+	*plhs = mxCreateStructMatrix(1, 1, countof(_slots), _slots);
+	/* and an initial cell for the syms slot */
+	nsym = ninterns(obsym);
+	slots[0U] = mxCreateCellMatrix(nsym, 1U);
+	slots[1U] = mxCreateCellMatrix(nsym, 1U);
+	slots[2U] = mxCreateCellMatrix(nsym, 1U);
+	mxSetField(*plhs, 0, _slots[0U], slots[0U]);
+	mxSetField(*plhs, 0, _slots[1U], slots[1U]);
+	mxSetField(*plhs, 0, _slots[2U], slots[2U]);
 
-		for (size_t c = 0; c < rst.ncol; c++) {
-			for (size_t r = 0; r < rst.lidx; r++) {
-				size_t old_pos = r * rst.ncol + c;
-				size_t new_pos = c * rst.lidx + r;
-				mxArray *val = (void*)rst.raw[old_pos];
+	for (obint_t i = 1U; i <= nsym; i++, free_obarray(rst.obfld)) {
+		const char *sym = obint_name(obsym, i);
+		size_t nfld;
+		mxArray *xfld;
 
-				mxSetCell(ap, new_pos, val);
-			}
+		/* rinse */
+		memset(&rst, 0, sizeof(rst));
+		rst.obsym = obsym;
+		rst.obfld = make_obarray();
+		gand_get_series(hdl, sym, qcb, &rst);
+
+		if (UNLIKELY(!rst.osym)) {
+			continue;
 		}
-		mxFree(rst.raw);
-	}
-	if (rst.vf) {
-		for (size_t i = 0; i < rst.nvf; i++) {
-			mxFree(rst.vf[i]);
+		/* otherwise copy stuff into result struct,
+		 * use real sym string though */
+		sym = obint_name(obsym, rst.osym);
+		mxSetCell(slots[0U], i - 1U, mxCreateString(sym));
+
+		nfld = ninterns(rst.obfld);
+		xfld = mxCreateCellMatrix(nfld, 1U);
+		mxSetCell(slots[2U], i - 1U, xfld);
+		for (obint_t j = 1U; j <= nfld; j++) {
+			const char *fld = obint_name(rst.obfld, j);
+			mxSetCell(xfld, j - 1U, mxCreateString(fld));
 		}
-		mxFree(rst.vf);
+
+		xfld = mxCreateDoubleMatrix(rst.n, 3U, mxREAL);
+		mxSetCell(slots[1U], i - 1U, xfld);
+		with (double *restrict p = mxGetPr(xfld)) {
+			memcpy(p, rst.d, rst.n * sizeof(double));
+			memcpy(p + rst.n, rst.f, rst.n * sizeof(double));
+			memcpy(p + 2U * rst.n, rst.v, rst.n * sizeof(double));
+		}
 	}
-	mxFree(sym);
+
+	free_obarray(obsym);
 	return;
 }
 
