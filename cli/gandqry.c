@@ -46,10 +46,7 @@ main(int argc, char *argv[])
 	}
 	for (size_t i = 0U; i < argi->nargs; i++) {
 		npkt = 0;
-		gand_get_series(
-			g, argi->args[i],
-			argi->valflav_args, argi->valflav_nargs,
-			cb, NULL);
+		gand_get_series(g, argi->args[i], cb, NULL);
 		fprintf(stdout, "number of packets %zu\n", npkt);
 	}
 	gand_close(g);

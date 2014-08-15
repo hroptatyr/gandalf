@@ -435,7 +435,7 @@ find:
 int
 gand_get_series(
 	gand_ctx_t ug,
-	const char *sym, char *const valflav[], size_t nvalflav,
+	const char *sym,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
 	static const char hhdr[] = " HTTP/1.1\r\n\
@@ -453,26 +453,6 @@ User-Agent: gandapi\r\n\
 	gqlen = snprintf(
 		g->buf, g->bsz,
 		"GET /v0/series/%s?select=sym,d,vf,v&igncase", sym);
-
-	if (valflav == NULL || nvalflav == 0) {
-		;
-	} else {
-		static const char flt[] = "filter=";
-		memcpy(g->buf + gqlen, flt, sizeof(flt));
-		gqlen += countof(flt) - 1;
-		for (size_t i = 0; i < nvalflav; i++) {
-			const char *vf = valflav[i];
-			size_t vflen = strlen(vf);
-
-			if (UNLIKELY(gqlen + vflen >= g->bsz)) {
-				break;
-			}
-			memcpy(g->buf + gqlen, vf, vflen);
-			g->buf[gqlen += vflen] = ',';
-			gqlen++;
-		}
-		--gqlen;
-	}
 
 	/* insert the host header */
 	memcpy(g->buf + gqlen, hhdr, sizeof(hhdr) - 1);
