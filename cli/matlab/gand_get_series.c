@@ -131,40 +131,19 @@ check_resize(struct __recv_st_s *st)
 		memset(st->v + st->lidx * st->ncol, -1, RESIZE_STEP * row_sz);
 
 		/* also resize the raw array */
-		st->raw = mxRealloc(st->raw, new_sz);
-		memset(st->raw + st->lidx * st->ncol, 0, RESIZE_STEP * row_sz);
+		if (st->raw && st->raw != (void*)0xdeadU) {
+			st->raw = mxRealloc(st->raw, new_sz);
+			memset(st->raw + st->lidx * st->ncol,
+			       0, RESIZE_STEP * row_sz);
+		} else if (st->raw) {
+			st->raw = mxCalloc(new_sz, 1U);
+		}
 	}
 	return;
 }
 
 static int
 qcb(gand_res_t res, void *clo)
-{
-	struct __recv_st_s *st = clo;
-	int this_vf;
-
-	if (res->date > st->ldat) {
-		st->lidx++;
-		check_resize(st);
-		/* set the date */
-		st->d[st->lidx] = idate_to_daysi(st->ldat = res->date);
-	}
-
-	if (st->v &&
-	    (this_vf = find_valflav(res->valflav, st)) >= 0) {
-		/* we demand res->strval to be a double atm */
-		double tmp = strtod(res->strval, NULL);
-		/* also fill the second matrix */
-		st->v[st->lidx * st->ncol + this_vf] = tmp;
-		if (st->res_vf && st->res_vf[this_vf] == NULL) {
-			st->res_vf[this_vf] = strdup(res->valflav);
-		}
-	}
-	return 0;
-}
-
-static int
-qrawcb(gand_res_t res, void *clo)
 {
 	struct __recv_st_s *st = clo;
 	int this_vf;
@@ -236,9 +215,11 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 	/* and off we go */
 	if (nlhs <= 3) {
+		rst.raw = NULL;
 		gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
 	} else {
-		gand_get_series(hdl, sym, rst.vf, rst.nvf, qrawcb, &rst);
+		rst.raw = (void*)0xdeadU;
+		gand_get_series(hdl, sym, rst.vf, rst.nvf, qcb, &rst);
 	}
 
 	/* now reset the matrices to their true dimensions */
