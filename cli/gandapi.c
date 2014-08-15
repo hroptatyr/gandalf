@@ -133,6 +133,42 @@ init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
 	return 0;
 }
 
+static int
+make_conn(const char *srv)
+{
+	const int fam = PF_INET6;
+	const char *host = srv;
+	uint16_t port = 8624;
+	/* for the actual sockaddr */
+	struct sockaddr_storage sa = {0};
+	size_t sa_len = sizeof(sa);
+	/* to parse the service string */
+	char *p;
+	int s;
+
+	if ((p = strrchr(srv, ':')) != NULL) {
+		static char _host[256U];
+
+		port = strtoul(p + 1, NULL, 10) ?: 8624;
+		if (srv[0] == '[' && p[-1] == ']') {
+			memcpy(_host, srv + 1, p - srv - 2);
+			_host[p - srv - 2] = '\0';
+		} else {
+			memcpy(_host, srv, p - srv);
+			_host[p - srv] = '\0';
+		}
+		host = _host;
+	}
+	if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
+		return -1;
+	} else if ((s = socket(fam, SOCK_STREAM, 0)) < 0) {
+		return -1;
+	} else if (connect(s, (void*)&sa, sa_len) < 0) {
+		return -1;
+	}
+	return s;
+}
+
 
 /* parser goodies */
 static int
@@ -215,45 +251,25 @@ read_date(const char *str, char **restrict ptr)
 gand_ctx_t
 gand_open(const char *srv, int timeout)
 {
-	volatile int ns;
-	struct sockaddr_storage sa = {0};
-	size_t sa_len = sizeof(sa);
-	int fam;
 	struct __ctx_s *res;
-	/* to parse the service string */
-	char *p;
+	volatile int s;
+	volatile int es;
 
-	if ((p = strrchr(srv, ':')) == NULL) {
-		/* must be a unix socket then */
-		fam = PF_LOCAL;
-		;
-	} else {
-		uint16_t port = strtoul(p + 1, NULL, 10) ?: 8624;
-		char host[p - srv + 1];
-
-		fam = PF_INET6;
-		if (srv[0] == '[' && p[-1] == ']') {
-			memcpy(host, srv + 1, p - srv - 2);
-			host[p - srv - 2] = '\0';
-		} else {
-			memcpy(host, srv, p - srv);
-			host[p - srv] = '\0';
-		}
-		if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
-			return NULL;
-		}
-	}
-
-	if ((ns = socket(fam, SOCK_STREAM, 0)) < 0) {
+	/* get ourselves a connected socket */
+	if (UNLIKELY((s = make_conn(srv)) < 0)) {
 		return NULL;
-	} else if (connect(ns, (void*)&sa, sa_len) < 0) {
+	} else if (UNLIKELY((es = epoll_create1(0)) < 0)) {
+		close(s);
 		return NULL;
 	}
+	/* go for nonblocking mode early */
+	setsock_nonblock(es);
+	setsock_nonblock(s);
 
 	/* init structure */
 	res = calloc(1, sizeof(*res));
-	res->eps = epoll_create1(0);
-	res->gs = ns;
+	res->eps = es;
+	res->gs = s;
 	res->nev = countof(res->ev);
 
 	with (size_t zrv = strlen(srv)) {
@@ -263,16 +279,34 @@ gand_open(const char *srv, int timeout)
 
 	res->bsz = 16 * 4096;
 	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
-
 	res->timeo = timeout;
 
 	/* set up epoll */
-	setsock_nonblock(res->eps);
-	setsock_nonblock(res->gs);
-
-	/* setup event waiter */
 	ep_prep(res, res->gs, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
 	return res;
+}
+
+static int
+gand_reopen(gand_ctx_t ug)
+{
+	struct __ctx_s *g = ug;
+	volatile int s;
+
+	/* close old shit */
+	if (LIKELY(g->gs > 0)) {
+		ep_fini(g, g->gs);
+		shut_sock(g->gs);
+	}
+	/* just reopen the whole shebang */
+	if (UNLIKELY((s = make_conn(g->host)) < 0)) {
+		return -1;
+	}
+	/* and set him non-blocking again */
+	setsock_nonblock(s);
+
+	g->gs = s;
+	ep_prep(g, s, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
+	return 0;
 }
 
 void
@@ -302,6 +336,7 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 
 		/* we've only asked for one, so it would be peculiar */
 		assert(nfds == 1);
+		assert(fd == g->gs);
 
 		if (LIKELY(EV & EPOLLOUT)) {
 			ssize_t nwr;
@@ -311,7 +346,9 @@ gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
 			       (nwr = send(fd, qry + tot, qsz - tot, SF)) > 0) {
 				tot += nwr;
 			}
-			if (tot >= qsz) {
+			if (UNLIKELY(nwr < 0 && gand_reopen(g) < 0)) {
+				break;
+			} else if (tot >= qsz) {
 				g->idx = g->nrd = 0;
 				return 0;
 			}
