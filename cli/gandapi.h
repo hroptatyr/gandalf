@@ -35,8 +35,4 @@ gand_get_series(
 	const char *qry,
 	int(*)(gand_res_t, void *closure), void *closure);
 
-/* lower level stuff */
-extern int gand_send(gand_ctx_t g, const char *qry, size_t qsz);
-extern ssize_t gand_recv(gand_ctx_t g, const char **buf);
-
 #endif	/* INCLUDED_gandapi_h_ */
