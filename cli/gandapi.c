@@ -3,16 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-/* socket stuff */
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <netdb.h>
-/* epoll stuff */
-#include <sys/epoll.h>
-#include <fcntl.h>
 /* mmap stuff */
 #include <sys/mman.h>
+#include <curl/curl.h>
 /* our decls */
 #include "gandapi.h"
 
@@ -42,132 +35,17 @@
 typedef struct __ctx_s *__ctx_t;
 
 struct __ctx_s {
-	/* epoll socket */
-	int eps;
-	/* gand sock */
-	int gs;
+	/* curl context */
+	CURL *curl_ctx;
 	/* host name pointer */
 	char *host;
 	size_t hlen;
-	/* generic index */
-	uint32_t idx;
-	uint32_t nrd;
-	/* buffer */
-	char *buf;
-	size_t bsz;
-	/* timeout */
+	/* callback and closure pointer */
+	int(*_cb)(gand_res_t, void *cloptr);
+	void *cloptr;
+	/* timeout (in seconds now) */
 	int32_t timeo;
-	/* number of events in the following flex array */
-	int32_t nev;
-	/* flex array of events, 8b-aligned */
-	struct epoll_event ev[1];
-#define RX	0U
-#define TX	0U
 };
-
-
-/* gand details */
-static __attribute__((unused)) void
-setsock_nonblock(int sock)
-{
-	int opts;
-
-	/* get former options */
-	opts = fcntl(sock, F_GETFL);
-	if (opts < 0) {
-		return;
-	}
-	opts |= O_NONBLOCK;
-	(void)fcntl(sock, F_SETFL, opts);
-	return;
-}
-
-static void
-shut_sock(int s)
-{
-	shutdown(s, SHUT_RDWR);
-	close(s);
-	return;
-}
-
-#define STD_FLAGS	EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP
-
-static inline int
-ep_prep(__ctx_t g, int s, int flags)
-{
-	struct epoll_event ev = {
-		.events = flags,
-		.data.fd = s
-	};
-	/* add S to the epoll descriptor EPFD */
-	return epoll_ctl(g->eps, EPOLL_CTL_ADD, s, &ev);
-}
-
-static inline int
-ep_fini(__ctx_t g, int s)
-{
-	/* remove S from the epoll descriptor EPFD */
-	return epoll_ctl(g->eps, EPOLL_CTL_DEL, s, NULL);
-}
-
-static inline int
-ep_wait(__ctx_t g, int timeout)
-{
-	/* wait and return */
-	return epoll_wait(g->eps, g->ev, g->nev, timeout);
-}
-
-static int
-init_sockaddr(struct sockaddr *sa, size_t *len, const char *host, uint16_t port)
-{
-	struct hostent *hi;
-	struct sockaddr_in6 *n = (void*)sa;
-
-	n->sin6_family = AF_INET6;
-	n->sin6_port = htons(port);
-	if ((hi = gethostbyname2(host, AF_INET6)) == NULL) {
-		return -1;
-	}
-	memcpy(&n->sin6_addr, hi->h_addr, sizeof(n->sin6_addr));
-	*len = sizeof(*n);
-	return 0;
-}
-
-static int
-make_conn(const char *srv)
-{
-	const int fam = PF_INET6;
-	const char *host = srv;
-	uint16_t port = 8624;
-	/* for the actual sockaddr */
-	struct sockaddr_storage sa = {0};
-	size_t sa_len = sizeof(sa);
-	/* to parse the service string */
-	char *p;
-	int s;
-
-	if ((p = strrchr(srv, ':')) != NULL) {
-		static char _host[256U];
-
-		port = strtoul(p + 1, NULL, 10) ?: 8624;
-		if (srv[0] == '[' && p[-1] == ']') {
-			memcpy(_host, srv + 1, p - srv - 2);
-			_host[p - srv - 2] = '\0';
-		} else {
-			memcpy(_host, srv, p - srv);
-			_host[p - srv] = '\0';
-		}
-		host = _host;
-	}
-	if (init_sockaddr((void*)&sa, &sa_len, host, port) < 0) {
-		return -1;
-	} else if ((s = socket(fam, SOCK_STREAM, 0)) < 0) {
-		return -1;
-	} else if (connect(s, (void*)&sa, sa_len) < 0) {
-		return -1;
-	}
-	return s;
-}
 
 
 /* parser goodies */
@@ -182,6 +60,20 @@ xisspace(char tmp)
 	default:
 		return 0;
 	}
+}
+
+static size_t
+xstrlncpy(char *restrict dst, size_t dsz, const char *src, size_t ssz)
+{
+	if (ssz > dsz) {
+		if (UNLIKELY(dsz > 0U)) {
+			return 0U;
+		}
+		ssz = dsz - 1U;
+	}
+	memcpy(dst, src, ssz);
+	dst[ssz] = '\0';
+	return ssz;
 }
 
 static char*
@@ -243,6 +135,59 @@ read_date(const char *str, char **restrict ptr)
 	return res;
 }
 
+static size_t
+_data_cb(void *buf, size_t chrz, size_t nchr, void *clo)
+{
+	const struct __ctx_s *g = clo;
+	const char *const bp = buf;
+	const size_t nrd = chrz * nchr;
+	size_t i = 0U;
+
+	/* unparse the buffer and call the callback */
+	for (char *eol;
+	     (eol = memchr(bp + i, '\n', nrd - i)) != NULL;
+	     i = eol - bp + 1U) {
+		struct gand_res_s r;
+		const char *pp = bp + i;
+		char *p;
+
+		/* demark the eol */
+		*eol = '\0';
+
+		/* find end of symbol */
+		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+			continue;
+		}
+		*p = '\0';
+		r.symbol = pp;
+		pp = p + 1U;
+
+		/* p + 1 has the date now */
+		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+			continue;
+		}
+		*p = '\0';
+		r.date = read_date(pp, NULL);
+		pp = p + 1U;
+
+		/* p + 1 is the valflav */
+		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+			continue;
+		}
+		*p = '\0';
+		r.valflav = pp;
+		pp = p + 1U;
+
+		/* and finally the value
+		 * stretches all the way to EOL which is \nul'd already */
+		r.strval = pp;
+
+		/* do the call */
+		g->_cb(&r, g->cloptr);
+	}
+	return i;
+}
+
 
 /* exported functions */
 #define PROT_MEM		(PROT_READ | PROT_WRITE)
@@ -252,184 +197,35 @@ gand_ctx_t
 gand_open(const char *srv, int timeout)
 {
 	struct __ctx_s *res;
-	volatile int s;
-	volatile int es;
+	CURL *ctx;
 
-	/* get ourselves a connected socket */
-	if (UNLIKELY((s = make_conn(srv)) < 0)) {
-		return NULL;
-	} else if (UNLIKELY((es = epoll_create1(0)) < 0)) {
-		close(s);
+	/* try and get a curl easy handle */
+	if (UNLIKELY((ctx = curl_easy_init()) == NULL)) {
 		return NULL;
 	}
-	/* go for nonblocking mode early */
-	setsock_nonblock(es);
-	setsock_nonblock(s);
 
 	/* init structure */
 	res = calloc(1, sizeof(*res));
-	res->eps = es;
-	res->gs = s;
-	res->nev = countof(res->ev);
+	res->curl_ctx = ctx;
 
 	with (size_t zrv = strlen(srv)) {
 		res->host = strndup(srv, zrv);
 		res->hlen = zrv;
 	}
 
-	res->bsz = 16 * 4096;
-	res->buf = mmap(NULL, res->bsz, PROT_MEM, MAP_MEM, 0, 0);
-	res->timeo = timeout;
-
-	/* set up epoll */
-	ep_prep(res, res->gs, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
+	res->timeo = timeout > 0 ? (timeout - 1) / 1000 + 1 : 0;
 	return res;
-}
-
-static int
-gand_reopen(gand_ctx_t ug)
-{
-	struct __ctx_s *g = ug;
-	volatile int s;
-
-	/* close old shit */
-	if (LIKELY(g->gs > 0)) {
-		ep_fini(g, g->gs);
-		shut_sock(g->gs);
-	}
-	/* just reopen the whole shebang */
-	if (UNLIKELY((s = make_conn(g->host)) < 0)) {
-		return -1;
-	}
-	/* and set him non-blocking again */
-	setsock_nonblock(s);
-
-	g->gs = s;
-	ep_prep(g, s, STD_FLAGS | EPOLLET | EPOLLIN | EPOLLOUT);
-	return 0;
 }
 
 void
 gand_close(gand_ctx_t ug)
 {
 	struct __ctx_s *g = ug;
-	/* stop waiting for events */
-	ep_fini(g, g->gs);
-	shut_sock(g->gs);
-	shut_sock(g->eps);
-	munmap(g->buf, g->bsz);
+
+	curl_easy_cleanup(g->curl_ctx);
 	free(g->host);
 	free(g);
 	return;
-}
-
-int
-gand_send(gand_ctx_t ug, const char *qry, size_t qsz)
-{
-	__ctx_t g = ug;
-	int nfds __attribute__((unused)) = 1;
-
-	do {
-#define EV	(g->ev[TX].events)
-#define SF	(MSG_NOSIGNAL)
-		int fd = g->ev[TX].data.fd;
-
-		/* we've only asked for one, so it would be peculiar */
-		assert(nfds == 1);
-		assert(fd == g->gs);
-
-		if (LIKELY(EV & EPOLLOUT)) {
-			ssize_t nwr;
-			size_t tot = 0;
-
-			while (tot < qsz &&
-			       (nwr = send(fd, qry + tot, qsz - tot, SF)) > 0) {
-				tot += nwr;
-			}
-			if (UNLIKELY(nwr < 0 && gand_reopen(g) < 0)) {
-				break;
-			} else if (tot >= qsz) {
-				g->idx = g->nrd = 0;
-				return 0;
-			}
-
-		} else if (EV & EPOLLIN) {
-			/* leave input for the next gand_recv() call */
-			;
-
-		} else if (EV == 0) {
-			/* state unknown, better poll */
-
-		} else {
-			break;
-		}
-#undef SF
-#undef EV
-	} while ((nfds = ep_wait(g, g->timeo)) > 0);
-	return -1;
-}
-
-ssize_t
-gand_recv(gand_ctx_t ug, const char **buf)
-{
-/* coroutine */
-	__ctx_t g = ug;
-	int nfds __attribute__((unused)) = 1;
-
-find:
-	if (g->idx < g->nrd) {
-		char *p = memchr(g->buf + g->idx, '\n', g->nrd - g->idx);
-		if (p) {
-			size_t res = p - (g->buf + g->idx);
-			*p = '\0';
-			*buf = g->buf + g->idx;
-			g->idx += res + 1;
-			return res;
-		}
-		/* memmove what we've got */
-		memmove(g->buf, g->buf + g->idx, g->nrd - g->idx);
-		g->nrd -= g->idx;
-		g->idx = 0;
-
-	} else if (g->idx > 0) {
-		/* message has been finished prematurely, we assume thats it
-		 * ATTENTION this might go wrong if the total message size
-		 * is divisible by the buffer size, in which case we wait
-		 * for another SRV_TIMEOUT millis, a well */
-		g->idx = g->nrd = 0;
-		g->timeo = 10;
-	}
-
-	do {
-#define EV	(g->ev[RX].events)
-		int fd = g->ev[RX].data.fd;
-
-		/* we've only asked for one, so it would be peculiar */
-		assert(nfds == 1);
-
-		if (LIKELY(EV & EPOLLIN)) {
-			ssize_t nrd;
-
-			if ((nrd = read(
-				     fd,
-				     g->buf + g->nrd, g->bsz - g->nrd)) > 0) {
-				g->nrd += nrd;
-				goto find;
-			} else if (nrd == 0) {
-				/* ah, eo-msg */
-				*buf = NULL;
-				return -1;
-			}
-		} else if (EV & EPOLLOUT) {
-			/* do nothing */
-			;
-		} else {
-			return -1;
-		}
-#undef EV
-	} while ((nfds = ep_wait(g, g->timeo)) > 0);
-	/* rinse */
-	return -1;
 }
 
 int
@@ -438,69 +234,37 @@ gand_get_series(
 	const char *sym,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
-	static const char hhdr[] = " HTTP/1.1\r\n\
-Host: ";
-	static const char rhdr[] = "\r\n\
-Connection: keep-alive\r\n\
-User-Agent: gandapi\r\n\
-\r\n";
+	char buf[256U];
 	struct __ctx_s *g = ug;
-	/* we just use g's buffer to offload our query */
-	size_t gqlen;
-	/* result buffer */
-	const char *rb;
 
-	gqlen = snprintf(
-		g->buf, g->bsz,
-		"GET /v0/series/%s?select=sym,d,vf,v&igncase", sym);
-
-	/* insert the host header */
-	memcpy(g->buf + gqlen, hhdr, sizeof(hhdr) - 1);
-	gqlen += sizeof(hhdr) - 1;
-	memcpy(g->buf + gqlen, g->host, g->hlen);
-	gqlen += g->hlen;
-
-	/* copy the rest of the header */
-	memcpy(g->buf + gqlen, rhdr, sizeof(rhdr) - 1);
-	gqlen += sizeof(rhdr) - 1;
-
-	/* query is ready now */
-	if (gand_send(g, g->buf, gqlen) < 0) {
-		return -1;
+	/* set up our own context first */
+	if (LIKELY(qcb != NULL)) {
+		g->_cb = qcb;
+		g->cloptr = closure;
 	}
 
-	while (gand_recv(g, &rb) > 0) {
-		struct gand_res_s res;
-		char *p;
-
-		/* find end of symbol */
-		if (UNLIKELY((p = strchr(rb, '\t')) == NULL)) {
-			continue;
+	/* reuse g's BUF to write the query string */
+	with (size_t z) {
+		if (UNLIKELY(!(z = xstrlncpy(
+				       buf, sizeof(buf), g->host, g->hlen)))) {
+			return -1;
 		}
-		*p = '\0';
-		res.symbol = rb;
-
-		/* p + 1 has the date now */
-		if (UNLIKELY((p = strchr((rb = p + 1), '\t')) == NULL)) {
-			continue;
+		if (buf[z - 1U] != '/') {
+			buf[z++] = '/';
 		}
-		*p = '\0';
-		res.date = read_date(rb, NULL);
+		z += snprintf(
+			buf + z, sizeof(buf) - z,
+			"v0/series/%s?select=sym,d,vf,v&igncase", sym);
+	}
 
-		/* p + 1 is the valflav */
-		if (UNLIKELY((p = strchr((rb = p + 1), '\t')) == NULL)) {
-			continue;
-		}
-		*p = '\0';
-		res.valflav = rb;
-
-		/* and finally the value */
-		p = strchrnul((rb = p + 1), '\n');
-		*p = '\0';
-		res.strval = rb;
-
-		/* do the call */
-		qcb(&res, closure);
+	/* hand-over to libcurl */
+	curl_easy_setopt(g->curl_ctx, CURLOPT_URL, buf);
+	curl_easy_setopt(g->curl_ctx, CURLOPT_WRITEFUNCTION, _data_cb);
+	curl_easy_setopt(g->curl_ctx, CURLOPT_WRITEDATA, g);
+	curl_easy_setopt(g->curl_ctx, CURLOPT_NOSIGNAL, 1);
+	curl_easy_setopt(g->curl_ctx, CURLOPT_TIMEOUT, g->timeo);
+	if (curl_easy_perform(g->curl_ctx) != CURLE_OK) {
+		return -1;
 	}
 	return 0;
 }

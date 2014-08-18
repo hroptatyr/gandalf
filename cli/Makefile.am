@@ -15,6 +15,10 @@ endif
 if BUILD_CLIAPPS
 noinst_LTLIBRARIES = libgandapi.la
 libgandapi_la_SOURCES = gandapi.c gandapi.h
+libgandapi_la_CPPFLAGS = $(AM_CPPFLAGS)
+libgandapi_la_CPPFLAGS += $(curl_CFLAGS)
+libgandapi_la_LDFLAGS = $(AM_LDFLAGS)
+libgandapi_la_LDFLAGS += $(curl_LIBS)
 
 noinst_PROGRAMS = gandqry
 gandqry_SOURCES = gandqry.c
