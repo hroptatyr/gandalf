@@ -58,6 +58,10 @@ AM_CONDITIONAL([HAVE_ZLIB], [test "${ac_cv_header_zlib_h}" = "yes"])
 SXE_CHECK_LIBEV
 AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
+## check for libcurl (critical for gandapi)
+PKG_CHECK_MODULES([curl], [libcurl >= 7.0.0], [have_curl="yes"], [have_curl="no"])
+AM_CONDITIONAL([HAVE_CURL], [test "${have_curl}" = "yes"])
+
 ## check for lua, critical
 PKG_CHECK_MODULES([lua], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
@@ -88,7 +92,7 @@ AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
-	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
+	[enable_cliapps="${enableval}"], [enable_cliapps="${have_curl}"])
 
 AC_ARG_WITH([matlab], [
 AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
