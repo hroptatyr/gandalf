@@ -519,6 +519,7 @@ typedef enum {
 	EP_UNK,
 	EP_V0_SERIES,
 	EP_V0_SOURCES,
+	EP_V0_FILES,
 	EP_V0_MAIN,
 } gand_ep_t;
 
@@ -544,6 +545,7 @@ static const char *const _ofs[] = {
 
 static const char _eps_V0_SERIES[] = "/v0/series";
 static const char _eps_V0_SOURCES[] = "/v0/sources";
+static const char _eps_V0_FILES[] = "/v0/files";
 #define EP(_x_)		(_eps_ ## _x_)
 
 static gand_ep_t
@@ -559,6 +561,10 @@ __gand_ep(const char *s, size_t z)
 		;
 	} else if (!memcmp(EP(V0_SOURCES), s, sizeof(EP(V0_SOURCES)) - 1U)) {
 		return EP_V0_SOURCES;
+	} else if (z < sizeof(EP(V0_FILES)) - 1U) {
+		;
+	} else if (!memcmp(EP(V0_FILES), s, sizeof(EP(V0_FILES)) - 1U)) {
+		return EP_V0_FILES;
 	}
 	return EP_UNK;
 }
@@ -815,6 +821,44 @@ interr:
 }
 
 static gand_httpd_res_t
+work_fil(gand_httpd_req_t req)
+{
+	const char *fn;
+	struct stat st;
+	int fd;
+
+	if ((fn = req.path + sizeof(EP(V0_FILES)))[-1] != '/') {
+		static const char errmsg[] = "Bad Request\n";
+
+		GAND_INFO_LOG(":rsp [400 Bad request]");
+		return (gand_httpd_res_t){
+			.rc = 400U/*BAD REQUEST*/,
+			.ctyp = OF(UNK),
+			.clen = sizeof(errmsg)- 1U,
+			.rd = {DTYP_DATA, errmsg},
+		};
+	} else if (UNLIKELY(fstatat(trolf_dirfd, fn, &st, 0) < 0)) {
+	} else if (UNLIKELY((fd = openat(trolf_dirfd, fn, O_RDONLY)) < 0)) {
+		static const char errmsg[] = "File not found\n";
+
+		GAND_INFO_LOG(":rsp [409 Conflict]: File not found");
+		return (gand_httpd_res_t){
+			.rc = 409U/*CONFLICT*/,
+			.ctyp = OF(UNK),
+			.clen = sizeof(errmsg)- 1U,
+			.rd = {DTYP_DATA, errmsg},
+		};
+	}
+
+	return (gand_httpd_res_t){
+		.rc = 200U/*OK*/,
+		.ctyp = OF(UNK),
+		.clen = st.st_size,
+		.rd = {DTYP_SOCK, .sock = fd},
+	};
+}
+
+static gand_httpd_res_t
 work_src(gand_httpd_req_t req)
 {
 	gandfn_t fb;
@@ -930,6 +974,8 @@ work(gand_httpd_req_t req)
 		return work_ser(req);
 	case EP_V0_SOURCES:
 		return work_src(req);
+	case EP_V0_FILES:
+		return work_fil(req);
 	case EP_V0_MAIN:
 		GAND_INFO_LOG(":rsp [200 OK]");
 		return (gand_httpd_res_t){

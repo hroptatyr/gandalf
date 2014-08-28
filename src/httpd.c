@@ -510,10 +510,26 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		x->o = 0U;
 		x->fd = fd;
 		break;
+
+	case DTYP_SOCK:
+		fd = r.rd.sock;
+		if ((x->z = r.clen) == CLEN_UNKNOWN) {
+			if (fstat(fd, &st) < 0) {
+				goto fail;
+			} else if (st.st_size < 0) {
+				goto fail;
+			}
+		}
+		/* enqueue now */
+		x->o = 0U;
+		x->fd = fd;
+		break;
+
 	fail:
-		/* no leakage */
+		/* no leakage, for socket based responses */
 		close(fd);
 		return -1;
+
 	case DTYP_DATA:
 		x->z = r.clen;
 		x->o = 0U;
@@ -570,6 +586,7 @@ _deq_resp(struct gand_conn_s *restrict c)
 		(void)unlink(x->res.rd.file);
 		/*@fallthrough@*/
 	case DTYP_FILE:
+	case DTYP_SOCK:
 		/* close the source descriptor in either case */
 		close(x->fd);
 		break;
@@ -699,6 +716,7 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 
 	case DTYP_FILE:
 	case DTYP_TMPF:
+	case DTYP_SOCK:
 		z = sendfile(fd, x->fd, &x->o, x->z);
 		break;
 	case DTYP_DATA:
