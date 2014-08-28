@@ -64,6 +64,9 @@ typedef struct {
 /* just an ordinary pointer but managed by ourselves. */
 typedef struct gand_gbuf_s *gand_gbuf_t;
 
+/* just wrap the OS's file descriptors */
+typedef int gand_sock_t;
+
 /* response data type */
 typedef enum gand_dtyp_e gand_dtyp_t;
 
@@ -76,6 +79,9 @@ typedef struct {
 		DTYP_FILE,
 		/* like DTYP_FILE but remove the file after transmission */
 		DTYP_TMPF,
+		/* send contents of file descriptor, close after use */
+		DTYP_SOCK,
+
 		/* send contents of buffer DATA,
 		 * this should be static or otherwise managed because
 		 * there will be no dtor calls or other forms of notification
@@ -88,6 +94,7 @@ typedef struct {
 	union {
 		const void *ptr;
 		const char *file;
+		gand_sock_t sock;
 		const char *data;
 		gand_gbuf_t gbuf;
 	};
