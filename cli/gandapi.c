@@ -34,7 +34,7 @@
 
 typedef struct __ctx_s *__ctx_t;
 
-struct __ctx_s {
+struct gand_ctx_s {
 	/* curl context */
 	CURL *curl_ctx;
 	/* host name pointer */
@@ -138,7 +138,7 @@ read_date(const char *str, char **restrict ptr)
 static size_t
 _data_cb(void *buf, size_t chrz, size_t nchr, void *clo)
 {
-	const struct __ctx_s *g = clo;
+	const struct gand_ctx_s *g = clo;
 	const char *const bp = buf;
 	const size_t nrd = chrz * nchr;
 	size_t i = 0U;
@@ -196,7 +196,7 @@ _data_cb(void *buf, size_t chrz, size_t nchr, void *clo)
 gand_ctx_t
 gand_open(const char *srv, int timeout)
 {
-	struct __ctx_s *res;
+	struct gand_ctx_s *res;
 	CURL *ctx;
 
 	/* don't allow NULL hosts */
@@ -223,24 +223,27 @@ gand_open(const char *srv, int timeout)
 }
 
 void
-gand_close(gand_ctx_t ug)
+gand_close(gand_ctx_t g)
 {
-	struct __ctx_s *g = ug;
-
 	curl_easy_cleanup(g->curl_ctx);
 	free(g->host);
 	free(g);
 	return;
 }
 
+const char*
+gand_service(gand_ctx_t g)
+{
+	return g->host;
+}
+
 int
 gand_get_series(
-	gand_ctx_t ug,
+	gand_ctx_t g,
 	const char *sym,
 	int(*qcb)(gand_res_t, void *closure), void *closure)
 {
 	char buf[256U];
-	struct __ctx_s *g = ug;
 
 	/* set up our own context first */
 	if (LIKELY(qcb != NULL)) {

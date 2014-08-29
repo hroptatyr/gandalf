@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-typedef void *gand_ctx_t;
+typedef struct gand_ctx_s *gand_ctx_t;
 typedef struct gand_res_s *gand_res_t;
 typedef uint32_t idate_t;
 
@@ -26,6 +26,10 @@ extern gand_ctx_t gand_open(const char *srv, int timeout);
 /**
  * Close a gandalf connection, and free associated resources. */
 extern void gand_close(gand_ctx_t);
+
+/**
+ * Return the service string as handed in to gand_open(). */
+extern const char *gand_service(gand_ctx_t);
 
 /**
  * Query the gandalf server. */
