@@ -824,7 +824,6 @@ static gand_httpd_res_t
 work_fil(gand_httpd_req_t req)
 {
 	const char *fn;
-	struct stat st;
 	int fd;
 
 	if ((fn = req.path + sizeof(EP(V0_FILES)))[-1] != '/') {
@@ -837,7 +836,6 @@ work_fil(gand_httpd_req_t req)
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
-	} else if (UNLIKELY(fstatat(trolf_dirfd, fn, &st, 0) < 0)) {
 	} else if (UNLIKELY((fd = openat(trolf_dirfd, fn, O_RDONLY)) < 0)) {
 		static const char errmsg[] = "File not found\n";
 
@@ -853,7 +851,6 @@ work_fil(gand_httpd_req_t req)
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = OF(UNK),
-		.clen = st.st_size,
 		.rd = {DTYP_SOCK, .sock = fd},
 	};
 }
