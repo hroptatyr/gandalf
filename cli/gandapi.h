@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-typedef void *gand_ctx_t;
+typedef struct gand_ctx_s *gand_ctx_t;
 typedef struct gand_res_s *gand_res_t;
 typedef uint32_t idate_t;
 
