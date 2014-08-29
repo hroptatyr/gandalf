@@ -177,6 +177,30 @@ qcb(gand_res_t res, void *clo)
 }
 
 
+static mxArray*
+mx_create_expand_string(const char *raw, size_t rz, const char *srv, size_t sz)
+{
+	mxArray *res;
+	mwSize len;
+
+	if (*raw != '/') {
+		/* just create the string */
+		return mxCreateString(raw);
+	}
+
+	/* otherwise put http://SRV in front of it */
+	len = 7U/*http*/ + sz + rz;
+	res = mxCreateCharArray(2, (mwSize[]){1, len});
+
+	/* assemble the string */
+	with (mxChar *restrict p = mxGetChars(res)) {
+		p += mxcharcpy(p, "http://", 7U);
+		p += mxcharcpy(p, srv, sz);
+		p += mxcharcpy(p, raw, rz);
+	}
+	return res;
+}
+
 void
 mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -185,6 +209,8 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	};
 	/* state for retrieval */
 	struct __recv_clo_s rst = {.z = 0U};
+	const char *srv;
+	size_t zrv;
 	gand_ctx_t hdl;
 	mxArray *slots[countof(_slots)];
 	size_t nsym;
@@ -194,6 +220,9 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		return;
 	} else if ((hdl = gmx_get_handle(prhs[0])) == NULL) {
 		mexErrMsgTxt("gandalf handle seems buggered");
+		return;
+	} else if ((srv = gand_service(hdl)) == NULL || !(zrv = strlen(srv))) {
+		mexErrMsgTxt("gandalf service seems buggered");
 		return;
 	} else if (nrhs == 1) {
 		mexErrMsgTxt("no symbol given\n");
@@ -267,21 +296,9 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		for (obint_t j = 1U; j <= nraw; j++) {
 			const char *raw = obint_name(rst.obraw, j);
 			const size_t rz = strlen(raw);
-			const char *srv = gand_service(hdl);
-			const size_t sz = strlen(srv);
-			mxArray *x;
-			mwSize len;
+			mxArray *x = mx_create_expand_string(raw, rz, srv, zrv);
 
-			len = 7U/*http*/ + sz + rz;
-			x = mxCreateCharArray(2, (mwSize[]){1, len});
 			mxSetCell(xraw, j - 1U, x);
-
-			/* assemble the string */
-			with (mxChar *restrict p = mxGetChars(x)) {
-				p += mxcharcpy(p, "http://", 7U);
-				p += mxcharcpy(p, srv, sz);
-				p += mxcharcpy(p, raw, rz);
-			}
 		}
 
 		n = rst.n;
