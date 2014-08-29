@@ -340,7 +340,7 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 	} else if (UNLIKELY(r.sym.z + 1U/*\t*/ +
 			    r.dat.z + 1U/*\t*/ +
 			    r.vrb.z + 1U/*\t*/ +
-			    r.val.z + 4U/*replacements*/ + 1U/*\n*/ >= z)) {
+			    r.val.z + 1U/*\n*/ >= z)) {
 		/* request a bigger buffer */
 		return -2;
 	}
@@ -365,16 +365,8 @@ filter_csv(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 	sp += r.vrb.z;
 	*sp++ = '\t';
 
-	/* intercept file:// values */
-	if (r.val.z <= 7U || memcmp(r.val.s, "file://", 7U)) {
-		memcpy(sp, r.val.s, r.val.z);
-		sp += r.val.z;
-	} else {
-		static const char rplc[] = "/v0/files";
-		memcpy(sp, rplc, sizeof(rplc) - 1U);
-		memcpy(sp + sizeof(rplc) - 1U, r.val.s + 6U, r.val.z - 6U);
-		sp += r.val.z - 6U + sizeof(rplc) - 1U;
-	}
+	memcpy(sp, r.val.s, r.val.z);
+	sp += r.val.z;
 	*sp++ = '\n';
 
 	return sp - scratch;
@@ -452,8 +444,6 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 	/* definitely need the verb and value space */
 	spc_needed += r.vrb.z + 2U/*quot*/ + sizeof("    {\"vrb\":}");
 	spc_needed += r.val.z + 2U/*quot*/ + sizeof("    {\"val\":}");
-	/* extra space for possible substitutions in value field */
-	spc_needed += 4U;
 
 	if (UNLIKELY(spc_needed + 3U/*separators*/ >= z)) {
 		/* request a bigger buffer */
@@ -514,13 +504,7 @@ filter_json(char *restrict scratch, size_t z, struct rln_s r, flt_t f)
 	*sp++ = '{';
 	sp += LITCPY(sp, "\"value\":");
 	*sp++ = '"';
-	/* intercept file:// values */
-	if (r.val.z <= 7U || memcmp(r.val.s, "file://", 7U)) {
-		sp += BUFCPY(sp, r.val.s, r.val.z);
-	} else {
-		sp += LITCPY(sp, "/v0/files");
-		sp += BUFCPY(sp, r.val.s + 6U, r.val.z - 6U);
-	}
+	sp += BUFCPY(sp, r.val.s, r.val.z);
 	*sp++ = '"';
 	*sp++ = '}';
 
