@@ -359,8 +359,6 @@ cmpr_gbuf(gand_gbuf_t gb, enum gand_cmpr_e cl)
 		.avail_in = gb->ibuf,
 		.total_in = 0UL,
 
-		.next_out = gb->data,
-		.avail_out = gb->zbuf,
 		.total_out = 0UL,
 
 		.zalloc = Z_NULL,
@@ -381,15 +379,37 @@ cmpr_gbuf(gand_gbuf_t gb, enum gand_cmpr_e cl)
 	if (UNLIKELY(rc != Z_OK)) {
 		return -1;
 	}
+	/* reset the length of our gbuf */
+	gb->ibuf = 0UL;
 	/* here's the actual compression, do it all in one go */
-	if ((rc = deflate(&zstr, Z_FINISH)) < 0) {
-		return -1;
-	}
-	gb->ibuf = zstr.total_out;
+	do {
+		unsigned char b[4096U];
+		size_t n;
+
+		zstr.next_out = b;
+		zstr.avail_out = sizeof(b);
+		if ((rc = deflate(&zstr, Z_FINISH)) < 0) {
+			break;
+		} else if ((n = sizeof(b) - zstr.avail_out) > zstr.total_in) {
+			/* uh oh, we actually inflated the stream,
+			 * best to go then and leave the whole shebang
+			 * uncompressed */
+			if (!gb->ibuf) {
+				/* re-establish the original size iff
+				 * we haven't copied anything yet */
+				gb->ibuf = zstr.avail_in + zstr.total_in;
+			}
+			break;
+		}
+
+		/* copy back to our buffer */
+		memcpy(gb->data + gb->ibuf, b, n);
+		gb->ibuf += n;
+	} while (zstr.avail_out == 0U);
 
 	/* finalise, return code doesn't matter */
 	(void)deflateEnd(&zstr);
-	return 0;
+	return rc;
 }
 #endif	/* HAVE_ZLIB_H */
 
