@@ -224,27 +224,14 @@ get_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
 	s = librdf_new_node_from_uri_string(w, rs);
 	p = librdf_new_node_from_uri_string(w, _v);
 
-#if 0
-	librdf_statement *st = librdf_new_statement(w);
-	librdf_statement_set_subject(st, s);
-	librdf_statement_set_predicate(st, p);
-	librdf_stream *res;
-	for (res = librdf_model_find_statements(m, st);
-	     res != NULL && !librdf_stream_end(res); librdf_stream_next(res)) {
-		librdf_statement *tgt = librdf_stream_get_object(res);
+	with (librdf_node *res = librdf_model_get_target(m, s, p)) {
+		if (res != NULL) {
+			const unsigned char *val =
+				librdf_node_get_literal_value(res);
 
-		librdf_statement_print(tgt, stdout);
-		fputc('\n', stdout);
+			rid = strtoul((const char*)val, NULL, 10);
+		}
 	}
-	librdf_free_statement(st);
-#else
-	librdf_iterator *res;
-	for (res = librdf_model_get_targets(m, s, p);
-	     res != NULL && !librdf_iterator_end(res); librdf_iterator_next(res)) {
-		librdf_node *tgt = librdf_iterator_get_object(res);
-		rid = strtoul(librdf_node_get_literal_value(tgt), NULL, 10);
-	}
-#endif
 	return rid;
 }
 
