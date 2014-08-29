@@ -104,16 +104,6 @@ idate_to_daysi(idate_t dt)
 	return res + 700170;
 }
 
-static size_t
-mxcharcpy(mxChar *restrict tgt, const char *src, size_t len)
-{
-	mxChar *restrict tp = tgt;
-	for (; len > 0 && *src; len--) {
-		*tp++ = *src++;
-	}
-	return tp - tgt;
-}
-
 
 #define RESIZE_STEP	(1024)
 
@@ -177,30 +167,6 @@ qcb(gand_res_t res, void *clo)
 }
 
 
-static mxArray*
-mx_create_expand_string(const char *raw, size_t rz, const char *srv, size_t sz)
-{
-	mxArray *res;
-	mwSize len;
-
-	if (*raw != '/') {
-		/* just create the string */
-		return mxCreateString(raw);
-	}
-
-	/* otherwise put http://SRV in front of it */
-	len = 7U/*http*/ + sz + rz;
-	res = mxCreateCharArray(2, (mwSize[]){1, len});
-
-	/* assemble the string */
-	with (mxChar *restrict p = mxGetChars(res)) {
-		p += mxcharcpy(p, "http://", 7U);
-		p += mxcharcpy(p, srv, sz);
-		p += mxcharcpy(p, raw, rz);
-	}
-	return res;
-}
-
 void
 mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -295,10 +261,7 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		mxSetCell(slots[3U], i - 1U, xraw);
 		for (obint_t j = 1U; j <= nraw; j++) {
 			const char *raw = obint_name(rst.obraw, j);
-			const size_t rz = strlen(raw);
-			mxArray *x = mx_create_expand_string(raw, rz, srv, zrv);
-
-			mxSetCell(xraw, j - 1U, x);
+			mxSetCell(xraw, j - 1U, mxCreateString(raw));
 		}
 
 		n = rst.n;
