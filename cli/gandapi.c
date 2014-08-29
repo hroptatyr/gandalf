@@ -199,6 +199,11 @@ gand_open(const char *srv, int timeout)
 	struct __ctx_s *res;
 	CURL *ctx;
 
+	/* don't allow NULL hosts */
+	if (UNLIKELY(srv == NULL)) {
+		return NULL;
+	}
+
 	/* try and get a curl easy handle */
 	if (UNLIKELY((ctx = curl_easy_init()) == NULL)) {
 		return NULL;
