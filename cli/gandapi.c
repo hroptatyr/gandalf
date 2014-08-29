@@ -268,6 +268,7 @@ gand_get_series(
 	curl_easy_setopt(g->curl_ctx, CURLOPT_WRITEDATA, g);
 	curl_easy_setopt(g->curl_ctx, CURLOPT_NOSIGNAL, 1);
 	curl_easy_setopt(g->curl_ctx, CURLOPT_TIMEOUT, g->timeo);
+	curl_easy_setopt(g->curl_ctx, CURLOPT_ENCODING, "gzip");
 	if (curl_easy_perform(g->curl_ctx) != CURLE_OK) {
 		return -1;
 	}
