@@ -40,7 +40,13 @@ libgand_la_CPPFLAGS += $(dict_CFLAGS)
 libgand_la_LDFLAGS = $(AM_LDFLAGS)
 libgand_la_LDFLAGS += $(cfg_LIBS) $(dict_LIBS)
 dict_CFLAGS = $(tokyocabinet_CFLAGS)
+dict_CFLAGS += $(shell pkg-config --cflags rasqal)
+dict_CFLAGS += $(shell pkg-config --cflags raptor2)
+dict_CFLAGS += $(shell pkg-config --cflags redland)
 dict_LIBS = $(tokyocabinet_LIBS)
+dict_LIBS += $(shell pkg-config --libs rasqal)
+dict_LIBS += $(shell pkg-config --libs raptor2)
+dict_LIBS += $(shell pkg-config --libs redland)
 
 ## our own take on a http server
 noinst_LTLIBRARIES += libbeef.la
