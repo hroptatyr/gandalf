@@ -28,6 +28,10 @@ extern gand_ctx_t gand_open(const char *srv, int timeout);
 extern void gand_close(gand_ctx_t);
 
 /**
+ * Return the service string as handed in to gand_open(). */
+extern const char *gand_service(gand_ctx_t);
+
+/**
  * Query the gandalf server. */
 extern int
 gand_get_series(

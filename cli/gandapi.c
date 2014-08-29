@@ -231,6 +231,12 @@ gand_close(gand_ctx_t g)
 	return;
 }
 
+const char*
+gand_service(gand_ctx_t g)
+{
+	return g->host;
+}
+
 int
 gand_get_series(
 	gand_ctx_t g,
