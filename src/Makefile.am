@@ -68,8 +68,14 @@ gandaux_SOURCES += version.h version.c
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += -DHAVE_VERSION_H
 gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandaux_CPPFLAGS += $(shell pkg-config --cflags rasqal)
+gandaux_CPPFLAGS += $(shell pkg-config --cflags raptor2)
+gandaux_CPPFLAGS += $(shell pkg-config --cflags redland)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
 gandaux_LDFLAGS += $(tokyocabinet_LIBS)
+gandaux_LDFLAGS += $(shell pkg-config --libs rasqal)
+gandaux_LDFLAGS += $(shell pkg-config --libs raptor2)
+gandaux_LDFLAGS += $(shell pkg-config --libs redland)
 endif  BUILD_SERVER
 BUILT_SOURCES += gandaux.yucc
 

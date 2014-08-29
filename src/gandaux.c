@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <tcbdb.h>
 #include <fcntl.h>
+#include <redland.h>
 #include "nifty.h"
 
 typedef TCBDB *dict_t;
@@ -196,10 +197,101 @@ get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 	return *rp;
 }
 
+static dict_id_t
+get_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
+{
+	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
+	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
+	static unsigned char *rs;
+	static size_t rz;
+	librdf_node *s, *p;
+	dict_id_t rid = 0;
+
+	if (UNLIKELY(rs == NULL)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64U - 1U);
+		rs = malloc(rz);
+		/* prefix with _s */
+		memcpy(rs, _s, sizeof(_s));
+	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64U - 1U);
+		rs = realloc(rs, rz);
+	}
+	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
+	rs[sizeof(_s) + ssz - 1U] = '\0';
+
+	s = librdf_new_node_from_uri_string(w, rs);
+	p = librdf_new_node_from_uri_string(w, _v);
+
+#if 0
+	librdf_statement *st = librdf_new_statement(w);
+	librdf_statement_set_subject(st, s);
+	librdf_statement_set_predicate(st, p);
+	librdf_stream *res;
+	for (res = librdf_model_find_statements(m, st);
+	     res != NULL && !librdf_stream_end(res); librdf_stream_next(res)) {
+		librdf_statement *tgt = librdf_stream_get_object(res);
+
+		librdf_statement_print(tgt, stdout);
+		fputc('\n', stdout);
+	}
+	librdf_free_statement(st);
+#else
+	librdf_iterator *res;
+	for (res = librdf_model_get_targets(m, s, p);
+	     res != NULL && !librdf_iterator_end(res); librdf_iterator_next(res)) {
+		librdf_node *tgt = librdf_iterator_get_object(res);
+		rid = strtoul(librdf_node_get_literal_value(tgt), NULL, 10);
+	}
+#endif
+	return rid;
+}
+
 static int
 put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_id_t sid)
 {
 	return tcbdbput(d, sym, ssz, &sid, sizeof(sid)) - 1;
+}
+
+static int
+put_sym2(void *w, void *m, const char sym[static 1U], size_t ssz, dict_id_t sid)
+{
+	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
+	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
+	static librdf_uri *xsdint;
+	static unsigned char *rs;
+	static size_t rz;
+	librdf_statement *st;
+	char o[16U];
+
+	if (UNLIKELY(rs == NULL)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64U - 1U);
+		rs = malloc(rz);
+		/* prefix with _s */
+		memcpy(rs, _s, sizeof(_s));
+		/* also instantiate xsd:integer */
+		xsdint = librdf_new_uri(
+			w, "http://www.w3.org/2001/XMLSchema/integer");
+	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64U - 1U);
+		rs = realloc(rs, rz);
+	}
+	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
+	rs[sizeof(_s) + ssz - 1U] = '\0';
+	snprintf(o, sizeof(o), "%08u", sid);
+
+	st = librdf_new_statement_from_nodes(
+		w,
+		librdf_new_node_from_uri_string(w, rs),
+		librdf_new_node_from_uri_string(w, _v),
+		librdf_new_node_from_typed_literal(
+			w, (const unsigned char*)o, NULL, xsdint));
+	librdf_model_add_statement(m, st);
+	librdf_free_statement(st);
+	return 0;
 }
 
 static dict_id_t
@@ -220,6 +312,13 @@ add_sym(dict_t d, const char sym[static 1U], size_t ssz)
 		sid = 0U;
 	}
 	return sid;
+}
+
+static dict_id_t
+add_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
+{
+/* add SYM with id SID (or if 0 generate one) and return the SID. */
+	return 0;
 }
 
 static dict_si_t
@@ -328,6 +427,64 @@ out:
 }
 
 static int
+cmd_addget2(const struct yuck_cmd_get_s argi[static 1U], bool addp)
+{
+	librdf_world *w = librdf_new_world();
+	librdf_storage *stor;
+	librdf_model *m;
+	int rc = 0;
+
+	librdf_world_open(w);
+	stor = librdf_new_storage(
+		w, "hashes", "test", "hash-type='bdb',dir='.'");
+	m = librdf_new_model(w, stor, NULL);
+
+	if (argi->nargs) {
+		for (unsigned int i = 0U; i < argi->nargs; i++) {
+			const char *sym = argi->args[i];
+			size_t ssz = strlen(sym);
+			dict_id_t id;
+
+			if (addp && !(id = add_sym2(w, m, sym, ssz))) {
+				fprintf(stderr, "\
+cannot add symbol `%s'\n", sym);
+			} else if (!addp && !(id = get_sym2(w, m, sym, ssz))) {
+				fprintf(stderr, "\
+no symbol `%s' in index file\n", sym);
+			}
+			printf("%08u\n", id);
+		}
+	} else {
+		/* get symlist from stdin */
+		char *line = NULL;
+		size_t llen = 0UL;
+		ssize_t nrd;
+
+		while ((nrd = getline(&line, &llen, stdin)) > 0) {
+			const char *sym = line;
+			size_t ssz = nrd - 1U;
+			dict_id_t id;
+
+			line[ssz] = '\0';
+			if (addp && !(id = add_sym2(w, m, sym, ssz))) {
+				fprintf(stderr, "\
+cannot add symbol `%s'\n", sym);
+			} else if (!addp && !(id = get_sym2(w, m, sym, ssz))) {
+				fprintf(stderr, "\
+no symbol `%s' in index file\n", sym);
+			}
+			printf("%08u\n", id);
+		}
+	}
+
+	librdf_free_model(m);
+	librdf_free_storage(stor);
+	librdf_free_world(w);
+out:
+	return rc;
+}
+
+static int
 cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 {
 	char tmpf[] = ".gand_idx2sym.XXXXXXXX";
@@ -412,6 +569,55 @@ out:
 	return rc;
 }
 
+static int
+cmd_bldred(const struct yuck_cmd_bldred_s argi[static 1U])
+{
+	librdf_world *w = librdf_new_world();
+	librdf_storage *stor;
+	librdf_model *m;
+	int rc = 0;
+
+	if (!argi->nargs) {
+		yuck_auto_help((const void*)argi);
+		rc = 1;
+		goto out;
+	}
+
+	librdf_world_open(w);
+	stor = librdf_new_storage(
+		w, "hashes", "test", "new='yes',hash-type='bdb',dir='.'");
+	m = librdf_new_model(w, stor, NULL);
+
+	with (const char *fn = argi->args[0U]) {
+		dict_id_t max = 0U;
+		FILE *f;
+
+		if ((f = fopen(fn, "r")) == NULL) {
+			rc = 1;
+			break;
+		}
+
+		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
+			size_t len = strlen(ln.sym);
+
+			if (put_sym2(w, m, ln.sym, len, ln.sid) < 0) {
+				/* ok, fuck that then */
+				;
+			} else if (ln.sid > max) {
+				max = ln.sid;
+			}
+		}
+
+		fclose(f);
+	}
+
+	librdf_free_model(m);
+	librdf_free_storage(stor);
+	librdf_free_world(w);
+out:
+	return rc;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -440,13 +646,16 @@ main(int argc, char *argv[])
 	case GANDAUX_CMD_ADD:
 		addp = true;
 	case GANDAUX_CMD_GET:
-		rc = cmd_addget((const void*)argi, addp);
+		rc = cmd_addget2((const void*)argi, addp);
 		break;
 	case GANDAUX_CMD_BUILD:
 		rc = cmd_build((const void*)argi);
 		break;
 	case GANDAUX_CMD_DUMP:
 		rc = cmd_dump((const void*)argi);
+		break;
+	case GANDAUX_CMD_BLDRED:
+		rc = cmd_bldred((const void*)argi);
 		break;
 	}
 
