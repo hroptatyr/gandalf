@@ -39,7 +39,7 @@ libgand_la_CPPFLAGS += $(cfg_CFLAGS)
 libgand_la_CPPFLAGS += $(dict_CFLAGS)
 libgand_la_LDFLAGS = $(AM_LDFLAGS)
 libgand_la_LDFLAGS += $(cfg_LIBS) $(dict_LIBS)
-dict_CFLAGS =
+dict_CFLAGS = $(tokyocabinet_CFLAGS)
 dict_LIBS = $(tokyocabinet_LIBS)
 
 ## our own take on a http server
