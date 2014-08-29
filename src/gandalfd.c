@@ -827,31 +827,42 @@ work_fil(gand_httpd_req_t req)
 	int fd;
 
 	if ((fn = req.path + sizeof(EP(V0_FILES)))[-1] != '/') {
-		static const char errmsg[] = "Bad Request\n";
+		goto r400;
 
-		GAND_INFO_LOG(":rsp [400 Bad request]");
-		return (gand_httpd_res_t){
-			.rc = 400U/*BAD REQUEST*/,
-			.ctyp = OF(UNK),
-			.clen = sizeof(errmsg)- 1U,
-			.rd = {DTYP_DATA, errmsg},
-		};
+	} else if (*fn == '.' || *fn == '/') {
+		/* don't let them trick us into leaving trolf_dirfd
+		 * by using relative paths */
+		goto r400;
+
 	} else if (UNLIKELY((fd = openat(trolf_dirfd, fn, O_RDONLY)) < 0)) {
-		static const char errmsg[] = "File not found\n";
-
-		GAND_INFO_LOG(":rsp [409 Conflict]: File not found");
-		return (gand_httpd_res_t){
-			.rc = 409U/*CONFLICT*/,
-			.ctyp = OF(UNK),
-			.clen = sizeof(errmsg)- 1U,
-			.rd = {DTYP_DATA, errmsg},
-		};
+		goto r409;
 	}
 
+	/* success */
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = OF(UNK),
 		.rd = {DTYP_SOCK, .sock = fd},
+	};
+
+r400:
+	GAND_INFO_LOG(":rsp [400 Bad request]");
+	static const char err400[] = "Bad Request\n";
+	return (gand_httpd_res_t){
+		.rc = 400U/*BAD REQUEST*/,
+		.ctyp = OF(UNK),
+		.clen = sizeof(err400)- 1U,
+		.rd = {DTYP_DATA, err400},
+	};
+
+r409:
+	GAND_INFO_LOG(":rsp [409 Conflict]: File not found");
+	static const char err409[] = "File not found\n";
+	return (gand_httpd_res_t){
+		.rc = 409U/*CONFLICT*/,
+		.ctyp = OF(UNK),
+		.clen = sizeof(err409)- 1U,
+		.rd = {DTYP_DATA, err409},
 	};
 }
 
