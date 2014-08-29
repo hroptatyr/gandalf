@@ -1,0 +1,24 @@
+Quick overview of the gandalf API.
+
+Endpoint /v0/series/SYMBOL
+--------------------------
+
+Retrieve series data for SYMBOL.
+The SYMBOL string is case-sensitive.
+
+Parameters:
+- &select=COLUMN[,...]  Only display selected COLUMNs
+- &filter=VALFLAV[,...] Only return values of flavour VALFLAV.
+
+
+Endpoint /v0/sources
+--------------------
+
+List all sources along with their description.
+
+
+Endpoint /v0/files/RESOURCE
+---------------------------
+
+Hand out RESOURCE (mostly relative to tolf directory).
+
