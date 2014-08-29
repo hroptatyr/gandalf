@@ -69,6 +69,10 @@ struct __recv_clo_s {
 	double *f;
 	/* vector of values */
 	double *v;
+
+	/* obint raw data */
+	obarray_t obraw;
+	double *r;
 };
 
 
@@ -123,6 +127,9 @@ check_resize(struct __recv_clo_s *st)
 
 	st->v = realloc(st->v, st->z * sizeof(double));
 	memset(st->v + n, -1, RESIZE_STEP * sizeof(double));
+
+	st->r = realloc(st->r, st->z * sizeof(obint_t));
+	memset(st->r + n, -1, RESIZE_STEP * sizeof(obint_t));
 	return;
 }
 
@@ -138,9 +145,22 @@ qcb(gand_res_t res, void *clo)
 
 	check_resize(st);
 	st->d[st->n] = idate_to_daysi(res->date);
-	st->f[st->n] = (double)intern(
-		st->obfld, res->valflav, strlen(res->valflav));
-	st->v[st->n] = strtod(res->strval, NULL);
+	with (const char *vrb = res->valflav) {
+		size_t z = strlen(res->valflav);
+
+		st->f[st->n] = (double)intern(st->obfld, vrb, z);
+	}
+	with (const char *val = res->strval) {
+		char *on;
+
+		/* try and convert to numeric value */
+		if (st->v[st->n] = strtod(val, &on), on == val && *on) {
+			size_t z = strlen(val);
+
+			/* bang into r */
+			st->r[st->n] = (double)intern(st->obraw, val, z);
+		}
+	}
 	/* more yum please */
 	st->n++;
 	return 0;
@@ -151,12 +171,12 @@ void
 mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 	static const char *_slots[] = {
-		"syms", "data", "flds",
+		"syms", "data", "flds", "raws",
 	};
 	/* state for retrieval */
 	struct __recv_clo_s rst = {.z = 0U};
 	gand_ctx_t hdl;
-	mxArray *slots[3U];
+	mxArray *slots[countof(_slots)];
 	size_t nsym;
 
 	if (nrhs <= 0) {
@@ -192,15 +212,23 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	slots[0U] = mxCreateCellMatrix(nsym, 1U);
 	slots[1U] = mxCreateCellMatrix(nsym, 1U);
 	slots[2U] = mxCreateCellMatrix(nsym, 1U);
+	slots[3U] = mxCreateCellMatrix(nsym, 1U);
 	mxSetField(*plhs, 0, _slots[0U], slots[0U]);
 	mxSetField(*plhs, 0, _slots[1U], slots[1U]);
 	mxSetField(*plhs, 0, _slots[2U], slots[2U]);
+	mxSetField(*plhs, 0, _slots[3U], slots[3U]);
 
+	/* generate obarrays for fields and raw values */
 	rst.obfld = make_obarray();
-	for (obint_t i = 1U; i <= nsym; i++, clear_interns(rst.obfld)) {
+	rst.obraw = make_obarray();
+	for (obint_t i = 1U; i <= nsym;
+	     i++, clear_interns(rst.obfld), clear_interns(rst.obraw)) {
 		const char *sym = obint_name(rst.obsym, i);
 		size_t nfld;
 		mxArray *xfld;
+		size_t nraw;
+		mxArray *xraw;
+		size_t n;
 
 		/* rinse */
 		rst.n = 0U;
@@ -223,13 +251,22 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			mxSetCell(xfld, j - 1U, mxCreateString(fld));
 		}
 
-		const size_t n = rst.n;
-		xfld = mxCreateDoubleMatrix(n, 3U, mxREAL);
+		nraw = ninterns(rst.obraw);
+		xraw = mxCreateCellMatrix(nraw, 1U);
+		mxSetCell(slots[3U], i - 1U, xraw);
+		for (obint_t j = 1U; j <= nraw; j++) {
+			const char *raw = obint_name(rst.obraw, j);
+			mxSetCell(xraw, j - 1U, mxCreateString(raw));
+		}
+
+		n = rst.n;
+		xfld = mxCreateDoubleMatrix(n, 4U, mxREAL);
 		mxSetCell(slots[1U], i - 1U, xfld);
 		with (double *restrict p = mxGetPr(xfld)) {
 			memcpy(p + 0U * n, rst.d, n * sizeof(double));
 			memcpy(p + 1U * n, rst.f, n * sizeof(double));
 			memcpy(p + 2U * n, rst.v, n * sizeof(double));
+			memcpy(p + 3U * n, rst.r, n * sizeof(double));
 		}
 	}
 
@@ -237,10 +274,12 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		free(rst.d);
 		free(rst.f);
 		free(rst.v);
+		free(rst.r);
 	}
 
 	free_obarray(rst.obfld);
 	free_obarray(rst.obsym);
+	free_obarray(rst.obraw);
 	return;
 }
 
