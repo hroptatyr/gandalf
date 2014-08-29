@@ -659,12 +659,64 @@ ser_get_filter(gand_httpd_req_t r)
 	return (flt_t){_f, w.len + 2U};
 }
 
+static void
+subst_rln(struct rln_s *restrict r, const char *host)
+{
+	static char *scratch;
+	static size_t zcratch;
+	static size_t scroff;
+
+	if (UNLIKELY(host == NULL)) {
+		/* reset request */
+		scroff = 0U;
+		return;
+	}
+	if (UNLIKELY(!scroff)) {
+		/* construct URI prefix */
+		size_t hlen = strlen(host);
+
+		if (7U + hlen + sizeof(_eps_V0_FILES) + r->val.z > zcratch) {
+			zcratch = 7U + hlen + sizeof(_eps_V0_FILES) + r->val.z;
+			zcratch += 64U;
+			zcratch &= ~(64U - 1U);
+
+			scratch = realloc(scratch, zcratch);
+		}
+		/* bang http:// */
+		memcpy(scratch, "http://", 7U);
+		scroff = 7U;
+		memcpy(scratch + scroff, host, hlen);
+		scroff += hlen;
+		memcpy(scratch + scroff, _eps_V0_FILES, sizeof(_eps_V0_FILES));
+		scroff += sizeof(_eps_V0_FILES) - 1U;
+	}
+	if (scroff + r->val.z > zcratch) {
+		zcratch = scroff + r->val.z;
+		zcratch += 64U;
+		zcratch &= ~(64U - 1U);
+
+		scratch = realloc(scratch, zcratch);
+	}
+	/* now actually subst file:// */
+	memcpy(scratch + scroff, r->val.s + 6U, r->val.z - 6U);
+	r->val.s = scratch;
+	r->val.z += scroff - 6U;
+	scratch[r->val.z] = '\0';
+	return;
+}
+
 static gand_httpd_res_t
 work_ser(gand_httpd_req_t req)
 {
+	char buf[4096U];
 	const char *sym;
 	dict_oid_t rid;
 	gand_of_t of;
+	const char *fn;
+	gandfn_t fx;
+	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln, flt_t f);
+	gand_gbuf_t gb;
+	flt_t f;
 
 	if ((of = req_get_outfmt(req)) == OF_UNK) {
 		of = OF_CSV;
@@ -691,13 +743,6 @@ work_ser(gand_httpd_req_t req)
 		};
 	}
 
-/* yacka */
-	const char *fn;
-	gandfn_t fx;
-	ssize_t(*filter)(char *restrict, size_t, struct rln_s ln, flt_t f);
-	gand_gbuf_t gb;
-	flt_t f;
-
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
 		goto interr;
@@ -719,17 +764,15 @@ work_ser(gand_httpd_req_t req)
 		break;
 	}
 
-	/* traverse the lines, filter and rewrite them */
-	const gandf_t fb = fx.fb;
-	char buf[4096U];
-	size_t tot = 0U;
-
 	/* obtain the buffer we can send bytes to */
+	const gandf_t fb = fx.fb;
+	size_t tot = 0U;
 	if (UNLIKELY((gb = make_gand_gbuf(fb.z)) == NULL)) {
 		GAND_ERR_LOG("cannot obtain gbuf");
 		goto interr_unmap;
 	}
 
+	/* traverse the lines, filter and rewrite them */
 	with (ssize_t z) {
 	bfilt:
 		z = filter(buf + tot, sizeof(buf) - tot, FILTER_FRST, nul_flt);
@@ -758,6 +801,11 @@ work_ser(gand_httpd_req_t req)
 		}
 		/* snarf the line, v0 format, zero copy */
 		ln = snarf_rln(bol, eol - bol);
+
+		if (UNLIKELY(ln.val.z > 7U &&
+			     !memcmp(ln.val.s, "file://", 7U))) {
+			subst_rln(&ln, req.host);
+		}
 	filt:
 		/* filter, maybe */
 		z = filter(buf + tot, sizeof(buf) - tot, ln, f);
@@ -793,6 +841,9 @@ work_ser(gand_httpd_req_t req)
 			tot += z;
 		}
 	}
+	/* reset subst'er */
+	subst_rln(NULL, NULL);
+
 	/* flush */
 	if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 		GAND_ERR_LOG("cannot write to gbuf");
