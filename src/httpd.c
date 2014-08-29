@@ -512,15 +512,15 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		break;
 
 	case DTYP_SOCK:
-		fd = r.rd.sock;
-		if ((x->z = r.clen) == CLEN_UNKNOWN) {
-			if (fstat(fd, &st) < 0) {
-				goto fail;
-			} else if (st.st_size < 0) {
-				goto fail;
-			}
+		if ((fd = r.rd.sock) < 0) {
+			goto fail;
+		} else if (fstat(fd, &st) < 0) {
+			goto fail;
+		} else if (st.st_size < 0) {
+			goto fail;
 		}
 		/* enqueue now */
+		x->z = st.st_size;
 		x->o = 0U;
 		x->fd = fd;
 		break;
