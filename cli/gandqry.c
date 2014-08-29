@@ -28,6 +28,7 @@ main(int argc, char *argv[])
 	/* args */
 	yuck_t argi[1U];
 	gand_ctx_t g;
+	const char *srv;
 	int timeout = 2000;
 	int rc = 0;
 
@@ -38,8 +39,9 @@ main(int argc, char *argv[])
 	if (argi->timeout_arg != NULL) {
 		timeout = strtoul(argi->timeout_arg, NULL, 0);
 	}
+	srv = argi->service_arg ?: "localhost:8080";
 
-	if ((g = gand_open(argi->service_arg, timeout)) == NULL) {
+	if ((g = gand_open(srv, timeout)) == NULL) {
 		perror("gand_open()");
 		rc = 1;
 		goto bugger_off;
