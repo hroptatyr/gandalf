@@ -183,6 +183,42 @@ set_next_id(dict_t d, dict_id_t id)
 	return;
 }
 
+static const unsigned char*
+get_symuri(const char *sym, size_t ssz)
+{
+	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
+	static unsigned char *rs;
+	static size_t rz;
+
+	if (UNLIKELY(sym == NULL)) {
+		/* clean up */
+		if (rs != NULL) {
+			free(rs);
+		}
+		rs = NULL;
+		rz = 0UL;
+		return NULL;
+	} else if (UNLIKELY(rs == NULL)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64UL - 1UL);
+		rs = malloc(rz);
+		/* prefix with _s */
+		memcpy(rs, _s, sizeof(_s));
+	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64UL - 1UL);
+		rs = realloc(rs, rz);
+	}
+	/* just to check if the malloc'ing worked */
+	if (UNLIKELY(rs == NULL)) {
+		rz = 0UL;
+		return NULL;
+	}
+	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
+	rs[sizeof(_s) + ssz - 1U] = '\0';
+	return rs;
+}
+
 static dict_id_t
 get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
@@ -200,26 +236,14 @@ get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 static dict_id_t
 get_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
 {
-	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
 	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
-	static unsigned char *rs;
-	static size_t rz;
+	const unsigned char *rs;
 	librdf_node *s, *p;
 	dict_id_t rid = 0;
 
-	if (UNLIKELY(rs == NULL)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64U - 1U);
-		rs = malloc(rz);
-		/* prefix with _s */
-		memcpy(rs, _s, sizeof(_s));
-	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64U - 1U);
-		rs = realloc(rs, rz);
+	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
+		return 0;
 	}
-	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
-	rs[sizeof(_s) + ssz - 1U] = '\0';
 
 	s = librdf_new_node_from_uri_string(w, rs);
 	p = librdf_new_node_from_uri_string(w, _v);
@@ -230,8 +254,11 @@ get_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
 				librdf_node_get_literal_value(res);
 
 			rid = strtoul((const char*)val, NULL, 10);
+			librdf_free_node(res);
 		}
 	}
+	librdf_free_node(s);
+	librdf_free_node(p);
 	return rid;
 }
 
@@ -244,40 +271,33 @@ put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_id_t sid)
 static int
 put_sym2(void *w, void *m, const char sym[static 1U], size_t ssz, dict_id_t sid)
 {
-	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
 	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
 	static librdf_uri *xsdint;
-	static unsigned char *rs;
-	static size_t rz;
-	librdf_statement *st;
-	char o[16U];
+	static librdf_node *nv;
+	const unsigned char *rs;
+	unsigned char o[16U];
 
-	if (UNLIKELY(rs == NULL)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64U - 1U);
-		rs = malloc(rz);
-		/* prefix with _s */
-		memcpy(rs, _s, sizeof(_s));
-		/* also instantiate xsd:integer */
+	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
+		return -1;
+	}
+	/* instantiate xsd:integer */
+	if (UNLIKELY(xsdint == NULL)) {
 		xsdint = librdf_new_uri(
 			w, "http://www.w3.org/2001/XMLSchema/integer");
-	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64U - 1U);
-		rs = realloc(rs, rz);
+		nv = librdf_new_node_from_uri_string(w, _v);
 	}
-	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
-	rs[sizeof(_s) + ssz - 1U] = '\0';
-	snprintf(o, sizeof(o), "%08u", sid);
+	snprintf((char*)o, sizeof(o), "%08u", sid);
 
-	st = librdf_new_statement_from_nodes(
-		w,
-		librdf_new_node_from_uri_string(w, rs),
-		librdf_new_node_from_uri_string(w, _v),
-		librdf_new_node_from_typed_literal(
-			w, (const unsigned char*)o, NULL, xsdint));
-	librdf_model_add_statement(m, st);
-	librdf_free_statement(st);
+	with (librdf_node *ns = librdf_new_node_from_uri_string(w, rs),
+	      *no = librdf_new_node_from_typed_literal(w, o, NULL, xsdint)) {
+		librdf_statement *st;
+
+		st = librdf_new_statement_from_nodes(w, ns, nv, no);
+		librdf_model_add_statement(m, st);
+		librdf_free_statement(st);
+		librdf_free_node(ns);
+		librdf_free_node(no);
+	}
 	return 0;
 }
 
