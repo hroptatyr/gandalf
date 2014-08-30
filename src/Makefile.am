@@ -10,7 +10,6 @@ sbin_PROGRAMS =
 noinst_PROGRAMS =
 noinst_HEADERS =
 noinst_LTLIBRARIES =
-pkgdata_DATA =
 BUILT_SOURCES =
 EXTRA_DIST = $(BUILT_SOURCES)
 CLEANFILES =
@@ -91,8 +90,6 @@ gandalfd_LDADD = libgand.la
 gandalfd_LDADD += libbeef.la
 endif  BUILD_SERVER
 BUILT_SOURCES += gandalfd.yucc
-pkgdata_DATA += $(top_srcdir)/www/index.html
-pkgdata_DATA += $(top_srcdir)/www/404.html
 
 noinst_PROGRAMS += clidalf
 clidalf_CPPFLAGS = $(AM_CPPFLAGS)
