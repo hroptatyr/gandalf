@@ -119,6 +119,7 @@ AC_CONFIG_FILES([build-aux/Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([cli/matlab/Makefile])
 AC_CONFIG_FILES([src/Makefile])
+AC_CONFIG_FILES([www/Makefile])
 AC_OUTPUT
 
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])

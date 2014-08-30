@@ -13,6 +13,7 @@ BUILT_SOURCES =
 SUBDIRS += build-aux
 SUBDIRS += cli
 SUBDIRS += src
+SUBDIRS += www
 
 DISTCLEANFILES += version.mk
 EXTRA_DIST += version.mk.in
