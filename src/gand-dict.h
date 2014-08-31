@@ -47,4 +47,11 @@ extern void close_dict(dict_t d);
 
 extern dict_oid_t dict_sym2oid(dict_t d, const char sym[static 1U], size_t ssz);
 
+/**
+ * Put SYM (of length SSZ) into dictionary D under oid ID, or
+ * if ID is 0, create a suitable oid.
+ * Return the oid that SYM is mapped to. */
+extern dict_oid_t
+dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id);
+
 #endif	/* INCLUDED_gand_dict_h_ */

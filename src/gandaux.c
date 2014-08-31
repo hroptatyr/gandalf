@@ -54,9 +54,8 @@
 # include <tcbdb.h>
 #endif	/* USE_REDLAND */
 #include <tcbdb.h>
+#include "gand-dict.h"
 #include "nifty.h"
-
-typedef TCBDB *dict_t;
 
 typedef unsigned int dict_id_t;
 
@@ -266,59 +265,20 @@ get_sym2(void *w, void *m, const char sym[static 1U], size_t ssz)
 	return rid;
 }
 
-static int
-put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_id_t sid)
-{
-	return tcbdbput(d, sym, ssz, &sid, sizeof(sid)) - 1;
-}
-
-static int
-put_sym2(void *w, void *m, const char sym[static 1U], size_t ssz, dict_id_t sid)
-{
-	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
-	static librdf_uri *xsdint;
-	static librdf_node *nv;
-	const unsigned char *rs;
-	unsigned char o[16U];
-
-	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
-		return -1;
-	}
-	/* instantiate xsd:integer */
-	if (UNLIKELY(xsdint == NULL)) {
-		xsdint = librdf_new_uri(
-			w, "http://www.w3.org/2001/XMLSchema/integer");
-		nv = librdf_new_node_from_uri_string(w, _v);
-	}
-	snprintf((char*)o, sizeof(o), "%08u", sid);
-
-	with (librdf_node *ns = librdf_new_node_from_uri_string(w, rs),
-	      *no = librdf_new_node_from_typed_literal(w, o, NULL, xsdint)) {
-		librdf_statement *st;
-
-		st = librdf_new_statement_from_nodes(w, ns, nv, no);
-		librdf_model_add_statement(m, st);
-		librdf_free_statement(st);
-		librdf_free_node(ns);
-		librdf_free_node(no);
-	}
-	return 0;
-}
-
-static dict_id_t
+static dict_oid_t
 add_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
 /* add SYM with id SID (or if 0 generate one) and return the SID. */
-	dict_id_t sid;
+	dict_oid_t sid;
 
-	if ((sid = get_sym(d, sym, ssz))) {
+	if ((sid = dict_sym2oid(d, sym, ssz))) {
 		/* ok, nothing to do */
 		;
 	} else if (UNLIKELY(!(sid = next_id(d)))) {
 		/* huh? */
 		;
 	/* finally just assoc SYM with SID */
-	} else if (UNLIKELY(put_sym(d, sym, ssz, sid) < 0)) {
+	} else if (UNLIKELY(!dict_put_sym(d, sym, ssz, sid))) {
 		/* grrrr */
 		sid = 0U;
 	}
@@ -512,7 +472,7 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		serror("cannot creat temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
-	} else if ((d = make_dict(tmpf, oflags)) == NULL) {
+	} else if ((d = open_dict(tmpf, oflags)) == NULL) {
 		serror("cannot create temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
@@ -521,7 +481,6 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 	/* close mkstemp's descriptor */
 	close(fd);
 	
-#if defined USE_REDLAND
 	with (const char *fn = argi->args[0U]) {
 		dict_id_t max = 0U;
 		FILE *f;
@@ -532,31 +491,9 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		}
 
 		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
-			size_t len = strlen(ln.sym);
+			const size_t ssz = strlen(ln.sym);
 
-			if (put_sym2(w, m, ln.sym, len, ln.sid) < 0) {
-				/* ok, fuck that then */
-				;
-			} else if (ln.sid > max) {
-				max = ln.sid;
-			}
-		}
-
-		fclose(f);
-	}
-
-#else  /* !USE_REDLAND */
-	with (const char *fn = argi->args[0U]) {
-		dict_id_t max = 0U;
-		FILE *f;
-
-		if ((f = fopen(fn, "r")) == NULL) {
-			rc = 1;
-			break;
-		}
-
-		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
-			if (put_sym(d, ln.sym, strlen(ln.sym), ln.sid) < 0) {
+			if (!dict_put_sym(d, ln.sym, ssz, ln.sid)) {
 				/* ok, fuck that then */
 				;
 			} else if (ln.sid > max) {
@@ -569,10 +506,9 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		/* make sure the maximum index value is recorded */
 		set_next_id(d, max);
 	}
-#endif	/* USE_REDLAND */
 
 	/* get ready to bugger off */
-	free_dict(d);
+	close_dict(d);
 
 	if (rc == 0) {
 		/* rename (atomically) to actual file name */

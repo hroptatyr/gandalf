@@ -53,6 +53,42 @@ static librdf_world *wrld;
 static librdf_storage *stor;
 #endif	/* USE_REDLAND */
 
+static const unsigned char*
+get_symuri(const char *sym, size_t ssz)
+{
+	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
+	static unsigned char *rs;
+	static size_t rz;
+
+	if (UNLIKELY(sym == NULL)) {
+		/* clean up */
+		if (rs != NULL) {
+			free(rs);
+		}
+		rs = NULL;
+		rz = 0UL;
+		return NULL;
+	} else if (UNLIKELY(rs == NULL)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64UL - 1UL);
+		rs = malloc(rz);
+		/* prefix with _s */
+		memcpy(rs, _s, sizeof(_s));
+	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
+		rz = sizeof(_s) + ssz + 64U;
+		rz &= ~(64UL - 1UL);
+		rs = realloc(rs, rz);
+	}
+	/* just to check if the malloc'ing worked */
+	if (UNLIKELY(rs == NULL)) {
+		rz = 0UL;
+		return NULL;
+	}
+	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
+	rs[sizeof(_s) + ssz - 1U] = '\0';
+	return rs;
+}
+
 
 dict_t
 open_dict(const char *fn, int oflags)
@@ -66,7 +102,7 @@ open_dict(const char *fn, int oflags)
 	stor = librdf_new_storage(
 		wrld, "hashes", fn, "hash-type='bdb',dir='.'");
 	return librdf_new_model(wrld, stor, NULL);
-#else
+#else  /* !USE_REDLAND */
 	int omode = BDBOREADER;
 	dict_t res;
 
@@ -93,7 +129,7 @@ free_out:
 	tcbdbdel(res);
 out:
 	return NULL;
-#endif
+#endif	/* USE_REDLAND */
 }
 
 void
@@ -104,7 +140,7 @@ close_dict(dict_t d)
 	librdf_free_storage(stor);
 	librdf_free_world(wrld);
 	wrld = NULL;
-#else
+#else  /* !USE_REDLAND */
 	tcbdbclose(d);
 	tcbdbdel(d);
 #endif	/* USE_REDLAND */
@@ -148,7 +184,7 @@ dict_sym2oid(dict_t d, const char sym[static 1U], size_t ssz)
 	}
 	return rid;
 
-#else
+#else  /* !USE_REDLAND */
 	const dict_oid_t *rp;
 	int rz[1];
 
@@ -158,7 +194,48 @@ dict_sym2oid(dict_t d, const char sym[static 1U], size_t ssz)
 		return 0U;
 	}
 	return *rp;
-#endif
+#endif	/* USE_REDLAND */
+}
+
+dict_oid_t
+dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id)
+{
+#if defined USE_REDLAND
+	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
+	static librdf_uri *xsdint;
+	static librdf_node *nv;
+	const unsigned char *rs;
+	unsigned char o[16U];
+
+	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
+		return 0;
+	}
+	/* instantiate xsd:integer */
+	if (UNLIKELY(xsdint == NULL)) {
+		xsdint = librdf_new_uri(
+			wrld, "http://www.w3.org/2001/XMLSchema/integer");
+		nv = librdf_new_node_from_uri_string(wrld, _v);
+	}
+	snprintf((char*)o, sizeof(o), "%08u", id);
+
+	with (librdf_node *ns = librdf_new_node_from_uri_string(wrld, rs),
+	      *no = librdf_new_node_from_typed_literal(wrld, o, NULL, xsdint)) {
+		librdf_statement *st;
+
+		st = librdf_new_statement_from_nodes(wrld, ns, nv, no);
+		librdf_model_add_statement(d, st);
+		librdf_free_statement(st);
+		librdf_free_node(ns);
+		librdf_free_node(no);
+	}
+	return id;
+
+#else  /* !USE_REDLAND */
+	if (tcbdbput(d, sym, ssz, &id, sizeof(sid)) <= 0) {
+		return 0;
+	}
+	return id;
+#endif	/* USE_REDLAND */
 }
 
 /* gand-dict.c ends here */
