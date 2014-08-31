@@ -1237,7 +1237,14 @@ main(int argc, char *argv[])
 	}
 
 	/* get the trolf dir */
-	ntrolfdir = gand_get_trolfdir(&trolfdir, cfg);
+	if (argi->trolfdir_arg) {
+		/* command line has precedence */
+		ntrolfdir = strlen(argi->trolfdir_arg);
+		/* make sure trolfdir is free()able */
+		trolfdir = strndup(argi->trolfdir_arg, ntrolfdir);
+	} else if (cfg && (ntrolfdir = gand_get_trolfdir(&trolfdir, cfg))) {
+		;
+	}
 
 	/* create trolf's dirfd */
 	if ((trolf_dirfd = open(trolfdir, O_RDONLY)) < 0) {
