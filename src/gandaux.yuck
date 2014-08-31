@@ -24,8 +24,3 @@ Generate a dump of specified IDX file.
 Usage: gandaux get
 
 Get a symbol from the symbol index.
-
-
-Usage: gandaux bldred IDX2SYM-FILE
-
-Generate the symbol index.

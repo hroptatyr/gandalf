@@ -35,6 +35,7 @@ cfg_LIBS = $(lua_LIBS)
 endif HAVE_LUA
 libgand_la_SOURCES += gand-dict.c gand-dict.h
 libgand_la_CPPFLAGS = $(AM_CPPFLAGS)
+libgand_la_CPPFLAGS += -DUSE_REDLAND
 libgand_la_CPPFLAGS += $(cfg_CFLAGS)
 libgand_la_CPPFLAGS += $(dict_CFLAGS)
 libgand_la_LDFLAGS = $(AM_LDFLAGS)
@@ -73,6 +74,7 @@ gandaux_SOURCES += nifty.h
 gandaux_SOURCES += version.h version.c
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += -DHAVE_VERSION_H
+gandaux_CPPFLAGS += -DUSE_REDLAND
 gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
 gandaux_CPPFLAGS += $(shell pkg-config --cflags rasqal)
 gandaux_CPPFLAGS += $(shell pkg-config --cflags raptor2)

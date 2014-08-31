@@ -47,9 +47,13 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
-#include <tcbdb.h>
 #include <fcntl.h>
-#include <redland.h>
+#if defined USE_REDLAND
+# include <redland.h>
+#else  /* !USE_REDLAND */
+# include <tcbdb.h>
+#endif	/* USE_REDLAND */
+#include <tcbdb.h>
 #include "nifty.h"
 
 typedef TCBDB *dict_t;
@@ -516,6 +520,32 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 
 	/* close mkstemp's descriptor */
 	close(fd);
+	
+#if defined USE_REDLAND
+	with (const char *fn = argi->args[0U]) {
+		dict_id_t max = 0U;
+		FILE *f;
+
+		if ((f = fopen(fn, "r")) == NULL) {
+			rc = 1;
+			break;
+		}
+
+		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
+			size_t len = strlen(ln.sym);
+
+			if (put_sym2(w, m, ln.sym, len, ln.sid) < 0) {
+				/* ok, fuck that then */
+				;
+			} else if (ln.sid > max) {
+				max = ln.sid;
+			}
+		}
+
+		fclose(f);
+	}
+
+#else  /* !USE_REDLAND */
 	with (const char *fn = argi->args[0U]) {
 		dict_id_t max = 0U;
 		FILE *f;
@@ -539,6 +569,7 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		/* make sure the maximum index value is recorded */
 		set_next_id(d, max);
 	}
+#endif	/* USE_REDLAND */
 
 	/* get ready to bugger off */
 	free_dict(d);
@@ -572,55 +603,6 @@ cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi[static 1U]))
 
 	/* and out we are */
 	free_dict(d);
-out:
-	return rc;
-}
-
-static int
-cmd_bldred(const struct yuck_cmd_bldred_s argi[static 1U])
-{
-	librdf_world *w = librdf_new_world();
-	librdf_storage *stor;
-	librdf_model *m;
-	int rc = 0;
-
-	if (!argi->nargs) {
-		yuck_auto_help((const void*)argi);
-		rc = 1;
-		goto out;
-	}
-
-	librdf_world_open(w);
-	stor = librdf_new_storage(
-		w, "hashes", "test", "new='yes',hash-type='bdb',dir='.'");
-	m = librdf_new_model(w, stor, NULL);
-
-	with (const char *fn = argi->args[0U]) {
-		dict_id_t max = 0U;
-		FILE *f;
-
-		if ((f = fopen(fn, "r")) == NULL) {
-			rc = 1;
-			break;
-		}
-
-		for (dict_si_t ln; (ln = get_idx_ln(f)).sid;) {
-			size_t len = strlen(ln.sym);
-
-			if (put_sym2(w, m, ln.sym, len, ln.sid) < 0) {
-				/* ok, fuck that then */
-				;
-			} else if (ln.sid > max) {
-				max = ln.sid;
-			}
-		}
-
-		fclose(f);
-	}
-
-	librdf_free_model(m);
-	librdf_free_storage(stor);
-	librdf_free_world(w);
 out:
 	return rc;
 }
@@ -660,9 +642,6 @@ main(int argc, char *argv[])
 		break;
 	case GANDAUX_CMD_DUMP:
 		rc = cmd_dump((const void*)argi);
-		break;
-	case GANDAUX_CMD_BLDRED:
-		rc = cmd_bldred((const void*)argi);
 		break;
 	}
 

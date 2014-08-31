@@ -40,7 +40,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#define USE_REDLAND
 #if defined USE_REDLAND
 # include <redland.h>
 #else
