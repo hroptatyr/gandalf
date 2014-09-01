@@ -204,27 +204,28 @@ gand_free_trolf_filename(const char *fn)
 }
 
 static const char*
-make_lateglu_name(dict_oid_t rolf_id)
+make_lateglu_name(dict_oid_t rid)
 {
-	static const char glud[] = "show_lateglu/";
-	static char f[PATH_MAX];
-	size_t idx;
+	static char f[PATH_MAX] = "show_lateglu/";
+	int x;
 
-	if (UNLIKELY(trolfdir == NULL)) {
+	x = snprintf(f + 13U, sizeof(f) - 13U, "%04u/%08u", rid / 10000U, rid);
+	if (UNLIKELY(x < 0 || (size_t)x >= sizeof(f) - 13U)) {
 		return NULL;
 	}
+	return f;
+}
 
-	/* construct the path */
-	memcpy(f, trolfdir, (idx = ntrolfdir));
-	if (f[idx - 1] != '/') {
-		f[idx++] = '/';
+static const char*
+make_super_name(dict_oid_t rid)
+{
+	static char f[PATH_MAX] = "super/";
+	int x;
+
+	x = snprintf(f + 6U, sizeof(f) - 6U, "%04u/%08u", rid / 10000U, rid);
+	if (UNLIKELY(x < 0 || (size_t)x >= sizeof(f) - 6U)) {
+		return NULL;
 	}
-	memcpy(f + idx, glud, sizeof(glud) - 1);
-	idx += sizeof(glud) - 1;
-	snprintf(
-		f + idx, PATH_MAX - idx,
-		/* this is the split version */
-		"%04u/%08u", rolf_id / 10000U, rolf_id);
 	return f;
 }
 
@@ -746,7 +747,7 @@ work_ser(gand_httpd_req_t req)
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
 		goto interr;
-	} else if (UNLIKELY((fx = mmap_fn(fn, O_RDONLY)).fd < 0)) {
+	} else if ((fx = mmapat_fn(trolf_dirfd, fn, O_RDONLY)).fd < 0) {
 		goto interr;
 	}
 
@@ -819,9 +820,10 @@ work_ser(gand_httpd_req_t req)
 			goto filt;
 		} else if (UNLIKELY(z < 0)) {
 			/* `just' an error */
-			goto filt;
+			goto next;
 		}
 		tot += z;
+	next:
 		i += eol - bol;
 	}
 	/* flush filter */
