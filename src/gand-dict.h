@@ -50,14 +50,14 @@ extern void close_dict(dict_t d);
 /**
  * Return oid for SYM (of length SSZ), or NUL_OID if not existent. */
 extern dict_oid_t
-dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz);
+dict_get_sym(dict_t d, const char *sym);
 
 /**
  * Put SYM (of length SSZ) into dictionary D under oid ID, or
  * if ID is NUL_OID, create a suitable oid.
  * Return the oid that SYM is mapped to. */
 extern dict_oid_t
-dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id);
+dict_put_sym(dict_t d, const char *sym, dict_oid_t id);
 
 /**
  * Return the next available oid. */

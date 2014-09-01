@@ -54,6 +54,7 @@ static librdf_world *wrld;
 static librdf_uri *uri_xsdint;
 static librdf_uri *uri_rid;
 static librdf_uri *uri_max;
+static librdf_uri *uri_ser;
 #else  /* !USE_REDLAND */
 # define SID_SPACE	"\x1d"
 # define SYM_SPACE	"\x20"
@@ -73,6 +74,8 @@ init_world(void)
 		wrld, "http://www.ga-group.nl/rolf/1.0/rid");
 	uri_max = librdf_new_uri(
 		wrld, "http://http://www.w3.org/2001/XMLSchema/maxInclusive");
+	uri_ser = librdf_new_uri(
+		wrld, "http://rolf.ga-group.nl/v0/series/");
 	return 0;
 }
 
@@ -85,60 +88,22 @@ fini_world(void)
 	librdf_free_uri(uri_xsdint);
 	librdf_free_uri(uri_rid);
 	librdf_free_uri(uri_max);
+	librdf_free_uri(uri_ser);
 	librdf_free_world(wrld);
 	wrld = NULL;
 	uri_xsdint = NULL;
 	uri_rid = NULL;
 	uri_max = NULL;
+	uri_ser = NULL;
 	return 0;
 }
 
-static const unsigned char*
-get_symuri(const char *sym, size_t ssz)
-{
-	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
-	static unsigned char *rs;
-	static size_t rz;
-
-	if (UNLIKELY(sym == NULL)) {
-		/* clean up */
-		if (rs != NULL) {
-			free(rs);
-		}
-		rs = NULL;
-		rz = 0UL;
-		return NULL;
-	} else if (UNLIKELY(rs == NULL)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64UL - 1UL);
-		rs = malloc(rz);
-		/* prefix with _s */
-		memcpy(rs, _s, sizeof(_s));
-	} else if (UNLIKELY(sizeof(_s) + ssz > rz)) {
-		rz = sizeof(_s) + ssz + 64U;
-		rz &= ~(64UL - 1UL);
-		rs = realloc(rs, rz);
-	}
-	/* just to check if the malloc'ing worked */
-	if (UNLIKELY(rs == NULL)) {
-		rz = 0UL;
-		return NULL;
-	}
-	memcpy(rs + sizeof(_s) - 1U, sym, ssz);
-	rs[sizeof(_s) + ssz - 1U] = '\0';
-	return rs;
-}
-
 static inline librdf_node*
-dict_sym(const char sym[static 1U], size_t ssz)
+dict_sym(const char *sym)
 {
 /* convenience */
-	const unsigned char *rs;
-
-	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
-		return NULL;
-	}
-	return librdf_new_node_from_uri_string(wrld, rs);
+	const unsigned char *sp = (const unsigned char*)sym;
+	return librdf_new_node_from_uri_local_name(wrld, uri_ser, sp);
 }
 
 #endif	/* USE_REDLAND */
@@ -213,13 +178,13 @@ close_dict(dict_t d)
 }
 
 dict_oid_t
-dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
+dict_get_sym(dict_t d, const char *sym)
 {
 #if defined USE_REDLAND
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
-	if (UNLIKELY((s = dict_sym(sym, ssz)) == NULL)) {
+	if (UNLIKELY((s = dict_sym(sym)) == NULL)) {
 		return NUL_OID;
 	}
 
@@ -249,13 +214,13 @@ dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 }
 
 dict_oid_t
-dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id)
+dict_put_sym(dict_t d, const char *sym, dict_oid_t id)
 {
 #if defined USE_REDLAND
 	librdf_node *ns, *nv, *no;
 	unsigned char o[16U];
 
-	if (UNLIKELY((ns = dict_sym(sym, ssz)) == NULL)) {
+	if (UNLIKELY((ns = dict_sym(sym)) == NULL)) {
 		return NUL_OID;
 	}
 
