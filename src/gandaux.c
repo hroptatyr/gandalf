@@ -285,7 +285,7 @@ cmd_dump(const struct yuck_cmd_dump_s UNUSED(argi[static 1U]))
 	}
 
 	/* just iterate (coroutine with static state) */
-	for (dict_si_t si; (si = dict_iter(d)).sid;) {
+	for (dict_si_t si; (si = dict_sym_iter(d)).sid;) {
 		printf("%s\t%08u\n", si.sym, si.sid);
 	}
 
