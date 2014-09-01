@@ -350,6 +350,8 @@ dict_sym_iter(dict_t d)
 /* uses static state */
 #if defined USE_REDLAND
 	static librdf_stream *i;
+	static const char *pre;
+	static size_t prz;
 	librdf_statement *st;
 	librdf_node *s, *o;
 	dict_si_t res;
@@ -360,6 +362,9 @@ dict_sym_iter(dict_t d)
 		st = librdf_new_statement_from_nodes(wrld, NULL, p, NULL);
 		i = librdf_model_find_statements(d, st);
 		librdf_free_statement(st);
+
+		/* while we're at it */
+		pre = (const char*)librdf_uri_as_counted_string(uri_ser, &prz);
 	} else {
 		(void)librdf_stream_next(i);
 	}
@@ -371,7 +376,12 @@ dict_sym_iter(dict_t d)
 	o = librdf_statement_get_object(st);
 
 	with (librdf_uri *u = librdf_node_get_uri(s)) {
-		res.sym = (const char*)librdf_uri_as_string(u);
+		const char *ustr = (const char*)librdf_uri_as_string(u);
+
+		if (LIKELY(!strncmp(ustr, pre, prz))) {
+			ustr += prz;
+		}
+		res.sym = ustr;
 	}
 	with (const unsigned char *val = librdf_node_get_literal_value(o)) {
 		res.sid = strtoul((const char*)val, NULL, 10);
@@ -428,6 +438,8 @@ dict_src_iter(dict_t d, const char *src)
 /* uses static state */
 #if defined USE_REDLAND
 	static librdf_iterator *i;
+	static const char *pre;
+	static size_t prz;
 	librdf_node *s;
 	dict_si_t res;
 
@@ -436,6 +448,9 @@ dict_src_iter(dict_t d, const char *src)
 		librdf_node *o = dict_src(src);
 
 		i = librdf_model_get_sources(d, p, o);
+
+		/* while we're at it */
+		pre = (const char*)librdf_uri_as_counted_string(uri_ser, &prz);
 	} else {
 		(void)librdf_iterator_next(i);
 	}
@@ -445,7 +460,12 @@ dict_src_iter(dict_t d, const char *src)
 	}
 
 	with (librdf_uri *u = librdf_node_get_uri(s)) {
-		res.sym = (const char*)librdf_uri_as_string(u);
+		const char *ustr = (const char*)librdf_uri_as_string(u);
+
+		if (LIKELY(!strncmp(ustr, pre, prz))) {
+			ustr += prz;
+		}
+		res.sym = ustr;
 	}
 	res.sid = 1U;
 	return res;
