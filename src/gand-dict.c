@@ -220,6 +220,7 @@ dict_get_sym(dict_t d, const char *sym)
 
 #else  /* !USE_REDLAND */
 	const dict_oid_t *rp;
+	const size_t ssz = strlen(sym);
 	int rz[1];
 
 	if (UNLIKELY((rp = tcbdbget3(d, sym, ssz, rz)) == NULL)) {
@@ -232,7 +233,7 @@ dict_get_sym(dict_t d, const char *sym)
 }
 
 dict_oid_t
-dict_put_sym(dict_t d, const char *sym, dict_oid_t id)
+dict_put_sym(dict_t d, const char *sym, dict_oid_t sid)
 {
 #if defined USE_REDLAND
 	librdf_node *s, *p, *o;
@@ -245,7 +246,7 @@ dict_put_sym(dict_t d, const char *sym, dict_oid_t id)
 	p = librdf_new_node_from_uri(wrld, vrb_rid);
 
 	/* prep the sid literal */
-	snprintf((char*)_o, sizeof(_o), "%08u", id);
+	snprintf((char*)_o, sizeof(_o), "%08u", sid);
 	o = librdf_new_node_from_typed_literal(wrld, _o, NULL, uri_xsdint);
 
 	with (librdf_statement *st) {
@@ -270,13 +271,15 @@ dict_put_sym(dict_t d, const char *sym, dict_oid_t id)
 			librdf_free_statement(st);
 		}
 	}
-	return id;
+	return sid;
 
 #else  /* !USE_REDLAND */
-	if (tcbdbput(d, sym, ssz, &id, sizeof(sid)) <= 0) {
+	const size_t ssz = strlen(sym);
+
+	if (tcbdbput(d, sym, ssz, &sid, sizeof(sid)) <= 0) {
 		return 0;
 	}
-	return id;
+	return sid;
 #endif	/* USE_REDLAND */
 }
 
@@ -310,7 +313,7 @@ dict_next_oid(dict_t d)
 	if (UNLIKELY((res = tcbdbaddint(d, sid, sizeof(sid), 1)) <= 0)) {
 		return 0U;
 	}
-	return (dict_id_t)res;
+	return (dict_oid_t)res;
 #endif	/* USE_REDLAND */
 }
 
@@ -477,6 +480,9 @@ null:
 	i = NULL;
 	return (dict_si_t){};
 #else  /* !USE_REDLAND */
+	(void)d;
+	(void)src;
+
 	return (dict_si_t){};
 #endif	/* USE_REDLAND */
 }
