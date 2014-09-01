@@ -35,19 +35,11 @@ cfg_LIBS = $(lua_LIBS)
 endif HAVE_LUA
 libgand_la_SOURCES += gand-dict.c gand-dict.h
 libgand_la_CPPFLAGS = $(AM_CPPFLAGS)
-libgand_la_CPPFLAGS += -DUSE_REDLAND
 libgand_la_CPPFLAGS += $(cfg_CFLAGS)
 libgand_la_CPPFLAGS += $(dict_CFLAGS)
 libgand_la_LDFLAGS = $(AM_LDFLAGS)
-libgand_la_LDFLAGS += $(cfg_LIBS) $(dict_LIBS)
-dict_CFLAGS = $(tokyocabinet_CFLAGS)
-dict_CFLAGS += $(shell pkg-config --cflags rasqal)
-dict_CFLAGS += $(shell pkg-config --cflags raptor2)
-dict_CFLAGS += $(shell pkg-config --cflags redland)
-dict_LIBS = $(tokyocabinet_LIBS)
-dict_LIBS += $(shell pkg-config --libs rasqal)
-dict_LIBS += $(shell pkg-config --libs raptor2)
-dict_LIBS += $(shell pkg-config --libs redland)
+libgand_la_LDFLAGS += $(cfg_LIBS)
+libgand_la_LDFLAGS += $(dict_LIBS)
 
 ## our own take on a http server
 noinst_LTLIBRARIES += libbeef.la
@@ -74,7 +66,6 @@ gandaux_SOURCES += nifty.h
 gandaux_SOURCES += version.h version.c
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += -DHAVE_VERSION_H
-gandaux_CPPFLAGS += -DUSE_REDLAND
 gandaux_CPPFLAGS += $(dict_CFLAGS)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
 gandaux_LDFLAGS += $(dict_LIBS)
@@ -88,7 +79,6 @@ gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
 EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
-gandalfd_CPPFLAGS += -DUSE_REDLAND
 gandalfd_CPPFLAGS += $(dict_CFLAGS)
 gandalfd_CPPFLAGS += $(cfg_CFLAGS)
 gandalfd_CPPFLAGS += $(libev_CFLAGS)

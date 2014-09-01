@@ -106,9 +106,32 @@ AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.]
 	], [with_matlab="no"])
 AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
 
-PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
-AC_DEFINE([USE_TCBDB], [1], [define when tokyocabinet shall be db backend])
-with_database="tcbdb"
+AC_ARG_ENABLE([redland], [
+AS_HELP_STRING([--enable-redland], [dnl
+Set up gandalf server against redland triplestore, default: no])],
+	[enable_redland="${enableval}"], [enable_redland="no"])
+
+if test "${enable_redland}" = "yes"; then
+	PKG_CHECK_MODULES([rasqal], [rasqal])
+	PKG_CHECK_MODULES([raptor2], [raptor2])
+	PKG_CHECK_MODULES([redland], [redland])
+
+	AC_DEFINE([USE_REDLAND], [1], [define for redland backend])
+	with_database="redland"
+
+	dict_CFLAGS="${rasqal_CFLAGS} ${raptor2_CFLAGS} ${redland_CFLAGS}"
+	dict_LIBS="${rasqal_LIBS} ${raptor2_LIBS} ${redland_LIBS}"
+else
+	PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
+	AC_DEFINE([USE_TCBDB], [1], [define for tokyocabinet backend])
+	with_database="tcbdb"
+
+	dict_CFLAGS="${tokyocabinet_CFLAGS}"
+	dict_LIBS="${tokyocabinet_LIBS}"
+fi
+AC_SUBST([dict_CFLAGS])
+AC_SUBST([dict_LIBS])
+
 
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
