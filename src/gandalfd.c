@@ -743,7 +743,6 @@ work_ser(gand_httpd_req_t req)
 		};
 	}
 
-	GAND_INFO_LOG("  %s -> %08u", sym, rid);
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
 		goto interr;
