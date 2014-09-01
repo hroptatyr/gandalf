@@ -88,6 +88,7 @@ gandalfd_SOURCES = gandalfd.c
 gandalfd_SOURCES += gandalfd.yuck
 EXTRA_gandalfd_SOURCES =
 gandalfd_CPPFLAGS = $(AM_CPPFLAGS)
+gandalfd_CPPFLAGS += -DUSE_REDLAND
 gandalfd_CPPFLAGS += $(dict_CFLAGS)
 gandalfd_CPPFLAGS += $(cfg_CFLAGS)
 gandalfd_CPPFLAGS += $(libev_CFLAGS)

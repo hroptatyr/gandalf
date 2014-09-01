@@ -1148,7 +1148,11 @@ main(int argc, char *argv[])
 	/* paths and files */
 	const char *pidf;
 	const char *wwwd;
+#if defined USE_REDLAND
+	static const char _dictf[] = "gand_idx2sym";
+#else  /* !USE_REDLAND */
 	static const char _dictf[] = "gand_idx2sym.tcb";
+#endif	/* USE_REDLAND */
 	const char *dictf;
 	bool free_dictf_p = false;
 	/* inotify watcher */
