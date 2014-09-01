@@ -167,7 +167,7 @@ dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 	static unsigned char *rs;
 	static size_t rz;
 	librdf_node *s, *p;
-	dict_oid_t rid = 0;
+	dict_oid_t rid = NUL_OID;
 
 	if (UNLIKELY(rs == NULL)) {
 		rz = sizeof(_s) + ssz + 64U;
@@ -200,9 +200,9 @@ dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 	int rz[1];
 
 	if (UNLIKELY((rp = tcbdbget3(d, sym, ssz, rz)) == NULL)) {
-		return 0U;
+		return NUL_OID;
 	} else if (UNLIKELY(*rz != sizeof(*rp))) {
-		return 0U;
+		return NUL_OID;
 	}
 	return *rp;
 #endif	/* USE_REDLAND */
