@@ -77,6 +77,7 @@ extern dict_oid_t
 dict_set_next_oid(dict_t d, dict_oid_t oid);
 
 /* iterators */
-extern dict_si_t dict_iter(dict_t d);
+extern dict_si_t dict_sym_iter(dict_t d);
+extern dict_si_t dict_src_iter(dict_t d, const char *src);
 
 #endif	/* INCLUDED_gand_dict_h_ */

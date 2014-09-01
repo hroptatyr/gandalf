@@ -345,7 +345,7 @@ dict_set_next_oid(dict_t d, dict_oid_t oid)
 
 /* iterators */
 dict_si_t
-dict_iter(dict_t d)
+dict_sym_iter(dict_t d)
 {
 /* uses static state */
 #if defined USE_REDLAND
@@ -418,6 +418,45 @@ null:
 		tcbdbcurdel(c);
 	}
 	c = NULL;
+	return (dict_si_t){};
+#endif	/* USE_REDLAND */
+}
+
+dict_si_t
+dict_src_iter(dict_t d, const char *src)
+{
+/* uses static state */
+#if defined USE_REDLAND
+	static librdf_iterator *i;
+	librdf_node *s;
+	dict_si_t res;
+
+	if (UNLIKELY(i == NULL)) {
+		librdf_node *p = librdf_new_node_from_uri(wrld, vrb_src);
+		librdf_node *o = dict_src(src);
+
+		i = librdf_model_get_sources(d, p, o);
+	} else {
+		(void)librdf_iterator_next(i);
+	}
+
+	if (UNLIKELY((s = librdf_iterator_get_object(i)) == NULL)) {
+		goto null;
+	}
+
+	with (librdf_uri *u = librdf_node_get_uri(s)) {
+		res.sym = (const char*)librdf_uri_as_string(u);
+	}
+	res.sid = 1U;
+	return res;
+
+null:
+	if (LIKELY(i != NULL)) {
+		librdf_free_iterator(i);
+	}
+	i = NULL;
+	return (dict_si_t){};
+#else  /* !USE_REDLAND */
 	return (dict_si_t){};
 #endif	/* USE_REDLAND */
 }
