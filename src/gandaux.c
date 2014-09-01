@@ -53,7 +53,11 @@
 
 typedef unsigned int dict_id_t;
 
+#if defined USE_REDLAND
+static char *idxf = "gand_idx2sym";
+#else  /* !USE_REDLAND */
 static char *idxf = "gand_idx2sym.tcb";
+#endif	/* USE_REDLAND */
 
 
 static __attribute__((format(printf, 1, 2))) void
@@ -215,10 +219,17 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		serror("cannot creat temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
+#if defined USE_REDLAND
+	} else if ((d = open_dict(idxf, oflags)) == NULL) {
+		serror("cannot create temporary index file `%s'", tmpf);
+		rc = 1;
+		goto out;
+#else  /* !USE_REDLAND */
 	} else if ((d = open_dict(tmpf, oflags)) == NULL) {
 		serror("cannot create temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
+#endif	/* USE_REDLAND */
 	}
 
 	/* close mkstemp's descriptor */
