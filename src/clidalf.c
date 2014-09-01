@@ -196,7 +196,7 @@ cmd_show(const struct yuck_cmd_show_s argi[static 1U])
 		const char *fn;
 		gandfn_t fb;
 
-		if (!(rid = dict_sym2oid(gsymdb, sym, ssz))) {
+		if (!(rid = dict_get_sym(gsymdb, sym, ssz))) {
 			errno = 0;
 			error("symbol not found: %s\n", sym);
 			continue;

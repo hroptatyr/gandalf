@@ -271,7 +271,7 @@ add_sym(dict_t d, const char sym[static 1U], size_t ssz)
 /* add SYM with id SID (or if 0 generate one) and return the SID. */
 	dict_oid_t sid;
 
-	if ((sid = dict_sym2oid(d, sym, ssz))) {
+	if ((sid = dict_get_sym(d, sym, ssz))) {
 		/* ok, nothing to do */
 		;
 	} else if (UNLIKELY(!(sid = next_id(d)))) {
