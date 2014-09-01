@@ -735,6 +735,7 @@ work_ser(gand_httpd_req_t req)
 	} else if (!(rid = dict_get_sym(gsymdb, sym))) {
 		static const char errmsg[] = "Symbol not found\n";
 
+	r409:
 		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
 		return (gand_httpd_res_t){
 			.rc = 409U/*CONFLICT*/,
@@ -743,6 +744,21 @@ work_ser(gand_httpd_req_t req)
 			.rd = {DTYP_DATA, errmsg},
 		};
 	}
+
+
+	int fd;
+	if (UNLIKELY((fn = make_super_name(rid)) == NULL)) {
+		goto interr;
+	} else if (UNLIKELY((fd = openat(trolf_dirfd, fn, O_RDONLY)) < 0)) {
+		goto r409;
+	}
+
+	/* success */
+	return (gand_httpd_res_t){
+		.rc = 200U/*OK*/,
+		.ctyp = OF(UNK),
+		.rd = {DTYP_SOCK, .sock = fd},
+	};
 
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
