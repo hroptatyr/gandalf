@@ -40,16 +40,21 @@
 typedef void *dict_t;
 typedef unsigned int dict_oid_t;
 
+#define NUL_OID		((dict_oid_t)0U)
+
 
 extern dict_t open_dict(const char *fn, int oflags);
 
 extern void close_dict(dict_t d);
 
-extern dict_oid_t dict_sym2oid(dict_t d, const char sym[static 1U], size_t ssz);
+/**
+ * Return oid for SYM (of length SSZ), or NUL_OID if not existent. */
+extern dict_oid_t
+dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz);
 
 /**
  * Put SYM (of length SSZ) into dictionary D under oid ID, or
- * if ID is 0, create a suitable oid.
+ * if ID is NUL_OID, create a suitable oid.
  * Return the oid that SYM is mapped to. */
 extern dict_oid_t
 dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id);

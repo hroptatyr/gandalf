@@ -148,7 +148,7 @@ close_dict(dict_t d)
 }
 
 dict_oid_t
-dict_sym2oid(dict_t d, const char sym[static 1U], size_t ssz)
+dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
 #if defined USE_REDLAND
 	static const unsigned char _s[] = "http://lakshmi:8080/v0/series/";
