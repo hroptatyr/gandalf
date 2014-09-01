@@ -59,4 +59,14 @@ dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz);
 extern dict_oid_t
 dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id);
 
+/**
+ * Return the next available oid. */
+extern dict_oid_t
+dict_next_oid(dict_t d);
+
+/**
+ * Clamp next available oid to OID. */
+extern dict_oid_t
+dict_set_next_oid(dict_t d, dict_oid_t oid);
+
 #endif	/* INCLUDED_gand_dict_h_ */
