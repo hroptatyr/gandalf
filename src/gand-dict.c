@@ -50,7 +50,6 @@
 
 #if defined USE_REDLAND
 static librdf_world *wrld;
-static librdf_storage *stor;
 #endif	/* USE_REDLAND */
 
 static const unsigned char*
@@ -94,14 +93,18 @@ dict_t
 open_dict(const char *fn, int oflags)
 {
 #if defined USE_REDLAND
+	dict_t res = NULL;
+
 	(void)oflags;
 
 	if (wrld == NULL) {
 		wrld = librdf_new_world();
 	}
-	stor = librdf_new_storage(
-		wrld, "hashes", fn, "hash-type='bdb',dir='.'");
-	return librdf_new_model(wrld, stor, NULL);
+	with (librdf_storage *s = librdf_new_storage(wrld, "hashes", fn, sfl)) {
+		res = librdf_new_model(wrld, s, NULL);
+		librdf_free_storage(s);
+	}
+	return res;
 #else  /* !USE_REDLAND */
 	int omode = BDBOREADER;
 	dict_t res;
@@ -137,7 +140,6 @@ close_dict(dict_t d)
 {
 #if defined USE_REDLAND
 	librdf_free_model(d);
-	librdf_free_storage(stor);
 	librdf_free_world(wrld);
 	wrld = NULL;
 #else  /* !USE_REDLAND */
