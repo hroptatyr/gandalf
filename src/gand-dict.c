@@ -310,4 +310,85 @@ dict_set_next_oid(dict_t d, dict_oid_t oid)
 	return oid;
 }
 
+
+/* iterators */
+dict_si_t
+dict_iter(dict_t d)
+{
+/* uses static state */
+#if defined USE_REDLAND
+	static librdf_stream *i;
+	librdf_statement *st;
+	librdf_node *s, *o;
+	dict_si_t res;
+
+	if (UNLIKELY(i == NULL)) {
+		librdf_node *p = librdf_new_node_from_uri(wrld, uri_rid);
+
+		st = librdf_new_statement_from_nodes(wrld, NULL, p, NULL);
+		i = librdf_model_find_statements(d, st);
+		librdf_free_node(p);
+		librdf_free_statement(st);
+	} else {
+		(void)librdf_stream_next(i);
+	}
+
+	if (UNLIKELY((st = librdf_stream_get_object(i)) == NULL)) {
+		goto null;
+	}
+	s = librdf_statement_get_subject(st);
+	o = librdf_statement_get_object(st);
+
+	with (librdf_uri *u = librdf_node_get_uri(s)) {
+		res.sym = (const char*)librdf_uri_as_string(u);
+	}
+	with (const unsigned char *val = librdf_node_get_literal_value(o)) {
+		res.sid = strtoul((const char*)val, NULL, 10);
+	}
+	return res;
+
+null:
+	if (LIKELY(i != NULL)) {
+		librdf_free_stream(i);
+	}
+	i = NULL;
+	return (dict_si_t){};
+
+#else  /* !USE_REDLAND */
+	static BDBCUR *c;
+	dict_si_t res;
+	const void *vp;
+	int z[1U];
+
+	if (UNLIKELY(c == NULL)) {
+		c = tcbdbcurnew(d);
+		tcbdbcurjump(c, SYM_SPACE, sizeof(SYM_SPACE));
+	}
+
+	if (UNLIKELY((vp = tcbdbcurval3(c, z)) == NULL)) {
+		goto null;
+	} else if (*z != sizeof(int)) {
+		goto null;
+	}
+	/* otherwise fill res */
+	res.sid = *(const int*)vp;
+
+	if (UNLIKELY((vp = tcbdbcurkey3(c, z)) == NULL)) {
+		goto null;
+	}
+	/* or fill */
+	res.sym = vp;
+	/* also iterate to the next thing */
+	tcbdbcurnext(c);
+	return res;
+
+null:
+	if (LIKELY(c != NULL)) {
+		tcbdbcurdel(c);
+	}
+	c = NULL;
+	return (dict_si_t){};
+#endif	/* USE_REDLAND */
+}
+
 /* gand-dict.c ends here */

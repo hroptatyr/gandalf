@@ -40,6 +40,13 @@
 typedef void *dict_t;
 typedef unsigned int dict_oid_t;
 
+typedef struct dict_si_s dict_si_t;
+
+struct dict_si_s {
+	dict_oid_t sid;
+	const char *sym;
+};
+
 #define NUL_OID		((dict_oid_t)0U)
 
 
@@ -68,5 +75,8 @@ dict_next_oid(dict_t d);
  * Clamp next available oid to OID. */
 extern dict_oid_t
 dict_set_next_oid(dict_t d, dict_oid_t oid);
+
+/* iterators */
+extern dict_si_t dict_iter(dict_t d);
 
 #endif	/* INCLUDED_gand_dict_h_ */
