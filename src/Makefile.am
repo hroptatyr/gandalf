@@ -38,9 +38,8 @@ libgand_la_CPPFLAGS = $(AM_CPPFLAGS)
 libgand_la_CPPFLAGS += $(cfg_CFLAGS)
 libgand_la_CPPFLAGS += $(dict_CFLAGS)
 libgand_la_LDFLAGS = $(AM_LDFLAGS)
-libgand_la_LDFLAGS += $(cfg_LIBS) $(dict_LIBS)
-dict_CFLAGS =
-dict_LIBS = $(tokyocabinet_LIBS)
+libgand_la_LDFLAGS += $(cfg_LIBS)
+libgand_la_LDFLAGS += $(dict_LIBS)
 
 ## our own take on a http server
 noinst_LTLIBRARIES += libbeef.la
@@ -67,9 +66,10 @@ gandaux_SOURCES += nifty.h
 gandaux_SOURCES += version.h version.c
 gandaux_CPPFLAGS = $(AM_CPPFLAGS)
 gandaux_CPPFLAGS += -DHAVE_VERSION_H
-gandaux_CPPFLAGS += $(tokyocabinet_CFLAGS)
+gandaux_CPPFLAGS += $(dict_CFLAGS)
 gandaux_LDFLAGS = $(AM_LDFLAGS)
-gandaux_LDFLAGS += $(tokyocabinet_LIBS)
+gandaux_LDFLAGS += $(dict_LIBS)
+gandaux_LDADD = libgand.la
 endif  BUILD_SERVER
 BUILT_SOURCES += gandaux.yucc
 

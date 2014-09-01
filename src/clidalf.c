@@ -142,7 +142,6 @@ filtshow(const char *data, const size_t dlen)
 		/* snarf the line, v0 format, zero copy */
 		ln = snarf_rln(bol, eol - bol);
 
-	filt:
 		/* apply filters */
 		;
 
@@ -191,12 +190,11 @@ cmd_show(const struct yuck_cmd_show_s argi[static 1U])
 {
 	for (size_t i = 0U; i < argi->symbol_nargs; i++) {
 		const char *sym = argi->symbol_args[i];
-		const size_t ssz = strlen(sym);
 		dict_oid_t rid;
 		const char *fn;
 		gandfn_t fb;
 
-		if (!(rid = dict_sym2oid(gsymdb, sym, ssz))) {
+		if (!(rid = dict_get_sym(gsymdb, sym))) {
 			errno = 0;
 			error("symbol not found: %s\n", sym);
 			continue;
