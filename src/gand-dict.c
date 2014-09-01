@@ -93,12 +93,21 @@ dict_t
 open_dict(const char *fn, int oflags)
 {
 #if defined USE_REDLAND
+	char sfl[64U] = "hash-type='bdb'";
+	char *sp = sfl + 15U;
 	dict_t res = NULL;
 
-	(void)oflags;
+	if (!(oflags & O_RDWR)) {
+		memcpy(sp, ",write='no'", 11U + 1U/*\nul*/);
+		sp += 11U;
+	}
+	if (oflags & O_TRUNC) {
+		memcpy(sp, ",new='yes'", 10U + 1U/*\nul*/);
+		sp += 10U;
+	}
 
-	if (wrld == NULL) {
-		wrld = librdf_new_world();
+	if (wrld == NULL && (wrld = librdf_new_world()) == NULL) {
+		return NULL;
 	}
 	with (librdf_storage *s = librdf_new_storage(wrld, "hashes", fn, sfl)) {
 		res = librdf_new_model(wrld, s, NULL);
