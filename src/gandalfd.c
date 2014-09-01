@@ -743,6 +743,7 @@ work_ser(gand_httpd_req_t req)
 		};
 	}
 
+	GAND_INFO_LOG("  %s -> %08u\n", sym, rid);
 	/* otherwise we've got some real yacka to do */
 	if (UNLIKELY((fn = make_lateglu_name(rid)) == NULL)) {
 		goto interr;
@@ -920,18 +921,21 @@ r409:
 static gand_httpd_res_t
 work_src(gand_httpd_req_t req)
 {
+	static const char _s[] = "rolf_source";
 	gandfn_t fb;
-	const char *sym;
+	const char *src;
 	dict_oid_t rid;
 	gand_of_t of;
+	gand_gbuf_t gb;
 
 	if ((of = req_get_outfmt(req)) == OF_UNK) {
 		of = OF_CSV;
 	}
-	if ((sym = req.path + sizeof(EP(V0_SOURCES)))[-1] == '\0') {
+	if ((src = req.path + sizeof(EP(V0_SOURCES)))[-1] == '\0' ||
+	    *src == '\0') {
 		/* they just want all sources listed */
-		;
-	} else if (sym[-1] != '/') {
+		goto all;
+	} else if (src[-1] != '/') {
 		static const char errmsg[] = "Bad Request\n";
 
 		GAND_INFO_LOG(":rsp [400 Bad request]");
@@ -943,7 +947,33 @@ work_src(gand_httpd_req_t req)
 		};
 	}
 
-	static const char _s[] = "rolf_source";
+	/* obtain the buffer we can send bytes to */
+	if (UNLIKELY((gb = make_gand_gbuf(4096U)) == NULL)) {
+		GAND_ERR_LOG("cannot obtain gbuf");
+		goto interr_unmap;
+	}
+	for (dict_si_t si; (si = dict_src_iter(gsymdb, src)).sid;) {
+		char sym[256U];
+		size_t len = strlen(si.sym);
+
+		if (len >= sizeof(sym)) {
+			/* buffer oflow protection */
+			len = sizeof(sym) - 1U;
+		}
+		memcpy(sym, si.sym, len);
+		sym[len++] = '\n';
+		gand_gbuf_write(gb, sym, len);
+	}
+
+	GAND_INFO_LOG(":rsp [200 OK]: source %s", src);
+	return (gand_httpd_res_t){
+		.rc = 200U/*OK*/,
+		.ctyp = _ofs[of],
+		.clen = CLEN_UNKNOWN,
+		.rd = {DTYP_GBUF, gb},
+	};
+
+all:
 	if (UNLIKELY((fb = mmapat_fn(trolf_dirfd, _s, O_RDONLY)).fd < 0)) {
 		/* big fuck */
 		goto interr;
@@ -954,7 +984,6 @@ work_src(gand_httpd_req_t req)
 	const size_t bsz = fb.fb.z;
 	char proto[4096U];
 	size_t tot = 0U;
-	gand_gbuf_t gb;
 
 	/* obtain the buffer we can send bytes to */
 	if (UNLIKELY((gb = make_gand_gbuf(bsz)) == NULL)) {
