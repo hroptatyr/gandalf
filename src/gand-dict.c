@@ -49,78 +49,48 @@
 #include "gand-dict.h"
 #include "nifty.h"
 
-#if !defined USE_REDLAND
+#if defined USE_REDLAND
+static librdf_world *wrld;
+static librdf_uri *uri_xsdint;
+static librdf_uri *uri_rid;
+static librdf_uri *uri_max;
+#else  /* !USE_REDLAND */
 # define SID_SPACE	"\x1d"
 # define SYM_SPACE	"\x20"
 #endif	/* USE_REDLAND */
 
 #if defined USE_REDLAND
-static inline librdf_world*
-dict_world(bool freep)
+static int
+init_world(void)
 {
-/* singleton */
-	static librdf_world *wrld;
+	if (LIKELY(wrld != NULL)) {
+		return 0;
+	}
+	wrld = librdf_new_world();
+	uri_xsdint = librdf_new_uri(
+		wrld, "http://www.w3.org/2001/XMLSchema/integer");
+	uri_rid = librdf_new_uri(
+		wrld, "http://www.ga-group.nl/rolf/1.0/rid");
+	uri_max = librdf_new_uri(
+		wrld, "http://http://www.w3.org/2001/XMLSchema/maxInclusive");
+	return 0;
+}
 
+static int
+fini_world(void)
+{
 	if (UNLIKELY(wrld == NULL)) {
-		wrld = librdf_new_world();
-	} else if (UNLIKELY(freep)) {
-		librdf_free_world(wrld);
-		wrld = NULL;
+		return 0;
 	}
-	return wrld;
-}
-
-static inline librdf_uri*
-xsdint_uri(bool freep)
-{
-/* singleton */
-	static librdf_uri *xsdint;
-	librdf_world *w;
-
-	if (UNLIKELY(xsdint == NULL) &&
-	    LIKELY((w = dict_world(false)) != NULL)) {
-		xsdint = librdf_new_uri(
-			w, "http://www.w3.org/2001/XMLSchema/integer");
-	} else if (LIKELY(xsdint != NULL) && UNLIKELY(freep)) {
-		librdf_free_uri(xsdint);
-		xsdint = NULL;
-	}
-	return xsdint;
-}
-
-static inline librdf_node*
-dict_rid(bool freep)
-{
-/* singleton */
-	static const unsigned char _v[] = "http://www.ga-group.nl/rolf/1.0/rid";
-	static librdf_node *n;
-	librdf_world *w;
-
-	if (UNLIKELY(n == NULL) && LIKELY((w = dict_world(false)) != NULL)) {
-		n = librdf_new_node_from_uri_string(w, _v);
-	} else if (LIKELY(n != NULL) && UNLIKELY(freep)) {
-		librdf_free_node(n);
-		n = NULL;
-	}
-	return n;
-}
-
-static inline librdf_node*
-dict_max(bool freep)
-{
-/* singleton */
-	static const unsigned char _v[] =
-		"http://http://www.w3.org/2001/XMLSchema/maxExclusive";
-	static librdf_node *n;
-	librdf_world *w;
-
-	if (UNLIKELY(n == NULL) && LIKELY((w = dict_world(false)) != NULL)) {
-		n = librdf_new_node_from_uri_string(w, _v);
-	} else if (LIKELY(n != NULL) && UNLIKELY(freep)) {
-		librdf_free_node(n);
-		n = NULL;
-	}
-	return n;
+	librdf_free_uri(uri_xsdint);
+	librdf_free_uri(uri_rid);
+	librdf_free_uri(uri_max);
+	librdf_free_world(wrld);
+	wrld = NULL;
+	uri_xsdint = NULL;
+	uri_rid = NULL;
+	uri_max = NULL;
+	return 0;
 }
 
 static const unsigned char*
@@ -163,15 +133,12 @@ static inline librdf_node*
 dict_sym(const char sym[static 1U], size_t ssz)
 {
 /* convenience */
-	librdf_world *w;
 	const unsigned char *rs;
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
-		return NULL;
-	} else if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
+	if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
 		return NULL;
 	}
-	return librdf_new_node_from_uri_string(w, rs);
+	return librdf_new_node_from_uri_string(wrld, rs);
 }
 
 #endif	/* USE_REDLAND */
@@ -184,7 +151,6 @@ open_dict(const char *fn, int oflags)
 	char sfl[64U] = "hash-type='bdb'";
 	char *sp = sfl + 15U;
 	dict_t res = NULL;
-	librdf_world *w;
 
 	if (!(oflags & O_RDWR)) {
 		memcpy(sp, ",write='no'", 11U + 1U/*\nul*/);
@@ -195,11 +161,11 @@ open_dict(const char *fn, int oflags)
 		sp += 10U;
 	}
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
+	if (UNLIKELY(init_world() < 0)) {
 		return NULL;
 	}
-	with (librdf_storage *s = librdf_new_storage(w, "hashes", fn, sfl)) {
-		res = librdf_new_model(w, s, NULL);
+	with (librdf_storage *s = librdf_new_storage(wrld, "hashes", fn, sfl)) {
+		res = librdf_new_model(wrld, s, NULL);
 		librdf_free_storage(s);
 	}
 	return res;
@@ -238,7 +204,7 @@ close_dict(dict_t d)
 {
 #if defined USE_REDLAND
 	librdf_free_model(d);
-	(void)dict_world(true);
+	(void)fini_world();
 #else  /* !USE_REDLAND */
 	tcbdbclose(d);
 	tcbdbdel(d);
@@ -250,18 +216,14 @@ dict_oid_t
 dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 {
 #if defined USE_REDLAND
-	librdf_world *w;
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((p = dict_rid(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((s = dict_sym(sym, ssz)) == NULL)) {
+	if (UNLIKELY((s = dict_sym(sym, ssz)) == NULL)) {
 		return NUL_OID;
 	}
 
+	p = librdf_new_node_from_uri(wrld, uri_rid);
 	with (librdf_node *res = librdf_model_get_target(d, s, p)) {
 		if (LIKELY(res != NULL)) {
 			const unsigned char *val =
@@ -270,6 +232,7 @@ dict_get_sym(dict_t d, const char sym[static 1U], size_t ssz)
 		}
 	}
 	librdf_free_node(s);
+	librdf_free_node(p);
 	return rid;
 
 #else  /* !USE_REDLAND */
@@ -289,34 +252,24 @@ dict_oid_t
 dict_put_sym(dict_t d, const char sym[static 1U], size_t ssz, dict_oid_t id)
 {
 #if defined USE_REDLAND
-	librdf_world *w;
-	librdf_uri *i;
-	librdf_node *nv;
-	const unsigned char *rs;
+	librdf_node *ns, *nv, *no;
 	unsigned char o[16U];
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((i = xsdint_uri(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((nv = dict_rid(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((rs = get_symuri(sym, ssz)) == NULL)) {
+	if (UNLIKELY((ns = dict_sym(sym, ssz)) == NULL)) {
 		return NUL_OID;
 	}
 
 	snprintf((char*)o, sizeof(o), "%08u", id);
-
-	with (librdf_node *ns = librdf_new_node_from_uri_string(w, rs),
-	      *no = librdf_new_node_from_typed_literal(w, o, NULL, i)) {
-		librdf_statement *st;
-
-		st = librdf_new_statement_from_nodes(w, ns, nv, no);
+	nv = librdf_new_node_from_uri(wrld, uri_rid);
+	no = librdf_new_node_from_typed_literal(wrld, o, NULL, uri_xsdint);
+	with (librdf_statement *st) {
+		st = librdf_new_statement_from_nodes(wrld, ns, nv, no);
 		librdf_model_add_statement(d, st);
 		librdf_free_statement(st);
-		librdf_free_node(ns);
-		librdf_free_node(no);
 	}
+	librdf_free_node(ns);
+	librdf_free_node(nv);
+	librdf_free_node(no);
 	return id;
 
 #else  /* !USE_REDLAND */
@@ -331,25 +284,23 @@ dict_oid_t
 dict_next_oid(dict_t d)
 {
 #if defined USE_REDLAND
-	librdf_world *w;
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((s = dict_rid(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((p = dict_max(false)) == NULL)) {
-		return NUL_OID;
-	}
+	s = librdf_new_node_from_uri(wrld, uri_rid);
+	p = librdf_new_node_from_uri(wrld, uri_max);
 
 	with (librdf_node *res = librdf_model_get_target(d, s, p)) {
 		if (LIKELY(res != NULL)) {
 			const unsigned char *val =
 				librdf_node_get_literal_value(res);
-			rid = strtoul((const char*)val, NULL, 10);
+			if ((rid = strtoul((const char*)val, NULL, 10))) {
+				rid++;
+			}
 		}
 	}
+	librdf_free_node(s);
+	librdf_free_node(p);
 	return rid;
 
 #else  /* !USE_REDLAND */
@@ -367,32 +318,23 @@ dict_oid_t
 dict_set_next_oid(dict_t d, dict_oid_t oid)
 {
 #if defined USE_REDLAND
-	librdf_world *w;
-	librdf_uri *i;
-	librdf_node *s, *p;
-	unsigned char o[16U];
+	librdf_node *s, *p, *o;
+	unsigned char _o[16U];
 
-	if (UNLIKELY((w = dict_world(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((i = xsdint_uri(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((s = dict_rid(false)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY((p = dict_max(false)) == NULL)) {
-		return NUL_OID;
-	}
+	s = librdf_new_node_from_uri(wrld, uri_rid);
+	p = librdf_new_node_from_uri(wrld, uri_max);
 	/* print off oid */
-	snprintf((char*)o, sizeof(o), "%08u", oid);
+	snprintf((char*)_o, sizeof(_o), "%08u", oid);
+	o = librdf_new_node_from_typed_literal(wrld, _o, NULL, uri_xsdint);
 
-	with (librdf_node *no =
-	      librdf_new_node_from_typed_literal(w, o, NULL, i)) {
-		librdf_statement *st;
-
-		st = librdf_new_statement_from_nodes(w, s, p, no);
+	with (librdf_statement *st) {
+		st = librdf_new_statement_from_nodes(wrld, s, p, o);
 		librdf_model_add_statement(d, st);
 		librdf_free_statement(st);
-		librdf_free_node(no);
 	}
+	librdf_free_node(s);
+	librdf_free_node(p);
+	librdf_free_node(o);
 
 #else  /* !USE_REDLAND */
 	static const char sid[] = SID_SPACE;
