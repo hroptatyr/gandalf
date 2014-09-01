@@ -52,9 +52,11 @@
 #if defined USE_REDLAND
 static librdf_world *wrld;
 static librdf_uri *uri_xsdint;
-static librdf_uri *uri_rid;
+static librdf_uri *vrb_rid;
+static librdf_uri *vrb_src;
 static librdf_uri *uri_max;
 static librdf_uri *uri_ser;
+static librdf_uri *uri_src;
 #else  /* !USE_REDLAND */
 # define SID_SPACE	"\x1d"
 # define SYM_SPACE	"\x20"
@@ -70,12 +72,16 @@ init_world(void)
 	wrld = librdf_new_world();
 	uri_xsdint = librdf_new_uri(
 		wrld, "http://www.w3.org/2001/XMLSchema/integer");
-	uri_rid = librdf_new_uri(
+	vrb_rid = librdf_new_uri(
 		wrld, "http://www.ga-group.nl/rolf/1.0/rid");
+	vrb_src = librdf_new_uri(
+		wrld, "http://www.ga-group.nl/rolf/1.0/src");
 	uri_max = librdf_new_uri(
 		wrld, "http://http://www.w3.org/2001/XMLSchema/maxInclusive");
 	uri_ser = librdf_new_uri(
 		wrld, "http://rolf.ga-group.nl/v0/series/");
+	uri_src = librdf_new_uri(
+		wrld, "http://rolf.ga-group.nl/v0/sources/");
 	return 0;
 }
 
@@ -86,15 +92,19 @@ fini_world(void)
 		return 0;
 	}
 	librdf_free_uri(uri_xsdint);
-	librdf_free_uri(uri_rid);
+	librdf_free_uri(vrb_rid);
+	librdf_free_uri(vrb_src);
 	librdf_free_uri(uri_max);
 	librdf_free_uri(uri_ser);
+	librdf_free_uri(uri_src);
 	librdf_free_world(wrld);
 	wrld = NULL;
 	uri_xsdint = NULL;
-	uri_rid = NULL;
+	vrb_rid = NULL;
+	vrb_src = NULL;
 	uri_max = NULL;
 	uri_ser = NULL;
+	uri_src = NULL;
 	return 0;
 }
 
@@ -104,6 +114,14 @@ dict_sym(const char *sym)
 /* convenience */
 	const unsigned char *sp = (const unsigned char*)sym;
 	return librdf_new_node_from_uri_local_name(wrld, uri_ser, sp);
+}
+
+static inline librdf_node*
+dict_src(const char *src)
+{
+/* convenience */
+	const unsigned char *sp = (const unsigned char*)src;
+	return librdf_new_node_from_uri_local_name(wrld, uri_src, sp);
 }
 
 #endif	/* USE_REDLAND */
@@ -188,7 +206,7 @@ dict_get_sym(dict_t d, const char *sym)
 		return NUL_OID;
 	}
 
-	p = librdf_new_node_from_uri(wrld, uri_rid);
+	p = librdf_new_node_from_uri(wrld, vrb_rid);
 	with (librdf_node *res = librdf_model_get_target(d, s, p)) {
 		if (LIKELY(res != NULL)) {
 			const unsigned char *val =
@@ -217,24 +235,41 @@ dict_oid_t
 dict_put_sym(dict_t d, const char *sym, dict_oid_t id)
 {
 #if defined USE_REDLAND
-	librdf_node *ns, *nv, *no;
-	unsigned char o[16U];
+	librdf_node *s, *p, *o;
+	unsigned char _o[16U];
 
-	if (UNLIKELY((ns = dict_sym(sym)) == NULL)) {
+	if (UNLIKELY((s = dict_sym(sym)) == NULL)) {
 		return NUL_OID;
 	}
 
-	snprintf((char*)o, sizeof(o), "%08u", id);
-	nv = librdf_new_node_from_uri(wrld, uri_rid);
-	no = librdf_new_node_from_typed_literal(wrld, o, NULL, uri_xsdint);
+	p = librdf_new_node_from_uri(wrld, vrb_rid);
+
+	/* prep the sid literal */
+	snprintf((char*)_o, sizeof(_o), "%08u", id);
+	o = librdf_new_node_from_typed_literal(wrld, _o, NULL, uri_xsdint);
+
 	with (librdf_statement *st) {
-		st = librdf_new_statement_from_nodes(wrld, ns, nv, no);
+		st = librdf_new_statement_from_nodes(wrld, s, p, o);
 		librdf_model_add_statement(d, st);
 		librdf_free_statement(st);
 	}
-	librdf_free_node(ns);
-	librdf_free_node(nv);
-	librdf_free_node(no);
+
+	with (const char *x = strrchr(sym, '@')) {
+		if (UNLIKELY(x == NULL)) {
+			break;
+		} else if (UNLIKELY((s = dict_sym(sym)) == NULL)) {
+			break;
+		} else if (UNLIKELY((o = dict_src(x + 1U)) == NULL)) {
+			break;
+		}
+
+		p = librdf_new_node_from_uri(wrld, vrb_src);
+		with (librdf_statement *st) {
+			st = librdf_new_statement_from_nodes(wrld, s, p, o);
+			librdf_model_add_statement(d, st);
+			librdf_free_statement(st);
+		}
+	}
 	return id;
 
 #else  /* !USE_REDLAND */
@@ -252,7 +287,7 @@ dict_next_oid(dict_t d)
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
-	s = librdf_new_node_from_uri(wrld, uri_rid);
+	s = librdf_new_node_from_uri(wrld, vrb_rid);
 	p = librdf_new_node_from_uri(wrld, uri_max);
 
 	with (librdf_node *res = librdf_model_get_target(d, s, p)) {
@@ -286,7 +321,7 @@ dict_set_next_oid(dict_t d, dict_oid_t oid)
 	librdf_node *s, *p, *o;
 	unsigned char _o[16U];
 
-	s = librdf_new_node_from_uri(wrld, uri_rid);
+	s = librdf_new_node_from_uri(wrld, vrb_rid);
 	p = librdf_new_node_from_uri(wrld, uri_max);
 	/* print off oid */
 	snprintf((char*)_o, sizeof(_o), "%08u", oid);
@@ -297,9 +332,6 @@ dict_set_next_oid(dict_t d, dict_oid_t oid)
 		librdf_model_add_statement(d, st);
 		librdf_free_statement(st);
 	}
-	librdf_free_node(s);
-	librdf_free_node(p);
-	librdf_free_node(o);
 
 #else  /* !USE_REDLAND */
 	static const char sid[] = SID_SPACE;
@@ -323,11 +355,10 @@ dict_iter(dict_t d)
 	dict_si_t res;
 
 	if (UNLIKELY(i == NULL)) {
-		librdf_node *p = librdf_new_node_from_uri(wrld, uri_rid);
+		librdf_node *p = librdf_new_node_from_uri(wrld, vrb_rid);
 
 		st = librdf_new_statement_from_nodes(wrld, NULL, p, NULL);
 		i = librdf_model_find_statements(d, st);
-		librdf_free_node(p);
 		librdf_free_statement(st);
 	} else {
 		(void)librdf_stream_next(i);
