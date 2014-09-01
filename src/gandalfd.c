@@ -731,7 +731,7 @@ work_ser(gand_httpd_req_t req)
 			.clen = sizeof(errmsg)- 1U,
 			.rd = {DTYP_DATA, errmsg},
 		};
-	} else if (!(rid = dict_get_sym(gsymdb, sym, strlen(sym)))) {
+	} else if (!(rid = dict_get_sym(gsymdb, sym))) {
 		static const char errmsg[] = "Symbol not found\n";
 
 		GAND_INFO_LOG(":rsp [409 Conflict]: Symbol not found");
