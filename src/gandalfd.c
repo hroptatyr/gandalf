@@ -77,8 +77,6 @@ struct rln_s {
 };
 
 static dict_t gsymdb;
-static char *trolfdir;
-static size_t ntrolfdir;
 static int trolf_dirfd;
 
 
@@ -1178,6 +1176,8 @@ main(int argc, char *argv[])
 	/* paths and files */
 	const char *pidf;
 	const char *wwwd;
+	const char *trlf;
+	static const char _trlf[] = "/var/scratch/freundt/trolf";
 #if defined USE_REDLAND
 	static const char _dictf[] = "gand_idx2sym";
 #else  /* !USE_REDLAND */
@@ -1271,17 +1271,17 @@ main(int argc, char *argv[])
 	}
 
 	/* get the trolf dir */
-	if (argi->trolfdir_arg) {
+	if ((trlf = argi->trolfdir_arg) ||
+	    (cfg && cfg_glob_lookup_s(&trlf, cfg, "trolfdir") > 0)) {
 		/* command line has precedence */
-		ntrolfdir = strlen(argi->trolfdir_arg);
-		/* make sure trolfdir is free()able */
-		trolfdir = strndup(argi->trolfdir_arg, ntrolfdir);
-	} else if (cfg && (ntrolfdir = gand_get_trolfdir(&trolfdir, cfg))) {
 		;
+	} else {
+		/* preset with default */
+		trlf = _trlf;
 	}
 
 	/* create trolf's dirfd */
-	if ((trolf_dirfd = open(trolfdir, O_RDONLY)) < 0) {
+	if ((trolf_dirfd = open(trlf, O_RDONLY)) < 0) {
 		GAND_ERR_LOG("cannot access trolf directory: %s",
 			     strerror(errno));
 		rc = 1;
@@ -1360,10 +1360,6 @@ outd:
 		close(trolf_dirfd);
 	}
 out2:
-	/* free trolfdir and nfo_fname */
-	if (LIKELY(trolfdir != NULL)) {
-		free(trolfdir);
-	}
 	if (free_dictf_p) {
 		gand_free_trolf_filename(dictf);
 	}

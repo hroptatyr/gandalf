@@ -130,50 +130,6 @@ gand_free_config(cfg_t ctx)
 	return;
 }
 
-size_t
-gand_get_trolfdir(char **tgt, cfg_t ctx)
-{
-	static char __trolfdir[] = "/var/scratch/freundt/trolf";
-	size_t rsz;
-	const char *res = NULL;
-	cfgset_t *cs;
-
-	if (UNLIKELY(ctx == NULL)) {
-		goto dflt;
-	}
-
-	/* start out with an empty target */
-	for (size_t i = 0, n = cfg_get_sets(&cs, ctx); i < n; i++) {
-		if ((rsz = cfg_tbl_lookup_s(&res, ctx, cs[i], "trolfdir"))) {
-			struct stat st = {0};
-
-			if (stat(res, &st) == 0) {
-				/* set up the IO watcher and timer */
-				goto out;
-			}
-		}
-	}
-
-	/* otherwise try the root domain */
-	if ((rsz = cfg_glob_lookup_s(&res, ctx, "trolfdir"))) {
-		struct stat st = {0};
-
-		if (stat(res, &st) == 0) {
-			goto out;
-		}
-	}
-
-	/* quite fruitless today */
-dflt:
-	res = __trolfdir;
-	rsz = sizeof(__trolfdir) -1;
-
-out:
-	/* make sure *tgt is freeable */
-	*tgt = strndup(res, rsz);
-	return rsz;
-}
-
 short unsigned int
 gand_get_port(cfg_t ctx)
 {
