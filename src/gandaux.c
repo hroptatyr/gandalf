@@ -48,16 +48,16 @@
 #include <errno.h>
 #include <stdio.h>
 #include <fcntl.h>
+#if defined USE_REDLAND
+# include <sys/types.h>
+# include <dirent.h>
+#endif	/* USE_REDLAND */
 #include "gand-dict.h"
 #include "nifty.h"
 
 typedef unsigned int dict_id_t;
 
-#if defined USE_REDLAND
-static char *idxf = "gand_idx2sym";
-#else  /* !USE_REDLAND */
-static char *idxf = "gand_idx2sym.tcb";
-#endif	/* USE_REDLAND */
+static char *idxf = DICT_DEFAULT;
 
 
 static __attribute__((format(printf, 1, 2))) void
@@ -219,17 +219,10 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		serror("cannot creat temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
-#if defined USE_REDLAND
-	} else if ((d = open_dict(idxf, oflags)) == NULL) {
-		serror("cannot create temporary index file `%s'", tmpf);
-		rc = 1;
-		goto out;
-#else  /* !USE_REDLAND */
 	} else if ((d = open_dict(tmpf, oflags)) == NULL) {
 		serror("cannot create temporary index file `%s'", tmpf);
 		rc = 1;
 		goto out;
-#endif	/* USE_REDLAND */
 	}
 
 	/* close mkstemp's descriptor */
@@ -263,9 +256,47 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 	close_dict(d);
 
 	if (rc == 0) {
+#if defined USE_REDLAND
+		DIR *dp;
+		char nu[256U];
+		char *np;
+
+		if ((dp = opendir(".")) == NULL) {
+			rc = 2;
+			goto fail;
+		}
+		/* prep the nu name */
+		with (size_t idxz = strlen(idxf)) {
+			if (idxz >= sizeof(nu)) {
+				idxz = sizeof(nu) - 1U;
+			}
+			memcpy(nu, idxf, idxz);
+			np = nu + idxz;
+			*np = '\0';
+		}
+
+		for (struct dirent *de; (de = readdir(dp));) {
+			const size_t tmpz = sizeof(tmpf) - 1U;
+			size_t rest;
+
+			if (strncmp(de->d_name, tmpf, tmpz)) {
+				continue;
+			} else if (!(rest = strlen(de->d_name + tmpz))) {
+				continue;
+			}
+			/* otherwise, yay, it's a match */
+			memcpy(np, de->d_name + tmpz, rest);
+			rename(de->d_name, nu);
+		}
+		closedir(dp);
+#endif	/* USE_REDLAND */
 		/* rename (atomically) to actual file name */
-		rc = rename(tmpf, idxf);
+		if (rename(tmpf, idxf) < 0) {
+			rc = 2;
+			goto fail;
+		}
 	} else {
+	fail:
 		(void)unlink(tmpf);
 	}
 out:

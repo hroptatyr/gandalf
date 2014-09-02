@@ -49,6 +49,12 @@ struct dict_si_s {
 
 #define NUL_OID		((dict_oid_t)0U)
 
+#if defined USE_REDLAND
+# define DICT_DEFAULT	"gand_store"
+#else  /* !USE_REDLAND */
+# define DICT_DEFAULT	"gand_idx2sym.tcb"
+#endif	/* USE_REDLAND */
+
 
 extern dict_t open_dict(const char *fn, int oflags);
 
