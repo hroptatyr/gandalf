@@ -1111,7 +1111,6 @@ write_pidfile(const char *pidfile)
 	return res;
 }
 
-#if !defined USE_REDLAND
 static void
 stat_cb(EV_P_ ev_stat *e, int UNUSED(revents))
 {
@@ -1125,7 +1124,6 @@ stat_cb(EV_P_ ev_stat *e, int UNUSED(revents))
 	}
 	return;
 }
-#endif	/* !USE_REDLAND */
 
 
 #include "gandalfd.yucc"
@@ -1147,10 +1145,10 @@ main(int argc, char *argv[])
 	static const char _dictf[] = "gand_idx2sym";
 #else  /* !USE_REDLAND */
 	static const char _dictf[] = "gand_idx2sym.tcb";
-	/* inotify watcher */
-	ev_stat dict_watcher;
 #endif	/* USE_REDLAND */
 	const char *dictf;
+	/* inotify watcher */
+	ev_stat dict_watcher;
 	cfg_t cfg;
 	int rc = 0;
 
@@ -1303,13 +1301,11 @@ main(int argc, char *argv[])
 		goto out2;
 	}
 
-#if !defined USE_REDLAND
 	/* we need an inotify on the dict file */
 	with (void *loop = ev_default_loop(EVFLAG_AUTO)) {
 		ev_stat_init(&dict_watcher, stat_cb, dictf, 0);
 		ev_stat_start(EV_A_ &dict_watcher);
 	}
-#endif	/* !USE_REDLAND */
 
 outd:
 	/* free cmdline parser goodness */
@@ -1327,12 +1323,10 @@ outd:
 		block_sigs();
 	}
 
-#if !defined USE_REDLAND
 	/* also we need an inotify on this guy */
 	with (void *loop = ev_default_loop(EVFLAG_AUTO)) {
 		ev_stat_stop(EV_A_ &dict_watcher);
 	}
-#endif	/* !USE_REDLAND */
 
 	/* away with the http */
 	free_gand_httpd(h);
