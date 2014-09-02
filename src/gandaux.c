@@ -57,11 +57,7 @@
 
 typedef unsigned int dict_id_t;
 
-#if defined USE_REDLAND
-static char *idxf = "gand_idx2sym";
-#else  /* !USE_REDLAND */
-static char *idxf = "gand_idx2sym.tcb";
-#endif	/* USE_REDLAND */
+static char *idxf = DICT_DEFAULT;
 
 
 static __attribute__((format(printf, 1, 2))) void

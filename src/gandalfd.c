@@ -1141,11 +1141,7 @@ main(int argc, char *argv[])
 	const char *wwwd;
 	const char *trlf;
 	static const char _trlf[] = "/var/scratch/freundt/trolf";
-#if defined USE_REDLAND
-	static const char _dictf[] = "gand_idx2sym";
-#else  /* !USE_REDLAND */
-	static const char _dictf[] = "gand_idx2sym.tcb";
-#endif	/* USE_REDLAND */
+	static const char _dictf[] = DICT_DEFAULT;
 	const char *dictf;
 	/* inotify watcher */
 	ev_stat dict_watcher;
