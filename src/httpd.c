@@ -509,7 +509,7 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 
 	case DTYP_FILE:
 	case DTYP_TMPF:
-		if (UNLIKELY((fn = r.rd.file) == NULL)) {
+		if (UNLIKELY((fn = r.rd GAND_RES_DATA(file)) == NULL)) {
 			return -1;
 		}
 		if (LIKELY(*fn != '/' && !(ctx->www_dirfd < 0))) {
@@ -532,7 +532,7 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 		break;
 
 	case DTYP_SOCK:
-		if ((fd = r.rd.sock) < 0) {
+		if ((fd = r.rd GAND_RES_DATA(sock)) < 0) {
 			goto fail;
 		} else if (fstat(fd, &st) < 0) {
 			goto fail;
@@ -559,7 +559,7 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	case DTYP_GBUF:
 		if (LIKELY((x->z = r.clen) == CLEN_UNKNOWN)) {
 			/* calculate the size from what's in the gbuf */
-			x->z = r.rd.gbuf->ibuf;
+			x->z = r.rd GAND_RES_DATA(gbuf)->ibuf;
 		}
 		x->o = 0U;
 		x->fd = -1;
@@ -571,13 +571,13 @@ _enq_resp(_httpd_ctx_t ctx, struct gand_conn_s *restrict c, gand_httpd_res_t r)
 	{
 		enum gand_cmpr_e cl = (enum gand_cmpr_e)(r.rd.dtyp - DTYP_GBUF);
 
-		if (UNLIKELY(cmpr_gbuf(r.rd.gbuf, cl) < 0)) {
+		if (UNLIKELY(cmpr_gbuf(r.rd GAND_RES_DATA(gbuf), cl) < 0)) {
 			/* best to send the buffer uncompressed then aye? */
 			GAND_ERR_LOG("cannot compress response");
 		}
 	}
 #endif	/* HAVE_ZLIB_H */
-		x->z = r.rd.gbuf->ibuf;
+		x->z = r.rd GAND_RES_DATA(gbuf)->ibuf;
 		x->o = 0U;
 		x->fd = -1;
 		break;
@@ -603,7 +603,7 @@ _deq_resp(struct gand_conn_s *restrict c)
 
 	case DTYP_TMPF:
 		/* remove temporary files */
-		(void)unlink(x->res.rd.file);
+		(void)unlink(x->res.rd GAND_RES_DATA(file));
 		/*@fallthrough@*/
 	case DTYP_FILE:
 	case DTYP_SOCK:
@@ -613,7 +613,7 @@ _deq_resp(struct gand_conn_s *restrict c)
 
 	case DTYP_GBUF:
 		/* free gand buffers */
-		free_gand_gbuf(x->res.rd.gbuf);
+		free_gand_gbuf(x->res.rd GAND_RES_DATA(gbuf));
 		break;
 	}
 
@@ -740,14 +740,18 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 		z = sendfile(fd, x->fd, &x->o, x->z);
 		break;
 	case DTYP_DATA:
-		z = send(fd, x->res.rd.data + x->o, x->z, 0);
-		x->o += z;
+		with (const char *data = x->res.rd GAND_RES_DATA(data)) {
+			z = send(fd, data + x->o, x->z, 0);
+			x->o += z;
+		}
 		break;
 	case DTYP_GBUF:
 	case DTYP_GBUF_DEFLATE:
 	case DTYP_GBUF_GZIP:
-		z = send(fd, x->res.rd.gbuf->data + x->o, x->z, 0);
-		x->o += z;
+		with (gand_gbuf_t gbuf = x->res.rd GAND_RES_DATA(gbuf)) {
+			z = send(fd, gbuf->data + x->o, x->z, 0);
+			x->o += z;
+		}
 		break;
 	}
 

@@ -691,7 +691,7 @@ work_ser(gand_httpd_req_t req)
 			.rc = 400U/*BAD REQUEST*/,
 			.ctyp = OF(UNK),
 			.clen = sizeof(errmsg)- 1U,
-			.rd = {DTYP_DATA, errmsg},
+			.rd = {DTYP_DATA, GAND_RES_DATA(data) = errmsg},
 		};
 	} else if (!(rid = dict_get_sym(gsymdb, sym))) {
 		static const char errmsg[] = "Symbol not found\n";
@@ -701,7 +701,7 @@ work_ser(gand_httpd_req_t req)
 			.rc = 409U/*CONFLICT*/,
 			.ctyp = OF(UNK),
 			.clen = sizeof(errmsg)- 1U,
-			.rd = {DTYP_DATA, errmsg},
+			.rd = {DTYP_DATA, GAND_RES_DATA(data) = errmsg},
 		};
 	}
 
@@ -819,7 +819,7 @@ work_ser(gand_httpd_req_t req)
 		.rc = 200U/*OK*/,
 		.ctyp = _ofs[of],
 		.clen = CLEN_UNKNOWN,
-		.rd = {DTYP_GBUF, gb},
+		.rd = {DTYP_GBUF, GAND_RES_DATA(gbuf) = gb},
 	};
 
 interr_unmap:
@@ -856,7 +856,7 @@ work_fil(gand_httpd_req_t req)
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = OF(UNK),
-		.rd = {DTYP_SOCK, .sock = fd},
+		.rd = {DTYP_SOCK, GAND_RES_DATA(sock) = fd},
 	};
 
 r400:
@@ -866,7 +866,7 @@ r400:
 		.rc = 400U/*BAD REQUEST*/,
 		.ctyp = OF(UNK),
 		.clen = sizeof(err400)- 1U,
-		.rd = {DTYP_DATA, err400},
+		.rd = {DTYP_DATA, GAND_RES_DATA(data) = err400},
 	};
 
 r409:
@@ -876,7 +876,7 @@ r409:
 		.rc = 409U/*CONFLICT*/,
 		.ctyp = OF(UNK),
 		.clen = sizeof(err409)- 1U,
-		.rd = {DTYP_DATA, err409},
+		.rd = {DTYP_DATA, GAND_RES_DATA(data) = err409},
 	};
 }
 
@@ -905,7 +905,7 @@ work_src(gand_httpd_req_t req)
 			.rc = 400U/*BAD REQUEST*/,
 			.ctyp = OF(UNK),
 			.clen = sizeof(errmsg)- 1U,
-			.rd = {DTYP_DATA, errmsg},
+			.rd = {DTYP_DATA, GAND_RES_DATA(data) = errmsg},
 		};
 	}
 
@@ -932,7 +932,7 @@ work_src(gand_httpd_req_t req)
 		.rc = 200U/*OK*/,
 		.ctyp = _ofs[of],
 		.clen = CLEN_UNKNOWN,
-		.rd = {DTYP_GBUF, gb},
+		.rd = {DTYP_GBUF, GAND_RES_DATA(gbuf) = gb},
 	};
 
 all:
@@ -988,7 +988,7 @@ all:
 		.rc = 200U/*OK*/,
 		.ctyp = _ofs[of],
 		.clen = CLEN_UNKNOWN,
-		.rd = {DTYP_GBUF, gb},
+		.rd = {DTYP_GBUF, GAND_RES_DATA(gbuf) = gb},
 	};
 
 interr_unmap:
@@ -1032,7 +1032,7 @@ work(gand_httpd_req_t req)
 			.rc = 200U/*OK*/,
 			.ctyp = "text/html",
 			.clen = CLEN_UNKNOWN,
-			.rd = {DTYP_FILE, "index.html"},
+			.rd = {DTYP_FILE, GAND_RES_DATA(file) = "404.html"},
 		};
 
 	default:
@@ -1046,7 +1046,7 @@ work(gand_httpd_req_t req)
 		.rc = 404U/*NOT FOUND*/,
 		.ctyp = "text/html",
 		.clen = CLEN_UNKNOWN,
-		.rd = {DTYP_FILE, "404.html"},
+		.rd = {DTYP_FILE, GAND_RES_DATA(file) = "404.html"},
 	};
 }
 
