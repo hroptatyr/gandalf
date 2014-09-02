@@ -97,8 +97,18 @@ typedef struct {
 		gand_sock_t sock;
 		const char *data;
 		gand_gbuf_t gbuf;
-	};
+	}
+#if !defined HAVE_ANON_STRUCTS_INIT
+		data
+#endif	/* !HAVE_ANON_STRUCTS_INIT */
+		;
 } gand_res_data_t;
+
+#if defined HAVE_ANON_STRUCTS_INIT
+# define GAND_RES_DATA(x)	.x
+#else  /* !HAVE_ANON_STRUCTS_INIT */
+# define GAND_RES_DATA(x)	.data.x
+#endif	/* !HAVE_ANON_STRUCTS_INIT */
 
 typedef struct {
 	gand_httpd_verb_t verb;
