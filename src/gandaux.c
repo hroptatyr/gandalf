@@ -207,7 +207,7 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 {
 	char tmpf[] = ".gand_idx2sym.XXXXXXXX";
 #if defined USE_REDLAND
-	const int oflags = O_RDWR;
+	const int oflags = O_RDWR | (argi->recreate_flag ? O_TRUNC : 0);
 #else  /* !USE_REDLAND */
 	const int oflags = O_RDWR | O_TRUNC | O_CREAT;
 #endif	/* USE_REDLAND */
