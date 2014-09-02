@@ -87,15 +87,18 @@ SXE_CHECK_UDP_SPLICE
 
 
 ## just so we know what to build
-AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
+AC_ARG_ENABLE([server], [dnl
+AS_HELP_STRING([--enable-server], [
+Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="yes"])
-AC_ARG_ENABLE([cliapps], [
-AS_HELP_STRING([--enable-client], [Build the client apps, default: yes.])],
+AC_ARG_ENABLE([cliapps], [dnl
+AS_HELP_STRING([--enable-client], [
+Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="${have_curl}"])
 
-AC_ARG_WITH([matlab], [
-AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.])],
+AC_ARG_WITH([matlab], [dnl
+AS_HELP_STRING([--with-matlab], [
+Build the gandalf->matlab client, default: no.])],
 	[dnl
 		SXE_CHECK_MATLAB([${withval}])
 		if test "${enable_cliapps}" != "no" -a \
@@ -106,8 +109,8 @@ AS_HELP_STRING([--with-matlab], [Build the gandalf->matlab client, default: no.]
 	], [with_matlab="no"])
 AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
 
-AC_ARG_ENABLE([redland], [
-AS_HELP_STRING([--enable-redland], [dnl
+AC_ARG_ENABLE([redland], [dnl
+AS_HELP_STRING([--enable-redland], [
 Set up gandalf server against redland triplestore, default: no])],
 	[enable_redland="${enableval}"], [enable_redland="no"])
 
