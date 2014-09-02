@@ -165,43 +165,6 @@ xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
 
 
 static const char*
-gand_make_trolf_filename(const char *fn)
-{
-	size_t fz;
-	size_t idx;
-	char *res;
-
-	if (UNLIKELY(trolfdir == NULL)) {
-		return NULL;
-	}
-
-	fz = strlen(fn);
-	res = malloc(ntrolfdir + fz + 1U/*slash*/ + 1U/*\nul*/);
-	if (UNLIKELY(res == NULL)) {
-		return NULL;
-	}
-
-	/* construct the path */
-	memcpy(res, trolfdir, (idx = ntrolfdir));
-	if (res[idx - 1] != '/') {
-		res[idx++] = '/';
-	}
-	memcpy(res + idx, fn, fz);
-	res[idx + fz] = '\0';
-	return res;
-}
-
-static void
-gand_free_trolf_filename(const char *fn)
-{
-	if (UNLIKELY(fn == NULL)) {
-		return;
-	}
-	free(deconst(fn));
-	return;
-}
-
-static const char*
 make_lateglu_name(dict_oid_t rid)
 {
 	static char f[PATH_MAX] = "show_lateglu/";
@@ -1184,7 +1147,6 @@ main(int argc, char *argv[])
 	static const char _dictf[] = "gand_idx2sym.tcb";
 #endif	/* USE_REDLAND */
 	const char *dictf;
-	bool free_dictf_p = false;
 	/* inotify watcher */
 	ev_stat dict_watcher;
 	cfg_t cfg;
@@ -1298,15 +1260,29 @@ main(int argc, char *argv[])
 		dictf = _dictf;
 	}
 	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-		dictf = gand_make_trolf_filename(dictf);
-		free_dictf_p = true;
+		size_t ntrlf = strlen(trlf);
+		size_t ndict = strlen(dictf);
+		char *tmpdf = malloc(ntrlf + 1U + ndict + 1U/*\nul*/);
 
+		memcpy(tmpdf, trlf, ntrlf);
+		if (tmpdf[ntrlf - 1] != '/') {
+			tmpdf[ntrlf++] = '/';
+		}
+		memcpy(tmpdf + ntrlf, dictf, ndict);
+		tmpdf[ntrlf + ndict] = '\0';
+
+		/* final hand-over */
+		dictf = tmpdf;
 		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
 			GAND_ERR_LOG("cannot open symbol index file `%s'",
 				     dictf);
 			rc = 1;
 			goto out2;
 		}
+	} else {
+		/* just strdup dictf so we can access it all year round
+		 * even when the cfg or the argi have been freed */
+		dictf = strdup(dictf);
 	}
 
 	/* server config */
@@ -1360,9 +1336,8 @@ outd:
 		close(trolf_dirfd);
 	}
 out2:
-	if (free_dictf_p) {
-		gand_free_trolf_filename(dictf);
-	}
+	/* dictf was strdup'd */
+	free(deconst(dictf));
 
 out1:
 	if (gsymdb != NULL) {
