@@ -200,7 +200,8 @@ mexFunction(int UNUSED(nlhs), mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	for (size_t i = 0U, _nsym = nrhs - 1; i < _nsym; i++) {
 		char *sym;
 
-		if (LIKELY((sym = mxArrayToString(prhs[i + 1U])) != NULL)) {
+		if (LIKELY(mxIsChar(prhs[i + 1U]) &&
+			   (sym = mxArrayToString(prhs[i + 1U])) != NULL)) {
 			size_t ssz = strlen(sym);
 
 			if (LIKELY(ssz > 0U)) {

@@ -47,6 +47,10 @@
 static char*
 snarf_fname(const mxArray *fn)
 {
+	if (UNLIKELY(!mxIsChar(fn))) {
+		/* big bugger */
+		return NULL;
+	}
 	return mxArrayToString(fn);
 }
 
