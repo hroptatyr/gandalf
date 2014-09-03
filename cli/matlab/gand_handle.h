@@ -62,6 +62,13 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
+/* octave doesn't define this */
+#if !defined mxINDEX_CLASS && defined _LP64
+# define mxINDEX_CLASS	mxUINT64_CLASS
+#elif !defined mxINDEX_CLASS
+# define mxINDEX_CLASS	mxUINT32_CLASS
+#endif	/* !mxINDEX_CLASS */
+
 static inline mxArray*
 make_gmx_handle(void)
 {
