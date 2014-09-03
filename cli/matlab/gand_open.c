@@ -64,14 +64,14 @@ mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		mexErrMsgTxt("cannot determine file name to open");
 		return;
 	} else if ((hdl = gand_open(fn, /*:timeout */2500)) == NULL) {
-		mexErrMsgTxt("cannot establish connection to gandalf server");
-		return;
+		mexWarnMsgTxt("cannot establish connection to gandalf server");
+	} else {
+		/* otherwise just assign the handle */
+		plhs[0] = make_gmx_handle();
+		gmx_put_handle(plhs[0], hdl);
 	}
 	/* free file name */
 	mxFree(fn);
-	/* otherwise just assign the handle */
-	plhs[0] = make_gmx_handle();
-	gmx_put_handle(plhs[0], hdl);
 	return;
 }
 
