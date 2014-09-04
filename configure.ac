@@ -96,18 +96,39 @@ AS_HELP_STRING([--enable-client], [
 Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="${have_curl}"])
 
+## check who can build our specialised apis
 AC_ARG_WITH([matlab], [dnl
 AS_HELP_STRING([--with-matlab], [
 Build the gandalf->matlab client, default: no.])],
-	[dnl
-		SXE_CHECK_MATLAB([${withval}])
-		if test "${enable_cliapps}" != "no" -a \
-			-n "${sxe_cv_matlabroot}"; then
-			with_matlab="yes"
-			CLIAPPS="${CLIAPPS} matlab"
-		fi
-	], [with_matlab="no"])
-AM_CONDITIONAL([BUILD_MATCLI], [test "${with_matlab}" = "yes"])
+	[with_matlab="${withval}"], [with_matlab="no"])
+## or maybe octave?
+AC_ARG_WITH([octave], [dnl
+AS_HELP_STRING([--with-octave], [
+Build the gandalf->octave client, default: yes.])],
+	[with_octave="${withval}"], [with_octave="yes"])
+
+## the actual checks
+if test "${with_matlab}" = "yes"; then
+	SXE_CHECK_MATLAB
+	if test "${sxe_cv_matlab_mex_h}" = "yes"; then
+		have_matlab="yes"
+		CLIAPPS="${CLIAPPS} matlab"
+	else
+		have_matlab="no"
+	fi
+fi
+if test "${with_octave}" = "yes"; then
+	SXE_CHECK_OCTAVE
+	if test "${sxe_cv_octave_mex_h}" = "yes" -a -n "${OCTAVEPATH}"; then
+		have_octave="yes"
+		CLIAPPS="${CLIAPPS} octave"
+	else
+		have_octave="no"
+	fi
+fi
+AM_CONDITIONAL([BUILD_MATCLI], [test "${have_matlab}" = "yes"])
+AM_CONDITIONAL([BUILD_OCTCLI], [test "${have_octave}" = "yes"])
+
 
 AC_ARG_ENABLE([redland], [dnl
 AS_HELP_STRING([--enable-redland], [
