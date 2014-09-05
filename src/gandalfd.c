@@ -1133,7 +1133,7 @@ int
 main(int argc, char *argv[])
 {
 	/* args */
-	yuck_t argi[1U] = {0U};
+	static yuck_t argi[1U];
 	gand_httpd_t h = NULL;
 	int daemonisep = 0;
 	short unsigned int port = 8080;
