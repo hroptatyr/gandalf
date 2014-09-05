@@ -73,10 +73,14 @@ gand_close_la_SOURCES += gand_handle.h
 
 ## rename .mex -> .mexa64 on the fly
 install-data-hook:
-	-cd $(DESTDIR)$(mexdir) && mv -f tzconv.mex tzconv.$(MEXEXT)
+	-for i in gand_get_series gand_open gand_close; do \
+		cd $(DESTDIR)$(mexdir) && mv -f $${i}.mex $${i}.$(MEXEXT); \
+	done
 
 uninstall-hook:
-	-$(RM) -- $(DESTDIR)$(mexdir)/tzconv.$(MEXEXT)
+	-for i in gand_get_series gand_open gand_close; do \
+		$(RM) -- $(DESTDIR)$(mexdir)/$${i}.$(MEXEXT); \
+	done
 
 # 
 # Help the developers get nice post-processed source files
