@@ -177,7 +177,7 @@ make_lateglu_name(dict_oid_t rid)
 	return f;
 }
 
-static const char*
+static __attribute__((unused)) const char*
 make_super_name(dict_oid_t rid)
 {
 	static char f[PATH_MAX] = "super/";
