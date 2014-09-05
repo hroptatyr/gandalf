@@ -35,7 +35,7 @@
  *
  ***/
 #if !defined INCLUDED_gand_dict_h_
-#define INCLUDED_gand_dcit_h_
+#define INCLUDED_gand_dict_h_
 
 typedef void *dict_t;
 typedef unsigned int dict_oid_t;
