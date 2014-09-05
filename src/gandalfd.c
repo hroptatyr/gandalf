@@ -1114,7 +1114,9 @@ static void
 stat_cb(EV_P_ ev_stat *e, int UNUSED(revents))
 {
 	GAND_NOTI_LOG("symbol index file `%s' changed ...", e->path);
-	close_dict(gsymdb);
+	if (gsymdb != NULL) {
+		close_dict(gsymdb);
+	}
 	if ((gsymdb = open_dict(e->path, O_RDONLY)) == NULL) {
 		GAND_ERR_LOG("cannot open symbol index file `%s': %s",
 			     e->path, strerror(errno));
