@@ -10,6 +10,7 @@ before_script:
   - sudo apt-get install -qq libev-dev
   - sudo apt-get install -qq lua5.1 liblua5.1-0-dev
   - sudo apt-get install -qq libtokyocabinet-dev
+  - sudo apt-get install -qq octave3.2-headers
   - autoreconf -vfi
 
 script:
