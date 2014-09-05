@@ -886,7 +886,6 @@ work_src(gand_httpd_req_t req)
 	static const char _s[] = "rolf_source";
 	gandfn_t fb;
 	const char *src;
-	dict_oid_t rid;
 	gand_of_t of;
 	gand_gbuf_t gb;
 
@@ -983,7 +982,7 @@ all:
 	}
 
 	munmap_fn(fb);
-	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
+	GAND_INFO_LOG(":rsp [200 OK]: all sources");
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = _ofs[of],
