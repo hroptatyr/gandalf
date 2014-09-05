@@ -177,7 +177,7 @@ make_lateglu_name(dict_oid_t rid)
 	return f;
 }
 
-static const char*
+static __attribute__((unused)) const char*
 make_super_name(dict_oid_t rid)
 {
 	static char f[PATH_MAX] = "super/";
@@ -886,7 +886,6 @@ work_src(gand_httpd_req_t req)
 	static const char _s[] = "rolf_source";
 	gandfn_t fb;
 	const char *src;
-	dict_oid_t rid;
 	gand_of_t of;
 	gand_gbuf_t gb;
 
@@ -983,7 +982,7 @@ all:
 	}
 
 	munmap_fn(fb);
-	GAND_INFO_LOG(":rsp [200 OK]: series %08u", rid);
+	GAND_INFO_LOG(":rsp [200 OK]: all sources");
 	return (gand_httpd_res_t){
 		.rc = 200U/*OK*/,
 		.ctyp = _ofs[of],
@@ -1115,7 +1114,9 @@ static void
 stat_cb(EV_P_ ev_stat *e, int UNUSED(revents))
 {
 	GAND_NOTI_LOG("symbol index file `%s' changed ...", e->path);
-	close_dict(gsymdb);
+	if (gsymdb != NULL) {
+		close_dict(gsymdb);
+	}
 	if ((gsymdb = open_dict(e->path, O_RDONLY)) == NULL) {
 		GAND_ERR_LOG("cannot open symbol index file `%s': %s",
 			     e->path, strerror(errno));
@@ -1132,20 +1133,19 @@ int
 main(int argc, char *argv[])
 {
 	/* args */
-	yuck_t argi[1U];
-	gand_httpd_t h;
+	static yuck_t argi[1U];
+	gand_httpd_t h = NULL;
 	int daemonisep = 0;
-	short unsigned int port;
+	short unsigned int port = 8080;
 	/* paths and files */
-	const char *pidf;
+	const char *pidf = NULL;
 	const char *wwwd;
-	const char *trlf;
 	static const char _trlf[] = "/var/scratch/freundt/trolf";
 	static const char _dictf[] = DICT_DEFAULT;
-	const char *dictf;
+	const char *dictf = NULL;
 	/* inotify watcher */
 	ev_stat dict_watcher;
-	cfg_t cfg;
+	cfg_t cfg = NULL;
 	int rc = 0;
 
 	/* best not to be signalled for a minute */
@@ -1154,7 +1154,7 @@ main(int argc, char *argv[])
 	/* parse the command line */
 	if (yuck_parse(argi, argc, argv)) {
 		rc = 1;
-		goto out0;
+		goto clos;
 	}
 
 	/* evaluate argi */
@@ -1174,10 +1174,10 @@ main(int argc, char *argv[])
 		if (ret < 0) {
 			perror("daemonisation failed");
 			rc = 1;
-			goto outd;
+			goto clos;
 		} else if (ret > 0) {
 			/* parent process */
-			goto outd;
+			goto clos;
 		}
 	} else {
 		/* fiddle with gandalf logging (default to syslog) */
@@ -1195,7 +1195,7 @@ main(int argc, char *argv[])
 			GAND_ERR_LOG("cannot write pid file `%s': %s",
 				     pidf, strerror(errno));
 			rc = 1;
-			goto out1;
+			goto clos;
 		}
 	}
 
@@ -1210,75 +1210,77 @@ main(int argc, char *argv[])
 		if (wwwd == NULL) {
 			GAND_ERR_LOG("wwwdir not specified");
 			rc = 1;
-			goto out1;
+			goto clos;
 		} else if (stat(wwwd, &st) < 0) {
 			GAND_ERR_LOG("cannot access wwwdir `%s': %s",
 				     wwwd, strerror(errno));
 			rc = 1;
-			goto out1;
+			goto clos;
 		} else if (!S_ISDIR(st.st_mode)) {
 			GAND_ERR_LOG("wwwdir `%s' not a directory", wwwd);
 			rc = 1;
-			goto out1;
+			goto clos;
 		} else if (access(wwwd, X_OK) < 0) {
 			GAND_ERR_LOG("cannot access wwwdir `%s': %s",
 				     wwwd, strerror(errno));
 			rc = 1;
-			goto out1;
+			goto clos;
 		}
 	}
 
 	/* get the trolf dir */
-	if ((trlf = argi->trolfdir_arg) ||
-	    (cfg && cfg_glob_lookup_s(&trlf, cfg, "trolfdir") > 0)) {
-		/* command line has precedence */
-		;
-	} else {
-		/* preset with default */
-		trlf = _trlf;
-	}
-
-	/* create trolf's dirfd */
-	if ((trolf_dirfd = open(trlf, O_RDONLY)) < 0) {
-		GAND_ERR_LOG("cannot access trolf directory: %s",
-			     strerror(errno));
-		rc = 1;
-		goto out2;
-	}
-
-	/* try and find the dictionary */
-	if ((dictf = argi->index_file_arg) ||
-	    (cfg && cfg_glob_lookup_s(&dictf, cfg, "index_file") > 0)) {
-		/* command line has precedence */
-		;
-	} else {
-		/* preset with default */
-		dictf = _dictf;
-	}
-	if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-		size_t ntrlf = strlen(trlf);
-		size_t ndict = strlen(dictf);
-		char *tmpdf = malloc(ntrlf + 1U + ndict + 1U/*\nul*/);
-
-		memcpy(tmpdf, trlf, ntrlf);
-		if (tmpdf[ntrlf - 1] != '/') {
-			tmpdf[ntrlf++] = '/';
+	with (const char *trlf) {
+		if ((trlf = argi->trolfdir_arg) ||
+		    (cfg && cfg_glob_lookup_s(&trlf, cfg, "trolfdir") > 0)) {
+			/* command line has precedence */
+			;
+		} else {
+			/* preset with default */
+			trlf = _trlf;
 		}
-		memcpy(tmpdf + ntrlf, dictf, ndict);
-		tmpdf[ntrlf + ndict] = '\0';
 
-		/* final hand-over */
-		dictf = tmpdf;
-		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
-			GAND_ERR_LOG("cannot open symbol index file `%s'",
-				     dictf);
+		/* create trolf's dirfd */
+		if ((trolf_dirfd = open(trlf, O_RDONLY)) < 0) {
+			GAND_ERR_LOG("cannot access trolf directory: %s",
+				     strerror(errno));
 			rc = 1;
-			goto out2;
+			goto clos;
 		}
-	} else {
-		/* just strdup dictf so we can access it all year round
-		 * even when the cfg or the argi have been freed */
-		dictf = strdup(dictf);
+
+		/* try and find the dictionary */
+		if ((dictf = argi->index_file_arg) ||
+		    (cfg && cfg_glob_lookup_s(&dictf, cfg, "index_file") > 0)) {
+			/* command line has precedence */
+		;
+		} else {
+			/* preset with default */
+			dictf = _dictf;
+		}
+		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
+			size_t ntrlf = strlen(trlf);
+			size_t ndict = strlen(dictf);
+			char *tmpdf = malloc(ntrlf + 1U + ndict + 1U/*\nul*/);
+
+			memcpy(tmpdf, trlf, ntrlf);
+			if (tmpdf[ntrlf - 1] != '/') {
+				tmpdf[ntrlf++] = '/';
+			}
+			memcpy(tmpdf + ntrlf, dictf, ndict);
+			tmpdf[ntrlf + ndict] = '\0';
+
+			/* final hand-over */
+			dictf = tmpdf;
+			if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
+				GAND_ERR_LOG("\
+cannot open symbol index file `%s'", dictf);
+				rc = 1;
+				goto clos;
+			}
+		} else {
+			/* just strdup dictf so we can access it all year round
+			 * even when the cfg or the argi have been freed */
+			dictf = strdup(dictf);
+		}
 	}
 
 	/* server config */
@@ -1294,7 +1296,7 @@ main(int argc, char *argv[])
 	if (UNLIKELY(h == NULL)) {
 		GAND_ERR_LOG("cannot spawn gandalf server");
 		rc = 1;
-		goto out2;
+		goto clos;
 	}
 
 	/* we need an inotify on the dict file */
@@ -1302,12 +1304,6 @@ main(int argc, char *argv[])
 		ev_stat_init(&dict_watcher, stat_cb, dictf, 0);
 		ev_stat_start(EV_A_ &dict_watcher);
 	}
-
-outd:
-	/* free cmdline parser goodness */
-	yuck_free(argi);
-	/* kick the config context */
-	gand_free_config(cfg);
 
 	/* main loop */
 	{
@@ -1324,25 +1320,36 @@ outd:
 		ev_stat_stop(EV_A_ &dict_watcher);
 	}
 
+clos:
 	/* away with the http */
-	free_gand_httpd(h);
+	if (h != NULL) {
+		free_gand_httpd(h);
+	}
+
+	/* kick the config context */
+	if (cfg != NULL) {
+		gand_free_config(cfg);
+	}
+	/* free cmdline parser goodness */
+	yuck_free(argi);
 
 	/* close trolf_dirfd */
-	if (LIKELY(trolf_dirfd > 0)) {
+	if (trolf_dirfd >= 0) {
 		close(trolf_dirfd);
 	}
-out2:
-	/* dictf was strdup'd */
-	free(deconst(dictf));
 
-out1:
+	/* dictf was strdup'd */
+	if (dictf != NULL) {
+		free(deconst(dictf));
+	}
+
 	if (gsymdb != NULL) {
 		close_dict(gsymdb);
 	}
 	if (pidf != NULL) {
 		(void)unlink(pidf);
 	}
-out0:
+
 	gand_closelog();
 	return rc;
 }
