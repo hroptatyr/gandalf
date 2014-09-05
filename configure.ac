@@ -156,6 +156,7 @@ else
 fi
 AC_SUBST([dict_CFLAGS])
 AC_SUBST([dict_LIBS])
+SRVBACK="${with_database}"
 
 
 ## libtool goddess^Wgoodness
@@ -174,7 +175,7 @@ AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 
 if test -n "${BUILD_SERVER_FALSE}"; then
-	BUILD_SRV="yes"
+	BUILD_SRV="yes (backed by ${SRVBACK})"
 else
 	BUILD_SRV="no"
 fi
