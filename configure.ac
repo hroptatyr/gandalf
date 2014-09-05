@@ -95,6 +95,7 @@ AC_ARG_ENABLE([cliapps], [dnl
 AS_HELP_STRING([--enable-client], [
 Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="${have_curl}"])
+CLIAPPS="gandqry"
 
 ## check who can build our specialised apis
 AC_ARG_WITH([matlab], [dnl
@@ -155,6 +156,7 @@ else
 fi
 AC_SUBST([dict_CFLAGS])
 AC_SUBST([dict_LIBS])
+SRVBACK="${with_database}"
 
 
 ## libtool goddess^Wgoodness
@@ -173,12 +175,12 @@ AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 
 if test -n "${BUILD_SERVER_FALSE}"; then
-	BUILD_SRV="yes"
+	BUILD_SRV="yes (backed by ${SRVBACK})"
 else
 	BUILD_SRV="no"
 fi
 if test -n "${BUILD_CLIAPPS_FALSE}"; then
-	BUILD_CLI="yes"
+	BUILD_CLI="yes (${CLIAPPS})"
 else
 	BUILD_CLI="no"
 fi
