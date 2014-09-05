@@ -2,6 +2,8 @@
 
 AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600 -D_BSD_SOURCE
 AM_LDFLAGS =
+EXTRA_DIST =
+
 MEX_LDFLAGS = -module -shared -avoid-version -shrext ".mex"
 
 mex_LTLIBRARIES =
@@ -32,7 +34,7 @@ gand_get_series_la_SOURCES = gand_get_series.c
 gand_get_series_la_SOURCES += gand_handle.h
 gand_get_series_la_SOURCES += intern.c intern.h
 gand_get_series_la_LDFLAGS = $(AM_LDFLAGS)
-gand_get_series_la_LDFLAGS += $(MOD_LDFLAGS)
+gand_get_series_la_LDFLAGS += $(MEX_LDFLAGS)
 gand_get_series_la_LDFLAGS += $(XCCLDFLAGS)
 gand_get_series_la_CPPFLAGS = $(AM_CPPFLAGS)
 gand_get_series_la_CPPFLAGS += $(octlab_CFLAGS)
@@ -45,7 +47,7 @@ gand_get_series_la_LIBADD = $(top_builddir)/cli/libgandapi.la
 mex_LTLIBRARIES += gand_open.la
 mex_DATA += gand_open.m
 gand_open_la_LDFLAGS = $(AM_LDFLAGS)
-gand_open_la_LDFLAGS += $(MOD_LDFLAGS)
+gand_open_la_LDFLAGS += $(MEX_LDFLAGS)
 gand_open_la_LDFLAGS += $(XCCLDFLAGS)
 gand_open_la_CPPFLAGS = $(AM_CPPFLAGS)
 gand_open_la_CPPFLAGS += $(octlab_CFLAGS)
@@ -58,7 +60,7 @@ gand_open_la_SOURCES += gand_handle.h
 mex_LTLIBRARIES += gand_close.la
 mex_DATA += gand_close.m
 gand_close_la_LDFLAGS = $(AM_LDFLAGS)
-gand_close_la_LDFLAGS += $(MOD_LDFLAGS)
+gand_close_la_LDFLAGS += $(MEX_LDFLAGS)
 gand_close_la_LDFLAGS += $(XCCLDFLAGS)
 gand_close_la_CPPFLAGS = $(AM_CPPFLAGS)
 gand_close_la_CPPFLAGS += $(octlab_CFLAGS)
