@@ -95,6 +95,7 @@ AC_ARG_ENABLE([cliapps], [dnl
 AS_HELP_STRING([--enable-client], [
 Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="${have_curl}"])
+CLIAPPS="gandqry"
 
 ## check who can build our specialised apis
 AC_ARG_WITH([matlab], [dnl
@@ -178,7 +179,7 @@ else
 	BUILD_SRV="no"
 fi
 if test -n "${BUILD_CLIAPPS_FALSE}"; then
-	BUILD_CLI="yes"
+	BUILD_CLI="yes (${CLIAPPS})"
 else
 	BUILD_CLI="no"
 fi
