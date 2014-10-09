@@ -267,7 +267,10 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		}
 		/* prep the nu name */
 		with (size_t idxz = strlen(idxf)) {
-			if (idxz >= sizeof(nu)) {
+			if (UNLIKELY(idxz == 0U)) {
+				rc = 2;
+				goto fail;
+			} else if (idxz >= sizeof(nu)) {
 				idxz = sizeof(nu) - 1U;
 			}
 			memcpy(nu, idxf, idxz);
