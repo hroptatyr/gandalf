@@ -292,6 +292,7 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 #endif	/* USE_REDLAND */
 		/* rename (atomically) to actual file name */
 		if (rename(tmpf, idxf) < 0) {
+			serror("cannot rename `%s' -> `%s'", tmpf, idxf);
 			rc = 2;
 			goto fail;
 		}
