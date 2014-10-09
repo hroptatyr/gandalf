@@ -58,6 +58,7 @@
 typedef unsigned int dict_id_t;
 
 static char *idxf = DICT_DEFAULT;
+static char *idxp;
 
 
 static __attribute__((format(printf, 1, 2))) void
@@ -153,7 +154,12 @@ cmd_addget(const struct yuck_cmd_get_s argi[static 1U], bool addp)
 		oflags = O_RDONLY;
 	}
 
-	if ((d = open_dict(idxf, oflags)) == NULL) {
+	if (idxp != NULL) {
+		/* we expect idxf to look at the basename portion
+		 * of idxp, and idxp was the \nul'd dirname */
+		idxf[-1] = '/';
+	}
+	if ((d = open_dict(idxp ?: idxf, oflags)) == NULL) {
 		fputs("cannot open symbol index file\n", stderr);
 		rc = 1;
 		goto out;
@@ -199,6 +205,10 @@ no symbol `%s' in index file\n", sym);
 	/* get ready to bugger off */
 	close_dict(d);
 out:
+	if (idxp != NULL) {
+		/* split idxp and idxf into dirname and basename again */
+		idxf[-1] = '\0';
+	}
 	return rc;
 }
 
@@ -206,6 +216,7 @@ static int
 cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 {
 	char tmpf[] = ".gand_idx2sym.XXXXXXXX";
+	char ocwd[256U];
 	const int oflags = O_RDWR | O_TRUNC | O_CREAT;
 	int fd;
 	dict_t d;
@@ -215,18 +226,26 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		yuck_auto_help((const void*)argi);
 		rc = 1;
 		goto out;
-	} else if ((fd = mkstemp(tmpf)) < 0) {
-		serror("cannot creat temporary index file `%s'", tmpf);
+	} else if (UNLIKELY(getcwd(ocwd, sizeof(ocwd)) == NULL)) {
+		serror("cannot obtain current directory");
 		rc = 1;
 		goto out;
+	} else if (idxp != NULL && chdir(idxp) < 0) {
+		serror("cannot change to target directory `%s'", idxp);
+		rc = 1;
+		goto out;
+	} else if ((fd = mkstemp(tmpf)) < 0) {
+		serror("cannot create temporary index file `%s'", tmpf);
+		rc = 1;
+		goto rstcwd;
 	} else if ((d = open_dict(tmpf, oflags)) == NULL) {
 		serror("cannot create temporary index file `%s'", tmpf);
 		rc = 1;
-		goto out;
+		goto rstcwd;
 	}
 
 	/* close mkstemp's descriptor */
-	close(fd);
+	(void)close(fd);
 	
 	with (const char *fn = argi->args[0U]) {
 		dict_id_t max = 0U;
@@ -303,6 +322,8 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 	fail:
 		(void)unlink(tmpf);
 	}
+rstcwd:
+	chdir(ocwd);
 out:
 	return rc;
 }
@@ -345,6 +366,15 @@ main(int argc, char *argv[])
 
 	if (argi->index_file_arg) {
 		idxf = argi->index_file_arg;
+		if ((idxp = strrchr(idxf, '/')) != NULL) {
+			/* we've got a path + file */
+			char *tmp = idxf;
+
+			/* terminate path with \nul, then swap idxf and idxp */
+			*idxp++ = '\0';
+			idxf = idxp;
+			idxp = tmp;
+		}
 	}
 
 	switch (argi->cmd) {
