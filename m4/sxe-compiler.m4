@@ -325,6 +325,11 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 		SXE_CHECK_COMPILER_FLAG([-wd 10237], [dnl
 			warnflags="${warnflags} -wd 10237"])])
 
+	SXE_CHECK_COMPILER_FLAG([-diag-disable 2102], [dnl
+		warnflags="${warnflags} -diag-disable 2102"], [
+		SXE_CHECK_COMPILER_FLAG([-wd 2102], [dnl
+			warnflags="${warnflags} -wd 2102"])])
+
 	SXE_CHECK_COMPILER_FLAG([-debug inline-debug-info], [
 		warnflags="${warnflags} -debug inline-debug-info"])
 
@@ -340,31 +345,78 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 ])dnl SXE_WARNFLAGS
 
 AC_DEFUN([SXE_OPTIFLAGS], [dnl
-	SXE_CHECK_COMPILER_FLAG([-O3], [
-		optiflags="${optiflags} -O3"])
+	AC_REQUIRE([SXE_USER_CFLAGS])
+	AC_REQUIRE([SXE_WARNFLAGS])
 
-	SXE_CHECK_COMPILER_FLAG([-ipo256], [
-		optiflags="${optiflags} -ipo256"])
+	case " ${CFLAGS} ${EXTRA_CFLAGS}" in
+	(*" -O"[0-9]" "*)
+		;;
+	(*)
+		SXE_CHECK_COMPILER_FLAG([-O3], [
+			optiflags="${optiflags} -O3"])
+		;;
+	esac
 
-	SXE_CHECK_COMPILER_FLAG([-ipo-jobs256], [
-		optiflags="${optiflags} -ipo-jobs256"])
+	SXE_CHECK_COMPILER_FLAG([-ipo], [
+		optiflags="${optiflags} -ipo"
+
+		AC_CHECK_TOOLS([AR], [xiar ar], [false])
+		AC_CHECK_TOOLS([LD], [xild ld], [false])
+
+		## fiddle with xiar and xild params, kick ansi aliasing warnings
+		if test "${ac_cv_prog_ac_ct_AR}" = "xiar"; then
+			AR="${AR} -qdiag-disable=2102"
+		fi
+		if test "${ac_cv_prog_ac_ct_LD}" = "xild"; then
+			LD="${LD} -qdiag-disable=2102"
+		fi
+	])
 
 	SXE_CHECK_COMPILER_FLAG([-no-prec-div], [
 		optiflags="${optiflags} -no-prec-div"])
+])dnl SXE_OPTIFLAGS
 
-	SXE_CHECK_COMPILER_FLAG([-xHost], [
-		optiflags="${optiflags} -xHost"])
+AC_DEFUN([SXE_CC_NATIVE], [dnl
+dnl Usage: SXE_CC_NATIVE([yes|no])
+	AC_ARG_ENABLE([native], [dnl
+AS_HELP_STRING(m4_case([$1], [yes], [--disable-native], [--enable-native]), [
+Use code native to the build machine.])],
+		[enable_native="${enableval}"], [enable_native="$1"])
 
+	## -fast implies -static which is a dream but
+	## packager prefer dynamic binaries
 	dnl SXE_CHECK_COMPILER_FLAG([-fast], [
 	dnl 	optiflags="${optiflags} -fast"])
 
+	## auto-vectorisation
 	dnl SXE_CHECK_COMPILER_FLAG([-axMIC-AVX512,CORE-AVX2,CORE-AVX-I,AVX,SSSE3], [
 	dnl 	optiflags="${optiflags} -axMIC-AVX512,CORE-AVX2,CORE-AVX-I,AVX,SSSE3"])
 
-	SXE_CHECK_COMPILER_FLAG([-mtune=native -march=native], [
-		optiflags="${optiflags} -mtune=native -march=native"])
-
-])dnl SXE_OPTIFLAGS
+	if test "${enable_native}" = "yes"; then
+		case " ${CFLAGS} ${EXTRA_CFLAGS}" in
+		(*" -mtune"*)
+			## don't tune
+			;;
+		(*" -march"*)
+			## don't set march
+			;;
+		(*" -m32 "*)
+			## don't bother
+			;;
+		(*" -m64 "*)
+			## don't bother
+			;;
+		(*)
+			SXE_CHECK_COMPILER_FLAG([-xHost], [
+				optiflags="${optiflags} -xHost"], [
+				## non-icc
+				SXE_CHECK_COMPILER_FLAG([-mtune=native -march=native], [
+					optiflags="${optiflags} -mtune=native -march=native"])
+			])
+			;;
+		esac
+	fi
+])dnl SXE_CC_NATIVE
 
 AC_DEFUN([SXE_FEATFLAGS], [dnl
 	## default flags for needed features
@@ -393,6 +445,14 @@ AC_DEFUN([SXE_FEATFLAGS], [dnl
 	SXE_CHECK_COMPILER_FLAG([-intel-extensions], [dnl
 		featflags="${featflags} -intel-extensions"])
 
+	## also pass on some diags to the linker
+	if test "${sxe_cv_c_flag__diag_disable_10237}" = "yes"; then
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -diag-disable=10237"
+	fi
+	if test "${sxe_cv_c_flag__diag_disable_2102}" = "yes"; then
+		XCCLDFLAGS="${XCCLDFLAGS} \${XCCFLAG} -diag-disable=2102"
+	fi
+
 	AC_SUBST([XCCLDFLAGS])
 	AC_SUBST([XCCFLAG])
 ])dnl SXE_FEATFLAGS
@@ -408,31 +468,53 @@ AC_DEFUN([SXE_CHECK_COMPILER_XFLAG], [dnl
 	AC_SUBST([XFLAG])
 ])dnl SXE_CHECK_COMPILER_XFLAG
 
+AC_DEFUN([SXE_USER_CFLAGS], [dnl
+	AC_MSG_CHECKING([for user provided CFLAGS/EXTRA_CFLAGS])
+
+	CFLAGS="${ac_cv_env_CFLAGS_value}"
+	AC_MSG_RESULT([${CFLAGS} ${EXTRA_CFLAGS}])
+])dnl SXE_USER_CFLAGS
+
 
 AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
-	dnl #### This may need to be overhauled so that all of SXEMACS_CC's flags
-	dnl are handled separately, not just the xe_cflags_warning stuff.
+dnl Usage: SXE_CHECK_CFLAGS([option ...])
+dnl valid options include:
+dnl + native[=yes|no]  Emit the --enable-native flag
 
+	## those are passed on to our determined CFLAGS
+	AC_ARG_VAR([EXTRA_CFLAGS], [C compiler flags to be APPENDED.])
+
+	## check for user provided flags
+	AC_REQUIRE([SXE_USER_CFLAGS])
 	## Use either command line flag, environment var, or autodetection
-	CFLAGS=""
 	SXE_DEBUGFLAGS
 	SXE_WARNFLAGS
 	SXE_OPTIFLAGS
-	SXE_CFLAGS="$SXE_CFLAGS $debugflags $optiflags $warnflags"
+	m4_foreach_w([opt], [$1], [dnl
+		m4_case(opt,
+			[native], [SXE_CC_NATIVE],
+			[native=yes], [SXE_CC_NATIVE([yes])],
+			[native=no], [SXE_CC_NATIVE([no])])
+	])
+	SXE_CFLAGS="${SXE_CFLAGS} ${debugflags} ${optiflags} ${warnflags}"
 
 	SXE_FEATFLAGS
-	SXE_CFLAGS="$SXE_CFLAGS $featflags"
+	SXE_CFLAGS="${SXE_CFLAGS} ${featflags}"
 
 	save_ac_c_werror_flag="${ac_c_werror_flag}"
 
-	CFLAGS="${SXE_CFLAGS} ${ac_cv_env_CFLAGS_value}"
+	CFLAGS="${CFLAGS} ${SXE_CFLAGS} ${EXTRA_CFLAGS}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
 	AC_MSG_RESULT([${CFLAGS}])
 
 	AC_MSG_NOTICE([
-If you wish to ADD your own flags you want to stop here and rerun the
+If you wish to APPEND your own flags you want to stop here and rerun the
 configure script like so:
-  configure CFLAGS=<to-be-added-flags>
+  configure EXTRA_CFLAGS=<to-be-added-flags>
+
+If you wish to OVERRIDE these flags you want to stop here too and rerun
+the configure script like this:
+  configure CFLAGS=<the-definitive-flags-I-want>
 
 You can always override the determined CFLAGS, partially or totally,
 using
@@ -645,6 +727,13 @@ AC_DEFUN([SXE_CHECK_INTRINS], [dnl
 # include <immintrin.h>
 #endif
 ]])
+	AC_CHECK_TYPES([__mmask64], [], [], [[
+#if defined HAVE_X86INTRIN_H
+# include <x86intrin.h>
+#elif defined HAVE_IMMINTRIN_H
+# include <immintrin.h>
+#endif
+]])
 ])dnl SXE_CHECK_INTRINS
 
 AC_DEFUN([SXE_CHECK_SIMD], [dnl
@@ -667,6 +756,8 @@ dnl Usage: SXE_CHECK_SIMD([INTRIN], [[SNIPPET], [IF-FOUND], [IF-NOT-FOUND]])
 #endif
 ]], [ifelse([$2],[],[$1(0U)],[$2]);])], [
 	eval AS_TR_SH(ac_cv_func_$1)="yes"
+	AC_DEFINE(AS_TR_CPP([HAVE_$1]), [1], [dnl
+Define to 1 if you have the `$1' simd routine])
 	$3
 ], [
 	eval AS_TR_SH(ac_cv_func_$1)="no"
