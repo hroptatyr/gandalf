@@ -48,6 +48,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #if defined USE_REDLAND
 # include <sys/types.h>
 # include <dirent.h>
@@ -312,6 +313,8 @@ cmd_build(const struct yuck_cmd_build_s argi[static 1U])
 		}
 		closedir(dp);
 #endif	/* USE_REDLAND */
+		/* change rights beforehand */
+		chmod(tmpf, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		/* rename (atomically) to actual file name */
 		if (rename(tmpf, idxf) < 0) {
 			serror("cannot rename `%s' -> `%s'", tmpf, idxf);
