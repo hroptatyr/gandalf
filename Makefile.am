@@ -6,9 +6,9 @@ LC_ALL = C
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS =
+EXTRA_DIST = $(DISTCLEANFILES)
 DISTCLEANFILES =
-EXTRA_DIST = $(BUILT_SOURCES)
-BUILT_SOURCES =
+CLEANFILES =
 
 SUBDIRS += build-aux
 SUBDIRS += cli
@@ -16,11 +16,10 @@ SUBDIRS += src
 SUBDIRS += www
 
 DISTCLEANFILES += version.mk
+DISTCLEANFILES += .version
 EXTRA_DIST += version.mk.in
-BUILT_SOURCES += .version
 
-.version:
-	$(AM_V_GEN) echo "v$(VERSION)" > $@
+EXTRA_DIST += $(doc_DATA)
 
 ## make sure .version is read-only in the dist
 dist-hook:
