@@ -1,0 +1,10 @@
+gandalf
+=======
+
+This is the web front-end of rolf, a flat-file time series database used
+in-house at GA Group.
+
+Technologically, this front-end is connected to the rolf metadata files,
+and exposes a number of endpoints that can be used to obtain information
+about or a copy of the time series in the collection.
+
