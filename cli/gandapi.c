@@ -135,57 +135,97 @@ read_date(const char *str, char **restrict ptr)
 	return res;
 }
 
+static int
+procln(const struct gand_ctx_s *g, const char *ln)
+{
+	struct gand_res_s r;
+	const char *pp = ln;
+	char *p;
+
+	/* find end of symbol */
+	if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+		return -1;
+	}
+	*p = '\0';
+	r.symbol = pp;
+	pp = p + 1U;
+
+	/* p + 1 has the date now */
+	if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+		return -1;
+	}
+	*p = '\0';
+	r.date = read_date(pp, NULL);
+	pp = p + 1U;
+
+	/* p + 1 is the valflav */
+	if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
+		return -1;
+	}
+	*p = '\0';
+	r.valflav = pp;
+	pp = p + 1U;
+
+	/* and finally the value
+	 * stretches all the way to EOL which is \nul'd already */
+	r.strval = pp;
+
+	/* do the call */
+	g->_cb(&r, g->cloptr);
+	return 0;
+}
+
 static size_t
 _data_cb(void *buf, size_t chrz, size_t nchr, void *clo)
 {
+	static char left[256U];
+	static size_t nleft;
 	const struct gand_ctx_s *g = clo;
 	const char *const bp = buf;
 	const size_t nrd = chrz * nchr;
 	size_t i = 0U;
 
+	/* process leftovers from previous run */
+	if (nleft) {
+		char *eol = memchr(bp, '\n', nrd);
+
+		if (UNLIKELY(eol == NULL)) {
+			nleft = 0U;
+			return 0U;
+		} else if (UNLIKELY(nleft + (eol - bp + 1U) > sizeof(left))) {
+			/* lines too long */
+			goto reset;
+		}
+		/* demark the eol */
+		*eol = '\0';
+		/* append to leftovers */
+		memcpy(left + nleft, bp, eol - bp + 1U);
+		/* process */
+		procln(g, left);
+	reset:
+		/* reset */
+		nleft = 0U;
+		i = eol - bp + 1U;
+	}
+
 	/* unparse the buffer and call the callback */
 	for (char *eol;
 	     (eol = memchr(bp + i, '\n', nrd - i)) != NULL;
 	     i = eol - bp + 1U) {
-		struct gand_res_s r;
-		const char *pp = bp + i;
-		char *p;
-
 		/* demark the eol */
 		*eol = '\0';
-
-		/* find end of symbol */
-		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
-			continue;
-		}
-		*p = '\0';
-		r.symbol = pp;
-		pp = p + 1U;
-
-		/* p + 1 has the date now */
-		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
-			continue;
-		}
-		*p = '\0';
-		r.date = read_date(pp, NULL);
-		pp = p + 1U;
-
-		/* p + 1 is the valflav */
-		if (UNLIKELY((p = strchr(pp, '\t')) == NULL)) {
-			continue;
-		}
-		*p = '\0';
-		r.valflav = pp;
-		pp = p + 1U;
-
-		/* and finally the value
-		 * stretches all the way to EOL which is \nul'd already */
-		r.strval = pp;
-
-		/* do the call */
-		g->_cb(&r, g->cloptr);
+		/* process */
+		procln(g, bp + i);
 	}
-	return i;
+	if (LIKELY(nrd > i)) {
+		if (UNLIKELY(nrd - i > sizeof(left))) {
+			/* huh? long lines? better indicate an error */
+			return i;
+		}
+		/* last line goes to leftovers */
+		memcpy(left, bp + i, nleft = nrd - i);
+	}
+	return nrd;
 }
 
 
@@ -271,7 +311,7 @@ gand_get_series(
 	curl_easy_setopt(g->curl_ctx, CURLOPT_WRITEDATA, g);
 	curl_easy_setopt(g->curl_ctx, CURLOPT_NOSIGNAL, 1);
 	curl_easy_setopt(g->curl_ctx, CURLOPT_TIMEOUT, g->timeo);
-	curl_easy_setopt(g->curl_ctx, CURLOPT_ENCODING, "gzip");
+	curl_easy_setopt(g->curl_ctx, CURLOPT_ACCEPT_ENCODING, "");
 	if (curl_easy_perform(g->curl_ctx) != CURLE_OK) {
 		return -1;
 	}
