@@ -6,6 +6,9 @@
 /* mmap stuff */
 #include <sys/mman.h>
 #include <curl/curl.h>
+#if !defined CURLOPT_ACCEPT_ENCODING
+# define CURLOPT_ACCEPT_ENCODING CURLOPT_ENCODING
+#endif
 /* our decls */
 #include "gandapi.h"
 
