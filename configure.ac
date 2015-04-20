@@ -3,7 +3,7 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.63])
-AC_INIT([gandalf], [0.3.1], [https://github.com/hroptatyr/gandalf])
+AC_INIT([gandalf], [0.3.2.GIT], [https://github.com/hroptatyr/gandalf])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
