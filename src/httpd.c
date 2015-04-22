@@ -612,6 +612,8 @@ _deq_resp(struct gand_conn_s *restrict c)
 		break;
 
 	case DTYP_GBUF:
+	case DTYP_GBUF_GZIP:
+	case DTYP_GBUF_DEFLATE:
 		/* free gand buffers */
 		free_gand_gbuf(x->res.rd GAND_RES_DATA(gbuf));
 		break;
