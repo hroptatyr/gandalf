@@ -744,7 +744,6 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 	case DTYP_DATA:
 		with (const char *data = x->res.rd GAND_RES_DATA(data)) {
 			z = send(fd, data + x->o, x->z, 0);
-			x->o += z;
 		}
 		break;
 	case DTYP_GBUF:
@@ -752,7 +751,6 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 	case DTYP_GBUF_GZIP:
 		with (gand_gbuf_t gbuf = x->res.rd GAND_RES_DATA(gbuf)) {
 			z = send(fd, gbuf->data + x->o, x->z, 0);
-			x->o += z;
 		}
 		break;
 	}
@@ -760,7 +758,11 @@ _tx_resp(int fd, _httpd_ctx_t ctx, struct gand_wrqi_s *restrict x)
 	tcp_uncork(fd);
 	if (UNLIKELY(z < 0)) {
 		return -1;
-	} else if ((x->z -= z) == 0U) {
+	}
+	/* adjust offset and lengths */
+	x->o += (size_t)z;
+	x->z -= (size_t)z;
+	if (LIKELY(x->z == 0U)) {
 		return 1;
 	}
 	return 0;
