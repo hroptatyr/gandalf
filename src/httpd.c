@@ -262,7 +262,7 @@ make_gand_gbuf(size_t estz)
 	gand_gbuf_t res;
 
 	/* just find us any buffer really */
-	for (i = 0U; i < countof(gbufs); i++) {
+	for (i = 0U; i < countof(used_gbufs); i++) {
 		if ((k = ffs(~used_gbufs[i]))) {
 			goto found;
 		}
