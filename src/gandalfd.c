@@ -743,7 +743,7 @@ work_ser(gand_httpd_req_t req)
 			/* flush buffer */
 			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
-				goto interr_unmap;
+				goto interr_unmap_unbuf;
 			}
 			tot = 0U;
 			goto bfilt;
@@ -775,7 +775,7 @@ work_ser(gand_httpd_req_t req)
 			/* flush buffer */
 			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
-				goto interr_unmap;
+				goto interr_unmap_unbuf;
 			}
 			tot = 0U;
 			goto filt;
@@ -796,7 +796,7 @@ work_ser(gand_httpd_req_t req)
 			/* flush buffer */
 			if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 				GAND_ERR_LOG("cannot write to gbuf");
-				goto interr_unmap;
+				goto interr_unmap_unbuf;
 			}
 			tot = 0U;
 			goto efilt;
@@ -810,7 +810,7 @@ work_ser(gand_httpd_req_t req)
 	/* flush */
 	if (UNLIKELY(gand_gbuf_write(gb, buf, tot) < 0)) {
 		GAND_ERR_LOG("cannot write to gbuf");
-		goto interr_unmap;
+		goto interr_unmap_unbuf;
 	}
 
 	munmap_fn(fx);
@@ -822,6 +822,8 @@ work_ser(gand_httpd_req_t req)
 		.rd = {DTYP_GBUF, GAND_RES_DATA(gbuf) = gb},
 	};
 
+interr_unmap_unbuf:
+	free_gand_gbuf(gb);
 interr_unmap:
 	munmap_fn(fx);
 interr:
