@@ -129,26 +129,33 @@ AM_CONDITIONAL([BUILD_MATCLI], [test "${have_matlab}" = "yes"])
 AM_CONDITIONAL([BUILD_OCTCLI], [test "${have_octave}" = "yes"])
 
 
-AC_ARG_ENABLE([redland], [dnl
-AS_HELP_STRING([--enable-redland], [
-Set up gandalf server against redland triplestore, default: no])],
-	[enable_redland="${enableval}"], [enable_redland="no"])
+AC_ARG_ENABLE([virtuoso], [dnl
+AS_HELP_STRING([--enable-virtuoso], [
+Set up gandalf server against virtuoso triplestore, default: no])],
+	[enable_virtuoso="${enableval}"], [enable_virtuoso="no"])
 
-if test "${enable_redland}" = "yes"; then
-	PKG_CHECK_MODULES([rasqal], [rasqal])
-	PKG_CHECK_MODULES([raptor2], [raptor2])
-	PKG_CHECK_MODULES([redland], [redland])
+if test "${enable_virtuoso}" = "yes"; then
+	AC_ARG_VAR([OBDC_CFLAGS], [include directives for odbc driver])
+	AC_ARG_VAR([OBDC_LIBS], [libraries for odbc driver])
 
-	AC_DEFINE([USE_REDLAND], [1], [define for redland backend])
-	with_database="redland"
+	save_CPPFLAGS="${CPPFLAGS}"
+	CPPFLAGS="${CPPFLAGS} ${ODBC_CFLAGS}"
+	AC_CHECK_HEADERS([sql.h])
+	CPPFLAGS="${save_CPPFLAGS}"
 
-	dict_CFLAGS="${rasqal_CFLAGS} ${raptor2_CFLAGS} ${redland_CFLAGS}"
-	dict_LIBS="${rasqal_LIBS} ${raptor2_LIBS} ${redland_LIBS}"
+	save_LDFLAGS="${LDFLAGS}"
+	LDFLAGS="${LDFLAGS} ${ODBC_LIBS}"
+	AC_CHECK_FUNCS([SQLConnect])
+	LDFLAGS="${save_LDFLAGS}"
+
+	with_database="virtuoso"
+	dict_CFLAGS="${ODBC_CFLAGS}"
+	dict_LIBS="${ODBC_LIBS}"
 else
 	PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
 	AC_DEFINE([USE_TCBDB], [1], [define for tokyocabinet backend])
-	with_database="tcbdb"
 
+	with_database="tcbdb"
 	dict_CFLAGS="${tokyocabinet_CFLAGS}"
 	dict_LIBS="${tokyocabinet_LIBS}"
 fi
