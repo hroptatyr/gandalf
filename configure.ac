@@ -148,6 +148,7 @@ if test "${enable_virtuoso}" = "yes"; then
 	AC_CHECK_FUNCS([SQLConnect])
 	LDFLAGS="${save_LDFLAGS}"
 
+	AC_DEFINE([USE_VIRTUOSO], [1], [define for virtuoso backend])
 	with_database="virtuoso"
 	dict_CFLAGS="${ODBC_CFLAGS}"
 	dict_LIBS="${ODBC_LIBS}"
@@ -155,13 +156,17 @@ else
 	PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
 	AC_DEFINE([USE_TCBDB], [1], [define for tokyocabinet backend])
 
-	with_database="tcbdb"
+	with_database="tokyocabinet"
 	dict_CFLAGS="${tokyocabinet_CFLAGS}"
 	dict_LIBS="${tokyocabinet_LIBS}"
 fi
 AC_SUBST([dict_CFLAGS])
 AC_SUBST([dict_LIBS])
 SRVBACK="${with_database}"
+
+AM_CONDITIONAL([USE_TOKYOCABINET], [test "${with_database}" = "tokyocabinet"])
+AM_CONDITIONAL([USE_VIRTUOSO], [test "${with_database}" = "virtuoso"])
+AM_CONDITIONAL([USE_REDLAND], [test "${with_database}" = "redland"])
 
 
 ## libtool goddess^Wgoodness
