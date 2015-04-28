@@ -3,7 +3,7 @@ Usage: gandaux COMMAND [OPTION]...
 Helpers to bring the gandalf system into shape.
 This is meant for the server side.
 
-  -f, --index-file=FILE  Name of the index file, default gand_idx2sym.tcb
+  -f, --database=FILE|DSN  Database DSN or file name.
 
 
 Usage: gandaux add
