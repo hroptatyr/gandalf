@@ -179,11 +179,11 @@ odbc_error(const char *where)
 }
 
 static int
-odbc_exec(char *qry, size_t qrz)
+odbc_exec(dict_t d, char *qry, size_t qrz)
 {
 	int rc;
 
-	if ((rc = SQLExecDirect(stmt, (SQLCHAR*)qry, qrz)) != SQL_SUCCESS) {
+	if ((rc = SQLExecDirect(d, (SQLCHAR*)qry, qrz)) != SQL_SUCCESS) {
 		odbc_error ("odbc_exec()");
 		if (rc != SQL_SUCCESS_WITH_INFO) {
 			return -1;
@@ -203,8 +203,9 @@ open_dict(const char *fn, int UNUSED(oflags))
 }
 
 void
-close_dict(dict_t UNUSED(d))
+close_dict(dict_t d)
 {
+	SQLFreeStmt(d, SQL_CLOSE);
 	(void)fini_odbc();
 	return;
 }
@@ -216,7 +217,7 @@ dict_get_sym(dict_t d, const char *sym)
 	size_t n;
 	SQLRETURN rc;
 	SQLLEN rz = 0U;
-	dict_oid_t rid;
+	dict_oid_t rid = NUL_OID;
 
 	n = snprintf(qbuf, sizeof(qbuf), "\
 SPARQL \
@@ -225,27 +226,29 @@ SELECT ?rid FROM <http://data.ga-group.nl/rolf/> WHERE {\
 	<http://data.ga-group.nl/rolf/%s> gas:rolfid ?rid .\
 }", sym);
 
-	if (UNLIKELY(odbc_exec(qbuf, n) < 0)) {
+	if (UNLIKELY(odbc_exec(d, qbuf, n) < 0)) {
 		return NUL_OID;
 	}
 	/* otherwise snarf first match */
 	if ((rc = SQLFetch(d)) == SQL_NO_DATA_FOUND) {
-                return NUL_OID;
+                goto out;
 	} else if (!SQL_SUCCEEDED(rc)) {
 		odbc_error("SQLFetch()");
-		return NUL_OID;
+                goto out;
 	}
 	/* get actual data */
 	rc = SQLGetData(d, 1, SQL_C_CHAR, qbuf, sizeof(qbuf), &rz);
 	if (!SQL_SUCCEEDED(rc)) {
 		odbc_error("SQLGetData()");
-		return NUL_OID;
+                goto out;
 	} else if (rz == SQL_NULL_DATA) {
-		return NUL_OID;
+                goto out;
 	}
 	/* just try and interpret as number */
-	GAND_INFO_LOG("got rz %d\n", rz);
 	rid = strtoul((const char*)qbuf, NULL, 10);
+out:
+	SQLFreeStmt(d, SQL_UNBIND);
+	SQLFreeStmt(d, SQL_CLOSE);
 	return rid;
 }
 
