@@ -1250,8 +1250,8 @@ main(int argc, char *argv[])
 		}
 
 		/* try and find the dictionary */
-		if ((dictf = argi->index_file_arg) ||
-		    (cfg && cfg_glob_lookup_s(&dictf, cfg, "index_file") > 0)) {
+		if ((dictf = argi->database_arg) ||
+		    (cfg && cfg_glob_lookup_s(&dictf, cfg, "database") > 0)) {
 			/* command line has precedence */
 			;
 		} else {
@@ -1275,7 +1275,7 @@ main(int argc, char *argv[])
 			dictf = tmpdf;
 			if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
 				GAND_ERR_LOG("\
-cannot open symbol index file `%s'", dictf);
+cannot open database file `%s'", dictf);
 				rc = 1;
 				goto clos;
 			}
