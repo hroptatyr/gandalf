@@ -180,7 +180,7 @@ odbc_error(const char *where)
 }
 
 static int
-odbc_exec(dict_t d, char *qry, size_t qrz)
+odbc_exec(SQLHANDLE d, char *qry, size_t qrz)
 {
 	int rc;
 
