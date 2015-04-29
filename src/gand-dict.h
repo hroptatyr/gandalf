@@ -49,10 +49,14 @@ struct dict_si_s {
 
 #define NUL_OID		((dict_oid_t)0U)
 
-#if defined USE_REDLAND
+#if defined USE_VIRTUOSO
+# define DICT_DEFAULT	"dsn=gandalf"
+#elif defined USE_REDLAND
 # define DICT_DEFAULT	"gand_store"
-#else  /* !USE_REDLAND */
+#elif defined USE_TOKYOCABINET
 # define DICT_DEFAULT	"gand_idx2sym.tcb"
+#else
+# error no datastore backend available
 #endif	/* USE_REDLAND */
 
 

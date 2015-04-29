@@ -367,8 +367,8 @@ main(int argc, char *argv[])
 		goto out;
 	}
 
-	if (argi->index_file_arg) {
-		idxf = argi->index_file_arg;
+	if (argi->database_arg) {
+		idxf = argi->database_arg;
 		if ((idxp = strrchr(idxf, '/')) != NULL) {
 			/* we've got a path + file */
 			char *tmp = idxf;

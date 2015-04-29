@@ -7,4 +7,4 @@ gandalf service
   -p, --pidfile=FILE  Output pid of server process into this file
   --trolfdir=PATH     Serve time series from rolf layout in PATH
   --wwwdir=PATH       Serve static files from directory PATH
-  --index-file=FILE   Name of the index file, default gand_idx2sym.tcb
+  -f, --database=FILE|DSN  Database DSN or file name.

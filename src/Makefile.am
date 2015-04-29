@@ -33,7 +33,16 @@ libgand_la_SOURCES += gand-cfg.c gand-cfg.h
 cfg_CFLAGS = -DUSE_LUA $(lua_CFLAGS)
 cfg_LIBS = $(lua_LIBS)
 endif HAVE_LUA
-libgand_la_SOURCES += gand-dict.c gand-dict.h
+libgand_la_SOURCES += gand-dict.h
+if USE_TOKYOCABINET
+libgand_la_SOURCES += gand-dict-tokyo.c
+endif  USE_TOKYOCABINET
+if USE_REDLAND
+libgand_la_SOURCES += gand-dict-redland.c
+endif  USE_REDLAND
+if USE_VIRTUOSO
+libgand_la_SOURCES += gand-dict-virt.c
+endif  USE_VIRTUOSO
 libgand_la_CPPFLAGS = $(AM_CPPFLAGS)
 libgand_la_CPPFLAGS += $(cfg_CFLAGS)
 libgand_la_CPPFLAGS += $(dict_CFLAGS)

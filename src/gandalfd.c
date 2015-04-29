@@ -1250,15 +1250,16 @@ main(int argc, char *argv[])
 		}
 
 		/* try and find the dictionary */
-		if ((dictf = argi->index_file_arg) ||
-		    (cfg && cfg_glob_lookup_s(&dictf, cfg, "index_file") > 0)) {
+		if ((dictf = argi->database_arg) ||
+		    (cfg && cfg_glob_lookup_s(&dictf, cfg, "database") > 0)) {
 			/* command line has precedence */
-		;
+			;
 		} else {
 			/* preset with default */
 			dictf = _dictf;
 		}
 		if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
+#if !defined USE_VIRTUOSO
 			size_t ntrlf = strlen(trlf);
 			size_t ndict = strlen(dictf);
 			char *tmpdf = malloc(ntrlf + 1U + ndict + 1U/*\nul*/);
@@ -1274,10 +1275,14 @@ main(int argc, char *argv[])
 			dictf = tmpdf;
 			if ((gsymdb = open_dict(dictf, O_RDONLY)) == NULL) {
 				GAND_ERR_LOG("\
-cannot open symbol index file `%s'", dictf);
+cannot open database file `%s'", dictf);
 				rc = 1;
 				goto clos;
 			}
+#else  /* USE_VIRTUOSO */
+			dictf = NULL;
+			goto clos;
+#endif	/* !USE_VIRTUOSO */
 		} else {
 			/* just strdup dictf so we can access it all year round
 			 * even when the cfg or the argi have been freed */

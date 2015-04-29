@@ -1,4 +1,4 @@
-/*** gand-dict.c -- dict reading from key/value store or triplestore
+/*** gand-dict-redland.c -- dict reading from redland triplestore
  *
  * Copyright (C) 2009-2014 Sebastian Freundt
  *
@@ -37,19 +37,17 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#if !defined USE_REDLAND
+# error redland triplestore backend not available
+#endif	/* !USE_REDLAND */
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <fcntl.h>
-#if defined USE_REDLAND
-# include <redland.h>
-#else
-# include <tcbdb.h>
-#endif
+#include <redland.h>
 #include "gand-dict.h"
 #include "nifty.h"
 
-#if defined USE_REDLAND
 static librdf_world *wrld;
 static librdf_uri *uri_xsdint;
 static librdf_uri *vrb_rid;
@@ -57,12 +55,7 @@ static librdf_uri *vrb_src;
 static librdf_uri *uri_max;
 static librdf_uri *uri_ser;
 static librdf_uri *uri_src;
-#else  /* !USE_REDLAND */
-# define SID_SPACE	"\x1d"
-# define SYM_SPACE	"\x20"
-#endif	/* USE_REDLAND */
 
-#if defined USE_REDLAND
 static int
 init_world(void)
 {
@@ -124,13 +117,10 @@ dict_src(const char *src)
 	return librdf_new_node_from_uri_local_name(wrld, uri_src, sp);
 }
 
-#endif	/* USE_REDLAND */
-
 
 dict_t
 open_dict(const char *fn, int oflags)
 {
-#if defined USE_REDLAND
 	char sfl[64U] = "hash-type='bdb'";
 	char *sp = sfl + 15U;
 	dict_t res = NULL;
@@ -152,53 +142,19 @@ open_dict(const char *fn, int oflags)
 		librdf_free_storage(s);
 	}
 	return res;
-#else  /* !USE_REDLAND */
-	int omode = BDBOREADER;
-	dict_t res;
-
-	if (oflags & O_RDWR) {
-		omode |= BDBOWRITER;
-	}
-	if (oflags & O_TRUNC) {
-		omode |= BDBOTRUNC;
-	}
-	if (oflags & O_CREAT) {
-		omode |= BDBOCREAT;
-	}
-
-	if (UNLIKELY((res = tcbdbnew()) == NULL)) {
-		goto out;
-	} else if (UNLIKELY(!tcbdbopen(res, fn, omode))) {
-		goto free_out;
-	}
-
-	/* success, just return the handle we've got */
-	return res;
-
-free_out:
-	tcbdbdel(res);
-out:
-	return NULL;
-#endif	/* USE_REDLAND */
 }
 
 void
 close_dict(dict_t d)
 {
-#if defined USE_REDLAND
 	librdf_free_model(d);
 	(void)fini_world();
-#else  /* !USE_REDLAND */
-	tcbdbclose(d);
-	tcbdbdel(d);
-#endif	/* USE_REDLAND */
 	return;
 }
 
 dict_oid_t
 dict_get_sym(dict_t d, const char *sym)
 {
-#if defined USE_REDLAND
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
@@ -217,25 +173,11 @@ dict_get_sym(dict_t d, const char *sym)
 	librdf_free_node(s);
 	librdf_free_node(p);
 	return rid;
-
-#else  /* !USE_REDLAND */
-	const dict_oid_t *rp;
-	const size_t ssz = strlen(sym);
-	int rz[1];
-
-	if (UNLIKELY((rp = tcbdbget3(d, sym, ssz, rz)) == NULL)) {
-		return NUL_OID;
-	} else if (UNLIKELY(*rz != sizeof(*rp))) {
-		return NUL_OID;
-	}
-	return *rp;
-#endif	/* USE_REDLAND */
 }
 
 dict_oid_t
 dict_put_sym(dict_t d, const char *sym, dict_oid_t sid)
 {
-#if defined USE_REDLAND
 	librdf_node *s, *p, *o;
 	unsigned char _o[16U];
 
@@ -272,21 +214,11 @@ dict_put_sym(dict_t d, const char *sym, dict_oid_t sid)
 		}
 	}
 	return sid;
-
-#else  /* !USE_REDLAND */
-	const size_t ssz = strlen(sym);
-
-	if (tcbdbput(d, sym, ssz, &sid, sizeof(sid)) <= 0) {
-		return 0;
-	}
-	return sid;
-#endif	/* USE_REDLAND */
 }
 
 dict_oid_t
 dict_next_oid(dict_t d)
 {
-#if defined USE_REDLAND
 	librdf_node *s, *p;
 	dict_oid_t rid = NUL_OID;
 
@@ -305,22 +237,11 @@ dict_next_oid(dict_t d)
 	librdf_free_node(s);
 	librdf_free_node(p);
 	return rid;
-
-#else  /* !USE_REDLAND */
-	static const char sid[] = SID_SPACE;
-	int res;
-
-	if (UNLIKELY((res = tcbdbaddint(d, sid, sizeof(sid), 1)) <= 0)) {
-		return 0U;
-	}
-	return (dict_oid_t)res;
-#endif	/* USE_REDLAND */
 }
 
 dict_oid_t
 dict_set_next_oid(dict_t d, dict_oid_t oid)
 {
-#if defined USE_REDLAND
 	librdf_node *s, *p, *o;
 	unsigned char _o[16U];
 
@@ -335,13 +256,6 @@ dict_set_next_oid(dict_t d, dict_oid_t oid)
 		librdf_model_add_statement(d, st);
 		librdf_free_statement(st);
 	}
-
-#else  /* !USE_REDLAND */
-	static const char sid[] = SID_SPACE;
-
-	tcbdbput(d, sid, sizeof(sid), &oid, sizeof(oid));
-#endif	/* USE_REDLAND */
-
 	return oid;
 }
 
@@ -351,7 +265,6 @@ dict_si_t
 dict_sym_iter(dict_t d)
 {
 /* uses static state */
-#if defined USE_REDLAND
 	static librdf_stream *i;
 	static const char *pre;
 	static size_t prz;
@@ -397,49 +310,12 @@ null:
 	}
 	i = NULL;
 	return (dict_si_t){};
-
-#else  /* !USE_REDLAND */
-	static BDBCUR *c;
-	dict_si_t res;
-	const void *vp;
-	int z[1U];
-
-	if (UNLIKELY(c == NULL)) {
-		c = tcbdbcurnew(d);
-		tcbdbcurjump(c, SYM_SPACE, sizeof(SYM_SPACE));
-	}
-
-	if (UNLIKELY((vp = tcbdbcurval3(c, z)) == NULL)) {
-		goto null;
-	} else if (*z != sizeof(int)) {
-		goto null;
-	}
-	/* otherwise fill res */
-	res.sid = *(const int*)vp;
-
-	if (UNLIKELY((vp = tcbdbcurkey3(c, z)) == NULL)) {
-		goto null;
-	}
-	/* or fill */
-	res.sym = vp;
-	/* also iterate to the next thing */
-	tcbdbcurnext(c);
-	return res;
-
-null:
-	if (LIKELY(c != NULL)) {
-		tcbdbcurdel(c);
-	}
-	c = NULL;
-	return (dict_si_t){};
-#endif	/* USE_REDLAND */
 }
 
 dict_si_t
 dict_src_iter(dict_t d, const char *src)
 {
 /* uses static state */
-#if defined USE_REDLAND
 	static librdf_iterator *i;
 	static const char *pre;
 	static size_t prz;
@@ -479,12 +355,6 @@ null:
 	}
 	i = NULL;
 	return (dict_si_t){};
-#else  /* !USE_REDLAND */
-	(void)d;
-	(void)src;
-
-	return (dict_si_t){};
-#endif	/* USE_REDLAND */
 }
 
-/* gand-dict.c ends here */
+/* gand-dict-redland.c ends here */
