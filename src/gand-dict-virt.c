@@ -216,7 +216,7 @@ dict_oid_t
 dict_get_sym(dict_t d, const char *sym)
 {
 /* resolve SYM to RID */
-	size_t n;
+	int n;
 	SQLRETURN rc;
 	SQLLEN rz = 0U;
 	dict_oid_t rid = NUL_OID;
@@ -228,7 +228,9 @@ SELECT ?rid FROM <http://data.ga-group.nl/rolf/> WHERE {\
 	<http://data.ga-group.nl/rolf/%s> gas:rolfid ?rid .\
 }", sym);
 
-	if (UNLIKELY(odbc_exec(d, qbuf, n) < 0)) {
+	if (UNLIKELY(n <= 0)) {
+		return NUL_OID;
+	} else if (UNLIKELY(odbc_exec(d, qbuf, (size_t)n) < 0)) {
 		return NUL_OID;
 	}
 	/* otherwise snarf first match */
