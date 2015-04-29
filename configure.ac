@@ -154,7 +154,7 @@ if test "${enable_virtuoso}" = "yes"; then
 	dict_LIBS="${ODBC_LIBS}"
 else
 	PKG_CHECK_MODULES([tokyocabinet], [tokyocabinet])
-	AC_DEFINE([USE_TCBDB], [1], [define for tokyocabinet backend])
+	AC_DEFINE([USE_TOKYOCABINET], [1], [define for tokyocabinet backend])
 
 	with_database="tokyocabinet"
 	dict_CFLAGS="${tokyocabinet_CFLAGS}"
