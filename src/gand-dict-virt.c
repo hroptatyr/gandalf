@@ -223,9 +223,10 @@ dict_get_sym(dict_t d, const char *sym)
 
 	n = snprintf(qbuf, sizeof(qbuf), "\
 SPARQL \
+DEFINE input:same-as \"yes\" \
 PREFIX gas: <http://schema.ga-group.nl/symbology#> \
 SELECT ?rid FROM <http://data.ga-group.nl/rolf/> WHERE {\
-	<http://data.ga-group.nl/rolf/%s> gas:rolfid ?rid .\
+	<http://data.ga-group.nl/rolf/series/%s> gas:rolfid ?rid .\
 }", sym);
 
 	if (UNLIKELY(n <= 0)) {
