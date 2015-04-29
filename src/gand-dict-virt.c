@@ -206,6 +206,7 @@ open_dict(const char *fn, int UNUSED(oflags))
 void
 close_dict(dict_t d)
 {
+	SQLFreeStmt(d, SQL_UNBIND);
 	SQLFreeStmt(d, SQL_CLOSE);
 	(void)fini_odbc();
 	return;
