@@ -45,6 +45,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <assert.h>
 #include <sql.h>
 #include <sqlext.h>
 #if defined HAVE_IODBC
@@ -284,6 +285,60 @@ dict_si_t
 dict_src_iter(dict_t d, const char *src)
 {
 /* uses static state */
+	static SQLHANDLE s = SQL_NULL_HANDLE;
+	SQLRETURN rc;
+	SQLLEN rz = 0U;
+
+	if (UNLIKELY(s == SQL_NULL_HANDLE)) {
+		int n;
+
+		/* allocate statement handle */
+		rc = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &s);
+		if (!SQL_SUCCEEDED(rc)) {
+			odbc_error("SQLAllocHandle()");
+			goto null;
+		}
+
+		/* we won't get the rolfid in this query despite being
+		 * promised as part of the dict_si_t contract
+		 * we will simply return 1U for every match */
+		n = snprintf(qbuf, sizeof(qbuf), "\
+SPARQL \
+DEFINE input:same-as \"yes\" \
+PREFIX gas: <http://schema.ga-group.nl/symbology#> \
+SELECT ?sym FROM <http://data.ga-group.nl/rolf/> WHERE {\
+	?sym gas:listedOn <http://data.ga-group.nl/rolf/sources/%s> .\
+}", src);
+
+		if (UNLIKELY(odbc_exec(s, qbuf, n) < 0)) {
+			goto null;
+		}
+	}
+	/* fetch next record */
+	if ((rc = SQLFetch(s)) == SQL_NO_DATA_FOUND) {
+		assert(SQLMoreResults(s) == SQL_NO_DATA_FOUND);
+		goto null;
+	} else if (!SQL_SUCCEEDED(rc)) {
+		odbc_error("SQLFetch()");
+		goto null;
+	}
+	/* get actual data */
+	rc = SQLGetData(s, 1, SQL_C_CHAR, qbuf, sizeof(qbuf), &rz);
+	if (!SQL_SUCCEEDED(rc)) {
+		odbc_error("SQLGetData()");
+                goto null;
+	} else if (rz == SQL_NULL_DATA) {
+                goto null;
+	}
+	return (dict_si_t){1U, qbuf};
+
+null:
+	if (LIKELY(s != SQL_NULL_HANDLE)) {
+		SQLFreeStmt(s, SQL_UNBIND);
+		SQLFreeStmt(s, SQL_CLOSE);
+		SQLFreeHandle(SQL_HANDLE_STMT, s);
+	}
+	s = SQL_NULL_HANDLE;
 	return (dict_si_t){};
 }
 
