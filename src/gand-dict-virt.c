@@ -318,7 +318,9 @@ SELECT ?sym FROM <http://data.ga-group.nl/rolf/> WHERE {\
 	?sym gas:listedOn <http://data.ga-group.nl/rolf/sources/%s> .\
 }", src);
 
-		if (UNLIKELY(odbc_exec(s, qbuf, n) < 0)) {
+		if (UNLIKELY(n <= 0)) {
+			goto null;
+		} else if (UNLIKELY(odbc_exec(s, qbuf, (size_t)n) < 0)) {
 			goto null;
 		}
 	}
