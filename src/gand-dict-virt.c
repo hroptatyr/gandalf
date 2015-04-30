@@ -329,7 +329,7 @@ SELECT ?sym FROM <http://data.ga-group.nl/rolf/> WHERE {\
 		assert(SQLMoreResults(s) == SQL_NO_DATA_FOUND);
 		goto null;
 	} else if (!SQL_SUCCEEDED(rc)) {
-		odbc_error("SQLFetch()");
+		odbc_error(s, "SQLFetch()");
 		goto null;
 	}
 	/* get actual data */
