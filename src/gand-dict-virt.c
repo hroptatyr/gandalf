@@ -66,7 +66,7 @@ static char qbuf[1024U];
 
 static int init_odbc(const char *conn);
 static int fini_odbc(void);
-static int odbc_error(const char *where);
+static int odbc_error(SQLHANDLE s, const char *where);
 
 static size_t
 xstrlcpy(SQLCHAR *restrict dst, const char *src, size_t dsz)
@@ -127,7 +127,7 @@ init_odbc(const char *conn)
 
 error:
 	/* failure */
-	odbc_error("init_odbc()");
+	odbc_error(stmt, "init_odbc()");
 	fini_odbc();
 	return -1;
 }
@@ -154,13 +154,13 @@ fini_odbc(void)
 }
 
 static int
-odbc_error(const char *where)
+odbc_error(SQLHANDLE s, const char *where)
 {
 	unsigned char buf[256U];
 	unsigned char sta[16U];
 
 	/* statement errors */
-	while (SQLError(henv, hdbc, stmt, sta, NULL,
+	while (SQLError(henv, hdbc, s, sta, NULL,
 			buf, sizeof(buf), NULL) == SQL_SUCCESS) {
 		GAND_ERR_LOG("STMT: %s || %s, SQLSTATE=%s", where, buf, sta);
         }
@@ -184,13 +184,17 @@ odbc_exec(SQLHANDLE d, char *qry, size_t qrz)
 {
 	int rc;
 
-	if ((rc = SQLExecDirect(d, (SQLCHAR*)qry, qrz)) != SQL_SUCCESS) {
-		odbc_error ("odbc_exec()");
-		if (rc != SQL_SUCCESS_WITH_INFO) {
-			return -1;
-		}
+	switch ((rc = SQLExecDirect(d, (SQLCHAR*)qry, qrz))) {
+	case SQL_SUCCESS:
+	case SQL_SUCCESS_WITH_INFO:
+		return 0;
+	case SQL_STILL_EXECUTING:
+		return 1;
+	default:
+		break;
         }
-	return 0;
+	odbc_error(d, "SQLExecDirect()");
+	return -1;
 }
 
 
@@ -238,13 +242,13 @@ SELECT ?rid FROM <http://data.ga-group.nl/rolf/> WHERE {\
 	if ((rc = SQLFetch(d)) == SQL_NO_DATA_FOUND) {
                 goto out;
 	} else if (!SQL_SUCCEEDED(rc)) {
-		odbc_error("SQLFetch()");
+		odbc_error(d, "SQLFetch()");
                 goto out;
 	}
 	/* get actual data */
 	rc = SQLGetData(d, 1, SQL_C_CHAR, qbuf, sizeof(qbuf), &rz);
 	if (!SQL_SUCCEEDED(rc)) {
-		odbc_error("SQLGetData()");
+		odbc_error(d, "SQLGetData()");
                 goto out;
 	} else if (rz == SQL_NULL_DATA) {
                 goto out;
@@ -299,7 +303,7 @@ dict_src_iter(dict_t d, const char *src)
 		/* allocate statement handle */
 		rc = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &s);
 		if (!SQL_SUCCEEDED(rc)) {
-			odbc_error("SQLAllocHandle()");
+			odbc_error(s, "SQLAllocHandle()");
 			goto null;
 		}
 
@@ -329,7 +333,7 @@ SELECT ?sym FROM <http://data.ga-group.nl/rolf/> WHERE {\
 	/* get actual data */
 	rc = SQLGetData(s, 1, SQL_C_CHAR, qbuf, sizeof(qbuf), &rz);
 	if (!SQL_SUCCEEDED(rc)) {
-		odbc_error("SQLGetData()");
+		odbc_error(s, "SQLGetData()");
                 goto null;
 	} else if (rz == SQL_NULL_DATA) {
                 goto null;
