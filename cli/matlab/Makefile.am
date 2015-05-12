@@ -32,6 +32,7 @@ mex_LTLIBRARIES += gand_get_series.la
 mex_DATA += gand_get_series.m
 gand_get_series_la_SOURCES = gand_get_series.c
 gand_get_series_la_SOURCES += gand_handle.h
+gand_get_series_la_SOURCES += mex.h
 gand_get_series_la_SOURCES += intern.c intern.h
 gand_get_series_la_LDFLAGS = $(AM_LDFLAGS)
 gand_get_series_la_LDFLAGS += $(MEX_LDFLAGS)
@@ -56,6 +57,7 @@ gand_open_la_CPPFLAGS += $(matlab_CFLAGS)
 gand_open_la_LIBADD = $(top_builddir)/cli/libgandapi.la
 gand_open_la_SOURCES = gand_open.c
 gand_open_la_SOURCES += gand_handle.h
+gand_open_la_SOURCES += mex.h
 
 mex_LTLIBRARIES += gand_close.la
 mex_DATA += gand_close.m
@@ -69,6 +71,7 @@ gand_close_la_CPPFLAGS += $(matlab_CFLAGS)
 gand_close_la_LIBADD = $(top_builddir)/cli/libgandapi.la
 gand_close_la_SOURCES = gand_close.c
 gand_close_la_SOURCES += gand_handle.h
+gand_close_la_SOURCES += mex.h
 
 
 ## rename .mex -> .mexa64 on the fly
