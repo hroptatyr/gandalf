@@ -109,24 +109,10 @@ Build the gandalf->octave client, default: yes.])],
 ## the actual checks
 if test "${with_matlab}" = "yes"; then
 	SXE_CHECK_MATLAB
-	if test "${sxe_cv_matlab_mex_h}" = "yes"; then
-		have_matlab="yes"
-		CLIAPPS="${CLIAPPS} matlab"
-	else
-		have_matlab="no"
-	fi
-fi
-if test "${with_octave}" = "yes"; then
-	SXE_CHECK_OCTAVE
-	if test "${sxe_cv_octave_mex_h}" = "yes" -a -n "${OCTAVEPATH}"; then
-		have_octave="yes"
-		CLIAPPS="${CLIAPPS} octave"
-	else
-		have_octave="no"
-	fi
+	have_matlab="yes"
+	CLIAPPS="${CLIAPPS} matlab"
 fi
 AM_CONDITIONAL([BUILD_MATCLI], [test "${have_matlab}" = "yes"])
-AM_CONDITIONAL([BUILD_OCTCLI], [test "${have_octave}" = "yes"])
 
 
 AC_ARG_ENABLE([virtuoso], [dnl

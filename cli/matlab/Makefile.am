@@ -14,17 +14,8 @@ if BUILD_MATCLI
 mexdir = $(MATLABPATH)/gandalf
 octlab_CFLAGS = -DMATLAB_MEX_FILE $(matlab_CFLAGS)
 else  !BUILD_MATCLI
-
-## backup plan is to use octave to build the mex file
-if BUILD_OCTCLI
-mexdir = $(OCTAVEPATH)/gandalf
-octlab_CFLAGS = -DOCTAVE_MEX_FILE $(octave_CFLAGS)
-
-else  !BUILD_OCTCLI
 ## no idea what we're doing here
 mexdir = $(pkglibexecdir)
-
-endif  !BUILD_OCTCLI
 endif  !BUILD_MATCLI
 
 

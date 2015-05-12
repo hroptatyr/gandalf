@@ -11,9 +11,6 @@ SUBDIRS = .
 if BUILD_MATCLI
 SUBDIRS += matlab
 endif  BUILD_MATCLI
-if BUILD_OCTCLI
-SUBDIRS += matlab
-endif  BUILD_OCTCLI
 
 if BUILD_CLIAPPS
 noinst_LTLIBRARIES = libgandapi.la
