@@ -100,11 +100,6 @@ AC_ARG_WITH([matlab], [dnl
 AS_HELP_STRING([--with-matlab], [
 Build the gandalf->matlab client, default: no.])],
 	[with_matlab="${withval}"], [with_matlab="no"])
-## or maybe octave?
-AC_ARG_WITH([octave], [dnl
-AS_HELP_STRING([--with-octave], [
-Build the gandalf->octave client, default: yes.])],
-	[with_octave="${withval}"], [with_octave="yes"])
 
 ## the actual checks
 if test "${with_matlab}" = "yes"; then
