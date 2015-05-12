@@ -38,11 +38,7 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 /* matlab stuff */
-#if defined HAVE_OCTAVE_MEX_H
-# include <octave/mex.h>
-#else  /* !HAVE_OCTAVE_MEX_H */
-# include <mex.h>
-#endif	/* HAVE_OCTAVE_MEX_H */
+#include <mex.h>
 /* our stuff */
 #include "gandapi.h"
 #include "gand_handle.h"
