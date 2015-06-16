@@ -45,25 +45,6 @@ AC_DEFUN([SXE_CHECK_MATLAB], [dnl
 	## now reset *our* idea of what MATLAB should be
 	MATLAB="${sxe_cv_matlab}"
 
-	AC_ARG_VAR([matlab_CFLAGS], [include directives for matlab headers])
-
-	if test -n "${matlab_CFLAGS}"; then
-		:
-	elif test -z "${MATLABROOT}"; then
-		## big cluster fuck
-		:
-	else
-		matlab_CFLAGS="-I${MATLABROOT}/extern/include"
-	fi
-	if test -n "${matlab_CFLAGS}"; then
-		save_CPPFLAGS="${CPPFLAGS}"
-		CPPFLAGS="${CPPFLAGS} ${matlab_CFLAGS}"
-		AC_CHECK_HEADER([mex.h])
-		sxe_cv_matlab_mex_h="${ac_cv_header_mex_h}"
-		unset ac_cv_header_mex_h
-		CPPFLAGS="${save_CPPFLAGS}"
-	fi
-
 	rm -f -- "${foo}"
 ])dnl SXE_CHECK_MATLAB
 
